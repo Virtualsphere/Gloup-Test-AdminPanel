@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root{
+    --color-primary: #2b7fff;
+    --color-secondary: #d53731;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* Radius */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Animation */
+  --transition-fast: 150ms;
+  --transition-normal: 300ms;
+  --transition-slow: 500ms;
+  --transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+/* Add to your global CSS file */
+.custom-datepicker .react-datepicker__day--selected {
+  background-color: #000000 !important;
+  color: white !important;
+}
+
+.custom-datepicker .react-datepicker__day--selected:hover {
+  background-color: #000000 !important;
+  color: white !important;
+}
+
+.custom-datepicker .react-datepicker__day:hover {
+  background-color: #000000 !important;
+  color: white !important;
+}
+
+.custom-datepicker .react-datepicker__day--keyboard-selected {
+  background-color: #000000 !important;
+  color: white !important;
+}
+
+.custom-datepicker .react-datepicker__day--in-range {
+  background-color: #000000 !important;
+  color: white !important;
+}

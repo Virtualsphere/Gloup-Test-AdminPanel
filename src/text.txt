@@ -1,0 +1,12 @@
+ // <Routes>
+        //   <Route
+        //     path="*"
+        //     element={
+        //       <div className="flex min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+        //         <div className="m-auto w-full max-w-md">
+        //           <AuthPages />
+        //         </div>
+        //       </div>
+        //     }
+        //   />
+        // </Routes>
