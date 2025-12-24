@@ -9,8 +9,9 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
   const [serviceName, setServiceName] = useState("");
   const [amount, setAmount] = useState("");
   const [discountedAmount, setDiscountedAmount] = useState("");
-  const [duration, setDuration] = useState("");
+  const [duration, setDuration] = useState("00:00:00");
   const [serviceStatus, setServiceStatus] = useState("");
+  const [time, setTime] = useState({ hh: "", mm: "", ss: "" });
 
   // 🔥 Pre-fill form with existing service data
   useEffect(() => {
@@ -18,8 +19,12 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       setServiceName(serviceData.service_name || "");
       setAmount(serviceData.amount || "");
       setDiscountedAmount(serviceData.discounted_amount || "");
-      setDuration(serviceData.duration || "");
-      setServiceStatus(serviceData.status || "");
+      setServiceStatus(serviceData.status || "active");
+        const [hh = "00", mm = "00", ss = "00"] =
+        (serviceData.duration || "00:00:00").split(":");
+
+      setTime({ hh, mm, ss });
+      setDuration(`${hh}:${mm}:${ss}`);
     }
   }, [serviceData]);
 
@@ -39,8 +44,21 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
     console.log("EDIT SERVICE PAYLOAD:", payload);
 
     await dispatch(editService(payload)).unwrap();
+    alert("Service updated successfully ✅");
+    window.location.reload();
     setShowModal(false);
   }
+
+    const handleDurationChange = (field, value) => {
+    const updated = { ...time, [field]: value };
+    setTime(updated);
+
+    const hh = String(updated.hh || 0).padStart(2, "0");
+    const mm = String(updated.mm || 0).padStart(2, "0");
+    const ss = String(updated.ss || 0).padStart(2, "0");
+
+    setDuration(`${hh}:${mm}:${ss}`);
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
@@ -95,25 +113,49 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
           {/* Duration */}
           <div>
             <label className="text-sm font-medium">Duration (HH:MM:SS)</label>
-            <input
-              type="text"
-              placeholder="00:45:00"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className="border px-3 py-2 rounded-md w-full"
-              required
-            />
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                type="number"
+                min="0"
+                max="23"
+                placeholder="HH"
+                value={time.hh}
+                onChange={(e) => handleDurationChange("hh", e.target.value)}
+                className="border px-2 py-2 rounded"
+              />
+              <input
+                type="number"
+                min="0"
+                max="59"
+                placeholder="MM"
+                value={time.mm}
+                onChange={(e) => handleDurationChange("mm", e.target.value)}
+                className="border px-2 py-2 rounded"
+              />
+              <input
+                type="number"
+                min="0"
+                max="59"
+                placeholder="SS"
+                value={time.ss}
+                onChange={(e) => handleDurationChange("ss", e.target.value)}
+                className="border px-2 py-2 rounded"
+              />
+            </div>
           </div>
 
           {/* Status */}
           <div>
             <label className="text-sm font-medium">Status</label>
-            <input
+            <select
               value={serviceStatus}
               onChange={(e) => setServiceStatus(e.target.value)}
               className="border px-3 py-2 rounded-md w-full"
               required
-            />
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
           </div>
 
           {/* Submit */}

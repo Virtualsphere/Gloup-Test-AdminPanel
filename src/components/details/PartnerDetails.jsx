@@ -58,6 +58,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
   });
 
   useEffect(() => {
+    debugger;
     if (!partnerData) return;
     const d = partnerData.store_details;
 
@@ -66,20 +67,20 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
       email: d?.email || "",
       phone: d?.phone || "",
       income: d?.income || "",
-      description: d?.description || "null",
+      description: d?.description || "",
       images: d?.images || [],
       addressLine1: d?.addressLine1,
-      addressLine2: d?.addressLine2,
-      state: d?.state,
-      district: d?.district,
-      city: d?.city,
-      area: d?.area,
-      zipcode: d?.zipcode,
-      landmark: d?.landmark,
+      addressLine2: d?.addressLine2 || "",
+      state: d?.state || "",
+      district: d?.district || "",
+      city: d?.city || "",
+      area: d?.area || "",
+      zipcode: d?.zipcode || "",
+      landmark: d?.landmark || "",
       latitude: d?.latitude,
       longitude: d?.longitude,
       location: null,
-      radius: d?.radius,
+      radius: d?.radius || "",
       status: d?.status,
       newImagesAdded: false,
     });
@@ -106,6 +107,14 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+   const handleLocationSelect = (loc) => {
+    setForm((p) => ({
+      ...p,
+      latitude: loc.lat.toFixed(6),
+      longitude: loc.lng.toFixed(6),
+    }));
+  };
+
   const handleImageChange = (e) => {
     const files = [...e.target.files];
     handleChange("images", files);
@@ -118,7 +127,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40">
-      <div className="relative w-full grid grid-cols-2 gap-3 max-w-md mx-auto p-6 rounded-2xl shadow-2xl border bg-white overflow-y-scroll max-h-screen">
+      <div className="relative w-full grid grid-cols-2 gap-3 max-w-5xl mx-auto p-6 rounded-2xl shadow-2xl border bg-white overflow-y-scroll max-h-screen">
         <div className="col-span-full">
           <button
           onClick={onClose}
@@ -152,9 +161,18 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
           <label className="block text-sm font-medium text-gray-700">
           Salon Location
         </label>
-        <MapPicker onSelectLocation={setLocation} />
+        <MapPicker
+  defaultLocation={
+    form.latitude && form.longitude
+      ? { lat: Number(form.latitude), lng: Number(form.longitude) }
+      : null
+  }
+  onSelectLocation={handleLocationSelect}
+  editable
+/>
+
         {location && (
-          <p>Selected: {location.lat}, {location.lng}</p>
+          <p>Selected: {form.latitude}, {form.longitude}</p>
         )}
         </div>
 
@@ -244,30 +262,40 @@ const PartnerDetails = ({ title }) => {
 
   // Get all services
   useEffect(() => {
-    setLoading(true);
+    debugger;
+  setLoading(true);
 
-    dispatch(getStoreServices({id}))
-      .unwrap()
-      .then((res) => {
-        setServicesData(res);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.toString());
-        setLoading(false);
-    });
+dispatch(getStoreServices({ id }))
+  .unwrap()
+  .then((res) => {
+    debugger;
 
-    // dispatch(getAllPartnersList())
-    //   .unwrap()
-    //   .then((res) => {
-    //     setpData(res);
-    //     setLoading(false);
-    //   })
-    //   .catch((err) => {
-    //     setError(err.toString());
-    //     setLoading(false);
-    // });
-  }, [dispatch]);
+    // ✅ Check if services array exists and is not empty
+    if (!Array.isArray(res.services) || res.services.length === 0) {
+      console.log("No services found for this store");
+      setServicesData([]);        // reset state
+      return;                     // stop further execution
+    }
+
+    console.log("Store ID:", id);
+    console.log("First service store_id:", res.services[0].store_id);
+
+    console.log(
+      "Unique store_ids:",
+      [...new Set(res.services.map(s => s.store_id))]
+    );
+
+    const filteredServices = res.services.filter(
+      (item) => Number(item.store_id) === Number(id)
+    );
+
+    console.log("Filtered Services:", filteredServices);
+
+    setServicesData(filteredServices);
+  })
+  .catch((err) => setError(err.toString()))
+  .finally(() => setLoading(false));
+}, [dispatch, id]);
 
   
   console.log('Services Data: ', servicesData);
@@ -292,7 +320,8 @@ const PartnerDetails = ({ title }) => {
     dispatch(getPartnerDetail({ id }))
       .unwrap()
       .then((res) => {
-        console.log('res: ', res)
+        console.log('response: ', res)
+        console.log('res: ', res.store_details)
         setData(res);
         setLocation({ lat: res.store_details.latitude, lng: res.store_details.longitude });
         setLoading(false);
@@ -357,6 +386,78 @@ const PartnerDetails = ({ title }) => {
   const handleSaveEdit = async (updatedData) => {
     try {
       console.log('handling save')
+ // -----------------------------
+    // 1️⃣ BASIC REQUIRED VALIDATION
+    // -----------------------------
+    const requiredFields = [
+      "name",
+      "email",
+      "phone",
+      "addressLine1",
+      "state",
+      "district",
+      "city",
+      "status",
+    ];
+
+    for (let field of requiredFields) {
+      if (!updatedData[field]?.toString().trim()) {
+        alert(`Please enter ${field}`);
+        return;
+      }
+    }
+
+    // -----------------------------
+    // 2️⃣ EMAIL VALIDATION
+    // -----------------------------
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(updatedData.email)) {
+      alert("Please enter a valid email address");
+      return;
+    }
+
+    // -----------------------------
+    // 3️⃣ PHONE VALIDATION (India)
+    // -----------------------------
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(updatedData.phone)) {
+      alert("Please enter a valid 10-digit mobile number");
+      return;
+    }
+
+    // -----------------------------
+    // 4️⃣ NUMERIC VALIDATION
+    // -----------------------------
+    if (!updatedData.income && isNaN(updatedData.income)) {
+      alert("Income must be a number");
+      return;
+    }
+
+    if (
+      !updatedData.latitude ||
+      !updatedData.longitude ||
+      isNaN(updatedData.latitude) ||
+      isNaN(updatedData.longitude)
+    ) {
+      alert("Please select a valid location on map");
+      return;
+    }
+
+    if (updatedData.radius && isNaN(updatedData.radius)) {
+      alert("Radius must be a number");
+      return;
+    }
+
+    // -----------------------------
+    // 5️⃣ IMAGE VALIDATION
+    // -----------------------------
+    if (
+      (!updatedData.images || updatedData.images.length === 0)
+    ) {
+      alert("Please upload at least one image");
+      return;
+    }
+
       const formData = new FormData();
       formData.append("id", id);
       formData.append("name", updatedData.name);
@@ -394,6 +495,8 @@ const PartnerDetails = ({ title }) => {
 
       await dispatch(updatePartnerDetail(formData)).unwrap();
 
+      alert("Partner Updated Successfully ✅");
+      window.location.reload();
       dispatch(getPartnerDetail({ id }));
       setShowEditModal(false);
     } catch (err) {
@@ -577,48 +680,50 @@ const PartnerDetails = ({ title }) => {
               <div className="p-4 max-h-72">
                 <p className="mb-2 font-semibold">Services</p>
                 <button onClick={handleEditService} className="px-3 py-2 bg-black hover:bg-neutral-800 text-white flex gap-2 cursor-pointer"><Plus /> Add Service</button>
-                  {servicesData && (
-                    <table border="1" className="w-full">
-                      <thead>
-                        <tr className="bg-neutral-300">
-                          {/* <th className="border-x border-neutral-200 py-1">Store Name</th> */}
-                          <th className="border-x border-neutral-200 py-1">Service</th>
-                          <th className="border-x border-neutral-200 py-1">Amount</th>
-                          <th className="border-x border-neutral-200 py-1">Discounted Amount</th>
-                          <th className="border-x border-neutral-200 py-1">Duration</th>
-                        </tr>
-                      </thead>
+                  {Array.isArray(servicesData) && servicesData.length > 0 && (
+  <table border="1" className="w-full mt-3">
+    <thead>
+      <tr className="bg-neutral-300">
+        <th className="border-x border-neutral-200 py-1">Service</th>
+        <th className="border-x border-neutral-200 py-1">Amount</th>
+        <th className="border-x border-neutral-200 py-1">Discounted Amount</th>
+        <th className="border-x border-neutral-200 py-1">Duration</th>
+      </tr>
+    </thead>
 
-                      <tbody>
-                        {servicesData.services?.map((item) => {
-                          // const partner = pdata?.find((p) => p.id === item.store_id);
+    <tbody>
+      {servicesData.map((item, index) => (
+        <tr
+          key={item.id}
+          className={`hover:bg-violet-300 cursor-pointer ${
+            index % 2 === 0 ? "bg-neutral-100" : "bg-white"
+          }`}
+          onClick={() => {
+            setServiceId(item.id);
+            setServiceData(item);
+            handleUpdateService();
+          }}
+        >
+          <td className="border-x border-neutral-200 px-3 py-1">
+            {item.service_name}
+          </td>
+          <td className="border-x border-neutral-200 px-3 py-1">
+            {item.amount}
+          </td>
+          <td className="border-x border-neutral-200 px-3 py-1">
+            {item.discounted_amount}
+          </td>
+          <td className="border-x border-neutral-200 px-3 py-1">
+            {item.duration}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+)}
 
-                          return (
-                            <tr
-                              key={item.id}
-                              className={`hover:bg-violet-300 cursor-pointer ${
-                                item.id % 2 === 0 ? "bg-neutral-100" : "bg-white"
-                              }`}
-                              onClick={() => {setServiceId(item.id); setServiceData(item); handleUpdateService()}}
-                            >
-                              <td className="border-x border-neutral-200 px-3 py-1">
-                                {item.service_name}
-                              </td>
-                              <td className="border-x border-neutral-200 px-3 py-1">
-                                {item.amount}
-                              </td>
-                              <td className="border-x border-neutral-200 px-3 py-1">
-                                {item.discounted_amount}
-                              </td>
-                              <td className="border-x border-neutral-200 px-3 py-1">
-                                {item.duration}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
+                  
+             
 
                   {showCreateModal && <CreateServiceModal setShowModal={setShowCreateModal} storeId={id}/>}
                   {showUpdateModal && (<EditServiceModal setShowModal={setShowUpdateModal} storeId={id} serviceId={serviceId} serviceData={serviceData}/>)}

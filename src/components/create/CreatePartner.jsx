@@ -1,143 +1,258 @@
-import React, { useState } from "react";
-import { XCircle } from "lucide-react";
+import React, { useEffect, useState, useCallback, memo } from "react";
 import { useDispatch } from "react-redux";
-import { createPartner } from "../../redux/slices/partnersSlice"; // <-- update name if needed
+import { createPartner } from "../../redux/slices/partnersSlice";
 import { useNavigate } from "react-router-dom";
+import MapPicker from "./MapPicker";
 
+
+/* -------------------- Reusable Input -------------------- */
+const Input = memo(
+  ({ label, name, value, error, onChange, type = "text", disabled = false }) => {
+    return (
+      <div>
+        <label className="text-sm text-gray-600">{label}</label>
+        <input
+          type={type}
+          value={value ?? ""}
+          disabled={disabled}
+          onChange={(e) => onChange(name, e.target.value)}
+          className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm
+            ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
+            ${error ? "border-red-500" : "border-gray-300"}`}
+        />
+        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      </div>
+    );
+  }
+);
+
+
+
+/* -------------------- Main Component -------------------- */
 const CreatePartner = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const [errors, setErrors] = useState({});
+  const [previews, setPreviews] = useState([]);
 
   const [form, setForm] = useState({
     name: "",
     email: "",
     phone: "",
+    category_id: "null",
+    deviceId: ["fvSaLo4fTfKg15N_1zHDT4:APA91bFfvqY749XGErflelYec8dzjN07ys9nITHCpEotOOV51J6XHsRhqOZCppjMMAPLixi3oayxf15CGK8l9wfrObI-FxQui1v6zSEwmxUd8RF6sjhhzrk"],
     store_type: "",
     password: "",
     bank_account_holder: "",
-    category_id: "null",
-    deviceId: ["fvSaLo4fTfKg15N_1zHDT4:APA91bFfvqY749XGErflelYec8dzjN07ys9nITHCpEotOOV51J6XHsRhqOZCppjMMAPLixi3oayxf15CGK8l9wfrObI-FxQui1v6zSEwmxUd8RF6sjhhzrk"],
     income: "",
     description: "",
     images: [],
     addressLine1: "",
     addressLine2: "",
-    state: "",
-    district: "",
-    city: "",
     area: "",
+    city: "",
+    district: "",
+    state: "",
     zipcode: "",
     landmark: "",
     latitude: "",
     longitude: "",
     radius: "",
-    status: "inactive",
+    status: "active",
   });
 
-  const handleChange = (key, value) => {
+  /* -------------------- Handlers -------------------- */
+  const handleChange = useCallback((key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
   const handleImageChange = (e) => {
-    const files = [...e.target.files];
-    handleChange("images", files);
+    setForm((prev) => ({ ...prev, images: Array.from(e.target.files) }));
   };
 
+const handleLocationSelect = (location) => {
+  console.log("MAP LOCATION:", location);
+
+  setForm((prev) => ({
+    ...prev,
+    latitude: location.lat.toFixed(6),
+    longitude: location.lng.toFixed(6),
+  }));
+};
+
+
+
+  useEffect(() => {
+    const urls = form.images.map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+    return () => urls.forEach(URL.revokeObjectURL);
+  }, [form.images]);
+
+  /* -------------------- Validation -------------------- */
+  const validateForm = () => {
+    const e = {};
+
+    if (!form.name.trim()) e.name = "Salon name is required";
+    if (!form.store_type.trim()) e.store_type = "Store type is required";
+
+    if (!form.email) e.email = "Email is required";
+    else if (!/^\S+@\S+\.\S+$/.test(form.email))
+      e.email = "Invalid email format";
+
+    if (!/^\d{10}$/.test(form.phone))
+      e.phone = "Phone must be 10 digits";
+
+    if (!form.password || form.password.length < 6)
+      e.password = "Password must be at least 6 characters";
+
+    if (!form.addressLine1) e.addressLine1 = "Address is required";
+    if (!form.city) e.city = "City is required";
+    if (!form.state) e.state = "State is required";
+
+    if (!form.latitude || form.latitude < -90 || form.latitude > 90)
+      e.latitude = "Latitude must be between -90 and 90";
+
+    if (!form.longitude || form.longitude < -180 || form.longitude > 180)
+      e.longitude = "Longitude must be between -180 and 180";
+
+    if (!form.radius || form.radius <= 0)
+      e.radius = "Radius must be greater than 0";
+
+    if (form.images.length === 0)
+      e.images = "At least one image is required";
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  /* -------------------- Submit -------------------- */
   const handleCreate = async () => {
+    if (!validateForm()) return;
+
     try {
       const fd = new FormData();
 
-      Object.keys(form).forEach((key) => {
-        if (key !== "images") fd.append(key, form[key]);
+      Object.entries(form).forEach(([k, v]) => {
+        if (k !== "images") fd.append(k, v);
       });
 
-      // location → longitude,latitude
       fd.append("location", `${form.longitude},${form.latitude}`);
-
-      // Images
-      form.images.forEach((file) => {
-        fd.append("images", file);
-      });
+      form.images.forEach((img) => fd.append("images", img));
 
       await dispatch(createPartner(fd)).unwrap();
-
-      alert("Partner created successfully!");
+      alert("Partner created successfully");
       navigate("/partners");
-
-    } catch (err) {
+    } catch {
       alert("Failed to create partner");
-      console.error(err);
     }
   };
 
-  // Timeslot - default 30min slots from 9am to 9pm done.
-
+  /* -------------------- UI -------------------- */
   return (
-    <div>
-      <div className="relative w-full mx-auto p-6 max-h-full">
+    <div className="max-w-5xl mx-auto p-6">
+      <h2 className="text-2xl font-semibold mb-6">Create Partner / Salon</h2>
 
-        <h3 className="text-xl font-semibold mb-5 text-gray-800 text-center">
-          Create New Partner / Salon
-        </h3>
+      {/* BASIC INFO */}
+      <section className="bg-white p-6 rounded-xl shadow-sm mb-6">
+        <h4 className="mb-4 font-medium">Basic Information</h4>
+        <div className="grid md:grid-cols-2 gap-4">
+          <Input label="Salon Name" name="name" value={form.name} error={errors.name} onChange={handleChange} />
+          <Input label="Store Type" name="store_type" value={form.store_type} error={errors.store_type} onChange={handleChange} />
+          <Input label="Email" name="email" value={form.email} error={errors.email} onChange={handleChange} />
+          <Input label="Phone" name="phone" value={form.phone} error={errors.phone} onChange={handleChange} />
+          <Input label="Password" name="password" type="password" value={form.password} error={errors.password} onChange={handleChange} />
+          <Input label="Bank Account Holder" name="bank_account_holder" value={form.bank_account_holder} onChange={handleChange} />
+        </div>
+      </section>
 
-        {/* Inputs */}
-        {[
-          "name", "email", "phone", "store_type", "password", "bank_account_holder", "income", "description",
-          "addressLine1", "addressLine2", "area", "city", "district", "state",
-           "zipcode", "landmark", "latitude", "longitude", "radius",
-          "status"
-        ].map((field) => (
-          <div className="mb-4" key={field}>
-            <label className="block text-sm font-medium text-gray-700 capitalize">
-              {field}
-            </label>
-            <input
-              type={field === "phone" ? "number" : "text"}
-              value={form[field]}
-              onChange={(e) => handleChange(field, e.target.value)}
-              className="mt-1 block w-full bg-white border border-gray-300 px-3 py-2 rounded-md focus:ring-indigo-500"
-            />
-          </div>
-        ))}
+      {/* BUSINESS */}
+      <section className="bg-white p-6 rounded-xl shadow-sm mb-6">
+        <h4 className="mb-4 font-medium">Business Details</h4>
+        <div className="grid md:grid-cols-2 gap-4">
+          <Input label="Income" name="income" value={form.income} onChange={handleChange} />
+          <Input label="Service Radius (km)" name="radius" value={form.radius} error={errors.radius} onChange={handleChange} />
+          <textarea
+            rows="3"
+            value={form.description}
+            onChange={(e) => handleChange("description", e.target.value)}
+            className="md:col-span-2 border rounded-lg px-3 py-2 text-sm"
+            placeholder="Description"
+          />
+        </div>
+      </section>
 
-        {/* Images */}
-        <label className="block text-sm font-medium text-gray-700">
-          Salon Images
-        </label>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleImageChange}
-          className="mt-1 block w-full border rounded-md cursor-pointer file:bg-indigo-600 file:text-white"
-        />
+      {/* ADDRESS */}
+      <section className="bg-white p-6 rounded-xl shadow-sm mb-6">
+        <h4 className="mb-4 font-medium">Address</h4>
+        <div className="grid md:grid-cols-3 gap-4">
+          <Input label="Address Line 1" name="addressLine1" value={form.addressLine1} error={errors.addressLine1} onChange={handleChange} />
+          <Input label="Address Line 2" name="addressLine2" value={form.addressLine2} onChange={handleChange} />
+          <Input label="Area" name="area" value={form.area} onChange={handleChange} />
+          <Input label="City" name="city" value={form.city} error={errors.city} onChange={handleChange} />
+          <Input label="District" name="district" value={form.district} onChange={handleChange} />
+          <Input label="State" name="state" value={form.state} error={errors.state} onChange={handleChange} />
+          <Input label="Zipcode" name="zipcode" value={form.zipcode} onChange={handleChange} />
+          <Input label="Landmark" name="landmark" value={form.landmark} onChange={handleChange} />
+        </div>
+      </section>
 
-        {/* Image Preview */}
-        <div className="flex flex-wrap gap-2 mt-3">
-          {form.images.map((file, i) => (
-            <img
-              key={i}
-              src={URL.createObjectURL(file)}
-              className="w-16 h-16 rounded-md object-cover border"
-            />
+      {/* LOCATION */}
+      <section className="bg-white p-6 rounded-xl shadow-sm mb-6">
+        <h4 className="mb-4 font-medium">Location</h4>
+
+        <MapPicker
+  defaultLocation={
+    form.latitude && form.longitude
+      ? { lat: Number(form.latitude), lng: Number(form.longitude) }
+      : null
+  }
+  onSelectLocation={handleLocationSelect}
+  editable={true}
+/>
+
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Input
+            label="Latitude"
+            name="latitude"
+            value={String(form.latitude)} 
+            error={errors.latitude}
+            onChange={handleChange}
+            disabled
+          />
+          <Input
+            label="Longitude"
+            name="longitude"
+value={String(form.longitude)}           
+ error={errors.longitude}
+            onChange={handleChange}
+            disabled
+          />
+        </div>
+      </section>
+
+
+      {/* IMAGES */}
+      <section className="bg-white p-6 rounded-xl shadow-sm mb-6">
+        <h4 className="mb-4 font-medium">Salon Images</h4>
+        <input type="file" multiple accept="image/*" onChange={handleImageChange} />
+        <div className="flex gap-3 mt-3 flex-wrap">
+          {previews.map((src, i) => (
+            <img key={i} src={src} className="w-20 h-20 object-cover rounded border" />
           ))}
         </div>
+        {errors.images && <p className="text-xs text-red-500 mt-2">{errors.images}</p>}
+      </section>
 
-        <div className="flex justify-end space-x-3 pt-6">
-          <button
-            onClick={() => navigate("/partners")}
-            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={handleCreate}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-          >
-            Create Partner
-          </button>
-        </div>
+      {/* ACTIONS */}
+      <div className="flex justify-end gap-3">
+        <button onClick={() => navigate("/partners")} className="px-5 py-2 border rounded-lg">
+          Cancel
+        </button>
+        <button onClick={handleCreate} className="px-5 py-2 bg-indigo-600 text-white rounded-lg">
+          Create Partner
+        </button>
       </div>
     </div>
   );
