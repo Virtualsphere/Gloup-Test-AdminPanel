@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+body {
+   font-family: "Outfit", sans-serif;
+}
+
+
 :root{
     --color-primary: #2b7fff;
     --color-secondary: #d53731;

@@ -31,14 +31,17 @@ const PartnerTable = ({ data, title }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const statusOptions = [
-    { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
-    { value: "terminated", label: "Terminated" },
-  ];
+  { value: "pending", label: "Pending Approval" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "suspended", label: "Suspended" },
+  { value: "terminated", label: "Terminated" },
+  { value: "rejected", label: "Rejected" },
+];
 
   // Filter out inactive from dropdown options for row updates, but keep it for display and global filter
   const getDropdownOptions = () => {
-    return statusOptions.filter((option) => option.value !== "inactive");
+    return statusOptions.filter((option) => option.value !== "pending");
   };
 
   // Get the current value - this will show inactive if it exists in data
