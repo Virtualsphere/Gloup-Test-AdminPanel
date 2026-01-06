@@ -50,6 +50,10 @@ const Sidebar = ({ collapsed }) => {
     //  path: "/services",
     //   icon: <Scissors size={20} />, 
     //   text: "Services" },
+    { path: "/verifypartner",
+      icon: <User size={20} />,
+      text: "Verify Partner" },
+
     { path: "/subscription", 
       icon: <CreditCard size={20} />, 
       text: "Subscription" },

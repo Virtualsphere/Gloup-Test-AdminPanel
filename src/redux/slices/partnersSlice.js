@@ -27,6 +27,30 @@ export const getAllPartnersList = createAsyncThunk(
   }
 );
 
+export const getVerifiedPartnersList = createAsyncThunk(
+  "allPartners/getVerifiedPartnersList",
+  async (_, { rejectWithValue }) => { 
+    try {
+      debugger;
+      const response = await api.post(
+        "/admin/app/getverifypartner",
+        {},
+        {
+          withCredentials: false,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch verified partners";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+
 // create partner
 export const createPartner = createAsyncThunk(
   "allPartners/createPartner",
@@ -41,10 +65,13 @@ export const createPartner = createAsyncThunk(
       return response.data.data;
     } catch (error) {
       const message =
-        error.response?.data?.error?.message ||
-        error.message ||
-        "Failed to create partner";
-      return rejectWithValue(message);
+  error.response?.data?.error?.message ||
+  error.message ||
+  "Partner already exists with matching data" ||
+  "Failed to create partner";
+
+return rejectWithValue(message);
+
     }
   }
 );
@@ -260,11 +287,11 @@ export const deletePartner = createAsyncThunk(
 // update Multiple Partners
 export const updateMultiplePartner = createAsyncThunk(
   "allPartners/updateMultiplePartner",
-  async ({ ids, status }, { rejectWithValue }) => {
+  async ({ partnerIds, status }, { rejectWithValue }) => {
     try {
       const response = await api.post(
         "/admin/app/updateMultiplePartner",
-        { ids, status },
+        { partnerIds, status },
         {
           headers: {
             "Content-Type": "application/json",
@@ -292,6 +319,7 @@ const initialState = {
   storeServices: {},
   allPartnersList: [],
   allPayoutLogs: [],
+  verifiedPartners: [],
 };
 
 const allPartnersSlice = createSlice({
@@ -350,6 +378,19 @@ const allPartnersSlice = createSlice({
       .addCase(getPartnerDetail.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to fetch PartnerDetail";
+      })
+
+      // Get VerifiedPartners list
+       .addCase(getVerifiedPartnersList.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(getVerifiedPartnersList.fulfilled, (state, action) => {
+        state.loading = false;
+        state.verifiedPartners = action.payload;
+      })
+      .addCase(getVerifiedPartnersList.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to fetch verified partners";
       })
 
       // Get StoreService

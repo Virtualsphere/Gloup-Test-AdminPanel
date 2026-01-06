@@ -22,6 +22,8 @@ const Coupon = lazy(() => import("../components/data/Coupon"));
 const Refund = lazy(() => import("../components/data/Refund"));
 const Subscription = lazy(() => import("../components/data/Subscription"));
 const Review = lazy(() => import("../components/data/Review"));
+const VerifyPartner = lazy(() => import("../components/data/VerifyPartner"));
+
 const AppRoutes = () => {
   return (
     <Suspense
@@ -40,6 +42,7 @@ const AppRoutes = () => {
         <Route path="/partner" element={<Partner title="Partner"/>} />
         <Route path="/partnerdetails/:id" element={<PartnerDetails title="Partner Details"/>} />
         <Route path="/createPartner" element={<CreatePartner title="CreatePartner"/>} />
+        <Route path="/verifypartner" element={<VerifyPartner title="Verify Partner"/>} />
         <Route path="/appointments" element={<Appointments title="Appointments"/>} />
         <Route path="/services" element={<Services title="Services"/>} />
         <Route path="/storeservices/:id" element={<StoreServices title="StoreServices"/>} />
