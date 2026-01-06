@@ -1,40 +1,64 @@
 import React, { useEffect, useState, useCallback, memo } from "react";
+import {Eye, EyeOff} from "lucide-react";
 import { useDispatch } from "react-redux";
 import { createPartner } from "../../redux/slices/partnersSlice";
 import { useNavigate } from "react-router-dom";
 import MapPicker from "./MapPicker";
+import { Toaster, toast } from "react-hot-toast";
+import { useRef } from "react";
 
+
+
+
+
+
+
+/* -------------------- Main Component -------------------- */
+const CreatePartner = () => {
+  const fileInputRef = useRef(null);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const [errors, setErrors] = useState({});
+  const [previews, setPreviews] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
 
 /* -------------------- Reusable Input -------------------- */
 const Input = memo(
-  ({ label, name, value, error, onChange, type = "text", disabled = false }) => {
+  ({ label, name, value, error, onChange, type = "text", disabled = false, showToggle, onToggle, className = "" }) => {
+    console.log("Password toggle state:", showPassword);
+    //console.log("Input props:", props);
     return (
       <div>
         <label className="text-sm text-gray-600">{label}</label>
+        <div className="relative">
         <input
           type={type}
           value={value ?? ""}
           disabled={disabled}
           onChange={(e) => onChange(name, e.target.value)}
-          className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm
-            ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
-            ${error ? "border-red-500" : "border-gray-300"}`}
+           className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm
+              ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
+              ${error ? "border-red-500" : "border-gray-300"}
+              ${showToggle ? "pr-10" : ""}
+              ${className}`}
         />
+        {/* 👁 Eye icon */}
+          {showToggle && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+              {type === "password" ? <Eye size={18} /> : <EyeOff size={18} />}
+            </button>
+          )}
+        </div>
         {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       </div>
     );
   }
 );
 
-
-
-/* -------------------- Main Component -------------------- */
-const CreatePartner = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-
-  const [errors, setErrors] = useState({});
-  const [previews, setPreviews] = useState([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -66,10 +90,47 @@ const CreatePartner = () => {
   const handleChange = useCallback((key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
+ const MAX_IMAGES = 4;
+ const handleImageChange = (e) => {
+  debugger;
+  const files = Array.from(e.target.files);
 
-  const handleImageChange = (e) => {
-    setForm((prev) => ({ ...prev, images: Array.from(e.target.files) }));
-  };
+  const allowedTypes = ["image/jpeg", "image/png"];
+
+  const validFiles = [];
+  const previews = [];
+
+  for (let file of files) {
+    if (!allowedTypes.includes(file.type)) {
+      setErrors((prev) => ({
+        ...prev,
+        images: "Only JPG and PNG images are allowed",
+      }));
+      continue;
+    }
+
+    validFiles.push(file);
+    previews.push(URL.createObjectURL(file));
+  }
+
+  if (files.length > MAX_IMAGES) {
+    toast.error(`You can upload a maximum of ${MAX_IMAGES} images only`);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    return;
+ }
+
+  setErrors((prev) => ({ ...prev, images: null }));
+
+  setForm((prev) => ({
+    ...prev,
+    images: [...prev.images, ...validFiles],
+  }));
+
+  setPreviews((prev) => [...prev, ...previews]);
+};
+
 
 const handleLocationSelect = (location) => {
   console.log("MAP LOCATION:", location);
@@ -108,7 +169,8 @@ const handleLocationSelect = (location) => {
 
     if (!form.addressLine1) e.addressLine1 = "Address is required";
     if (!form.city) e.city = "City is required";
-    if (!form.state) e.state = "State is required";
+    if (!form.area) e.area = "Area is required";
+    if(!form.district) e.district = "District is required";
 
     if (!form.latitude || form.latitude < -90 || form.latitude > 90)
       e.latitude = "Latitude must be between -90 and 90";
@@ -122,9 +184,15 @@ const handleLocationSelect = (location) => {
     if (form.images.length === 0)
       e.images = "At least one image is required";
 
+    if (form.images.length > 4) {
+      e.images = "Maximum 4 images allowed";
+      return;
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
+  
 
   /* -------------------- Submit -------------------- */
   const handleCreate = async () => {
@@ -143,10 +211,32 @@ const handleLocationSelect = (location) => {
       await dispatch(createPartner(fd)).unwrap();
       alert("Partner created successfully");
       navigate("/partners");
-    } catch {
-      alert("Failed to create partner");
+    } catch (error) {
+      if (!errors.form) setErrors((prev) => ({ ...prev, form: error }));
+      alert(error);
     }
   };
+
+const handleRemoveImage = (index) => {
+  const updatedImages = form.images.filter((_, i) => i !== index);
+
+  setForm((prev) => ({
+    ...prev,
+    images: updatedImages,
+  }));
+
+  setPreviews((prev) => prev.filter((_, i) => i !== index));
+
+  // 🔥 Rebuild FileList
+  if (fileInputRef.current) {
+    const dataTransfer = new DataTransfer();
+    updatedImages.forEach((file) => dataTransfer.items.add(file));
+    fileInputRef.current.files = dataTransfer.files;
+  }
+};
+
+
+
 
   /* -------------------- UI -------------------- */
   return (
@@ -161,7 +251,17 @@ const handleLocationSelect = (location) => {
           <Input label="Store Type" name="store_type" value={form.store_type} error={errors.store_type} onChange={handleChange} />
           <Input label="Email" name="email" value={form.email} error={errors.email} onChange={handleChange} />
           <Input label="Phone" name="phone" value={form.phone} error={errors.phone} onChange={handleChange} />
-          <Input label="Password" name="password" type="password" value={form.password} error={errors.password} onChange={handleChange} />
+         <Input
+  label="Password"
+  name="password"
+  type={showPassword ? "text" : "password"}
+  value={form.password}
+  error={errors.password}
+  onChange={handleChange}
+  showToggle
+  onToggle={() => setShowPassword((prev) => !prev)}
+/>
+
           <Input label="Bank Account Holder" name="bank_account_holder" value={form.bank_account_holder} onChange={handleChange} />
         </div>
       </section>
@@ -187,7 +287,6 @@ const handleLocationSelect = (location) => {
         <h4 className="mb-4 font-medium">Address</h4>
         <div className="grid md:grid-cols-3 gap-4">
           <Input label="Address Line 1" name="addressLine1" value={form.addressLine1} error={errors.addressLine1} onChange={handleChange} />
-          <Input label="Address Line 2" name="addressLine2" value={form.addressLine2} onChange={handleChange} />
           <Input label="Area" name="area" value={form.area} onChange={handleChange} />
           <Input label="City" name="city" value={form.city} error={errors.city} onChange={handleChange} />
           <Input label="District" name="district" value={form.district} onChange={handleChange} />
@@ -235,15 +334,45 @@ value={String(form.longitude)}
 
       {/* IMAGES */}
       <section className="bg-white p-6 rounded-xl shadow-sm mb-6">
-        <h4 className="mb-4 font-medium">Salon Images</h4>
-        <input type="file" multiple accept="image/*" onChange={handleImageChange} />
-        <div className="flex gap-3 mt-3 flex-wrap">
-          {previews.map((src, i) => (
-            <img key={i} src={src} className="w-20 h-20 object-cover rounded border" />
-          ))}
-        </div>
-        {errors.images && <p className="text-xs text-red-500 mt-2">{errors.images}</p>}
-      </section>
+  <h4 className="mb-4 font-medium">Salon Images</h4>
+
+  <input
+    ref={fileInputRef}
+    type="file"
+    multiple
+    accept="image/jpeg, image/png"
+    onChange={handleImageChange}
+  />
+
+  <div className="flex gap-3 mt-4 flex-wrap">
+    {previews.map((src, i) => (
+      <div
+        key={i}
+        className="relative w-20 h-20 rounded border overflow-hidden group"
+      >
+        <img
+          src={src}
+          alt={`preview-${i}`}
+          className="w-full h-full object-cover"
+        />
+
+        {/* ❌ Delete Button */}
+        <button
+          type="button"
+          onClick={() => handleRemoveImage(i)}
+          className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+        >
+          ✕
+        </button>
+      </div>
+    ))}
+  </div>
+
+  {errors.images && (
+    <p className="text-xs text-red-500 mt-2">{errors.images}</p>
+  )}
+</section>
+
 
       {/* ACTIONS */}
       <div className="flex justify-end gap-3">
