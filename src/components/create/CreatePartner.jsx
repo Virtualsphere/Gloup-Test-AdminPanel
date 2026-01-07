@@ -7,37 +7,23 @@ import MapPicker from "./MapPicker";
 import { Toaster, toast } from "react-hot-toast";
 import { useRef } from "react";
 
-
-
-
-
-
-
-/* -------------------- Main Component -------------------- */
-const CreatePartner = () => {
-  const fileInputRef = useRef(null);
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-
-  const [errors, setErrors] = useState({});
-  const [previews, setPreviews] = useState([]);
-  const [showPassword, setShowPassword] = useState(false);
-
 /* -------------------- Reusable Input -------------------- */
 const Input = memo(
-  ({ label, name, value, error, onChange, type = "text", disabled = false, showToggle, onToggle, className = "" }) => {
-    console.log("Password toggle state:", showPassword);
+  ({ label, name, value, error, onChange, type = "text", disabled = false, showToggle, onToggle, className = "",maxLength, }) => {
+    //console.log("Password toggle state:", showPassword);
     //console.log("Input props:", props);
     return (
       <div>
         <label className="text-sm text-gray-600">{label}</label>
         <div className="relative">
         <input
+          name={name} 
           type={type}
           value={value ?? ""}
           disabled={disabled}
-          onChange={(e) => onChange(name, e.target.value)}
-           className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm
+          onChange={onChange}
+          maxLength={maxLength} 
+          className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm
               ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
               ${error ? "border-red-500" : "border-gray-300"}
               ${showToggle ? "pr-10" : ""}
@@ -58,7 +44,15 @@ const Input = memo(
     );
   }
 );
+/* -------------------- Main Component -------------------- */
+const CreatePartner = () => {
+  const fileInputRef = useRef(null);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
+  const [errors, setErrors] = useState({});
+  const [previews, setPreviews] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -87,9 +81,16 @@ const Input = memo(
   });
 
   /* -------------------- Handlers -------------------- */
-  const handleChange = useCallback((key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }, []);
+const handleChange = useCallback((e) => {
+  const { name, value } = e.target;
+  if (name === "phone" && !/^\d*$/.test(value)) return;
+  setForm((prev) => ({
+    ...prev,
+    [name]: value,
+  }));
+}, []);
+
+
  const MAX_IMAGES = 4;
  const handleImageChange = (e) => {
   debugger;
@@ -196,7 +197,10 @@ const handleLocationSelect = (location) => {
 
   /* -------------------- Submit -------------------- */
   const handleCreate = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+    toast.error("Please fix validation errors");
+    return;
+    }
 
     try {
       const fd = new FormData();
@@ -207,13 +211,17 @@ const handleLocationSelect = (location) => {
 
       fd.append("location", `${form.longitude},${form.latitude}`);
       form.images.forEach((img) => fd.append("images", img));
-
+      const toastId = toast.loading("Creating partner...");
       await dispatch(createPartner(fd)).unwrap();
-      alert("Partner created successfully");
+       toast.success("Partner created successfully 🎉", {
+      id: toastId,
+    });
       navigate("/partners");
     } catch (error) {
       if (!errors.form) setErrors((prev) => ({ ...prev, form: error }));
-      alert(error);
+       toast.error(
+      error?.message || "Failed to create partner. Please try again."
+    );
     }
   };
 
@@ -240,17 +248,17 @@ const handleRemoveImage = (index) => {
 
   /* -------------------- UI -------------------- */
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <h2 className="text-2xl font-semibold mb-6">Create Partner / Salon</h2>
+    <div className="max-w-8xl mx-auto p-6">
+      <h2 className="text-2xl font-semibold mb-6">Create Partner</h2>
 
       {/* BASIC INFO */}
       <section className="bg-white p-6 rounded-xl shadow-sm mb-6">
         <h4 className="mb-4 font-medium">Basic Information</h4>
         <div className="grid md:grid-cols-2 gap-4">
-          <Input label="Salon Name" name="name" value={form.name} error={errors.name} onChange={handleChange} />
-          <Input label="Store Type" name="store_type" value={form.store_type} error={errors.store_type} onChange={handleChange} />
+          <Input label="Partner Name" name="name" value={form.name} error={errors.name} onChange={handleChange} />
+          <Input label="Partner Type" name="store_type" value={form.store_type} error={errors.store_type} onChange={handleChange} />
           <Input label="Email" name="email" value={form.email} error={errors.email} onChange={handleChange} />
-          <Input label="Phone" name="phone" value={form.phone} error={errors.phone} onChange={handleChange} />
+          <Input label="Phone" name="phone" maxLength={10} value={form.phone} error={errors.phone} onChange={handleChange} />
          <Input
   label="Password"
   name="password"
@@ -272,10 +280,11 @@ const handleRemoveImage = (index) => {
         <div className="grid md:grid-cols-2 gap-4">
           <Input label="Income" name="income" value={form.income} onChange={handleChange} />
           <Input label="Service Radius (km)" name="radius" value={form.radius} error={errors.radius} onChange={handleChange} />
-          <textarea
+         <textarea
             rows="3"
+            name="description"
             value={form.description}
-            onChange={(e) => handleChange("description", e.target.value)}
+            onChange={handleChange}
             className="md:col-span-2 border rounded-lg px-3 py-2 text-sm"
             placeholder="Description"
           />
@@ -343,7 +352,9 @@ value={String(form.longitude)}
     accept="image/jpeg, image/png"
     onChange={handleImageChange}
   />
-
+ <p className="text-xs text-gray-500 mt-1">
+  Only <strong>4 images</strong> allowed in <strong>JPG / PNG</strong> format
+ </p>
   <div className="flex gap-3 mt-4 flex-wrap">
     {previews.map((src, i) => (
       <div

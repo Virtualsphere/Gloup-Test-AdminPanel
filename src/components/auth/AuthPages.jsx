@@ -24,6 +24,7 @@ const AuthPages = () => {
   } = useForm();
 
   const onSubmit = async (data) => {
+    debugger;
     if (!isSignUp) {
       try {
         const response = await api.post(
@@ -47,11 +48,15 @@ const AuthPages = () => {
         }
 
         const token = response?.data?.data?.token;
+        const name = response?.data?.data?.name;
+        const email = data.email;
         const toastId = "login";
         if (token) {
           toast.dismiss(toastId);
           toast.success("Login Successflly!", { id: toastId });
           localStorage.setItem("token", token);
+          localStorage.setItem("name", name);
+          localStorage.setItem("email", email);
           window.location.href = "/";
         }
       } catch (error) {

@@ -105,7 +105,7 @@ const PartnerTable = ({ data, title }) => {
     endDate: "",
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(50); // Show 50 items per page
+  const [itemsPerPage] = useState(15); // Show 50 items per page
   const [selectedRows, setSelectedRows] = useState([]);
   const tableRef = useRef(null);
 
@@ -544,7 +544,7 @@ const PartnerTable = ({ data, title }) => {
 
   return (
     <div>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-2 border-b border-gray-200">
         <div className="relative w-full md:w-64 mb-4 md:mb-0">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search size={16} className="text-gray-400" />
@@ -1128,14 +1128,14 @@ const PartnerTable = ({ data, title }) => {
                 />
               </th>
               {visibleColumns.id && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   SNo
                 </th>
               )}
               {visibleColumns.name && (
                 <th
                   onClick={() => handleSort("name")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Name{getSortIcon("name")}
                 </th>
@@ -1143,7 +1143,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.ownerName && (
                 <th
                   onClick={() => handleSort("ownerName")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Owner Name{getSortIcon("ownerName")}
                 </th>
@@ -1151,7 +1151,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.phone && (
                 <th
                   onClick={() => handleSort("phone")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Phone{getSortIcon("phone")}
                 </th>
@@ -1159,7 +1159,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.email && (
                 <th
                   onClick={() => handleSort("email")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Email{getSortIcon("email")}
                 </th>
@@ -1167,7 +1167,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.categoryName && (
                 <th
                   onClick={() => handleSort("categoryName")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Category{getSortIcon("categoryName")}
                 </th>
@@ -1175,7 +1175,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.location && (
                 <th
                   onClick={() => handleSort("location")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   City/Location{getSortIcon("location")}
                 </th>
@@ -1183,7 +1183,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.createdAt && (
                 <th
                   onClick={() => handleSort("createdAt")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Registration Date{getSortIcon("createdAt")}
                 </th>
@@ -1191,7 +1191,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.TotalAppointment && (
                 <th
                   onClick={() => handleSort("TotalAppointment")}
-                  className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Total Appointments{getSortIcon("TotalAppointment")}
                 </th>
@@ -1199,7 +1199,7 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.totalRevenue && (
                 <th
                   onClick={() => handleSort("totalRevenue")}
-                  className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Total Revenue{getSortIcon("totalRevenue")}
                 </th>
@@ -1208,12 +1208,12 @@ const PartnerTable = ({ data, title }) => {
               {visibleColumns.status && (
                 <th
                   onClick={() => handleSort("status")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
                 >
                   Status{getSortIcon("status")}
                 </th>
               )}
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -1223,7 +1223,7 @@ const PartnerTable = ({ data, title }) => {
             {currentItems.length > 0 ? (
               currentItems.map((item, index) => (
                 <tr key={item.id}>
-                  <td className="px-2 py-4 w-8">
+                  <td className="px-2 w-8">
                     <input
                       type="checkbox"
                       checked={selectedRows.includes(item.id)}
@@ -1232,40 +1232,40 @@ const PartnerTable = ({ data, title }) => {
                     />
                   </td>
                   {visibleColumns.id && (
-                    <td className="px-6 py-4 capitalize">{index + 1}</td>
+                    <td className="px-6 capitalize">{index + 1}</td>
                   )}
                   {visibleColumns.name && (
-                    <td className="px-6 py-4 whitespace-nowrap  capitalize">
+                    <td className="px-6 whitespace-nowrap  capitalize">
                       {item?.name}
                     </td>
                   )}
                   {visibleColumns.ownerName && (
-                    <td className="px-6 py-4 whitespace-nowrap capitalize">
+                    <td className="px-6 whitespace-nowrap capitalize">
                       {item?.ownerDetails?.name}
                     </td>
                   )}
                   {visibleColumns.phone && (
-                    <td className="px-6 py-4 whitespace-nowrap ">
+                    <td className="px-6 whitespace-nowrap ">
                       {item?.ownerDetails?.phone}
                     </td>
                   )}
                   {visibleColumns.email && (
-                    <td className="px-6 py-4 whitespace-nowrap ">
+                    <td className="px-6 whitespace-nowrap ">
                       {item?.email}
                     </td>
                   )}
                   {visibleColumns.categoryName && (
-                    <td className="px-6 py-4 whitespace-nowrap capitalize">
+                    <td className="px-6 whitespace-nowrap capitalize">
                       {item?.categoryName}
                     </td>
                   )}
                   {visibleColumns.location && (
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
                       {item?.location?.city}
                     </td>
                   )}
                   {visibleColumns.createdAt && (
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
                       {item?.createdAt
                         ? moment(item.createdAt).format("YYYY-MM-DD")
                         : "-"}
@@ -1273,12 +1273,12 @@ const PartnerTable = ({ data, title }) => {
                   )}
 
                   {visibleColumns.TotalAppointment && (
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="px-6 whitespace-nowrap text-right">
                       {item?.TotalAppointment}
                     </td>
                   )}
                   {visibleColumns.totalRevenue && (
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="px-6 whitespace-nowrap text-right">
                       {item?.totalRevenue != null
                         ? `₹${new Intl.NumberFormat("en-IN").format(
                             item.totalRevenue
@@ -1288,7 +1288,7 @@ const PartnerTable = ({ data, title }) => {
                   )}
 
                   {visibleColumns.status && (
-                    <td className="px-2 py-2 whitespace-nowrap">
+                    <td className="px-2 whitespace-nowrap">
                       <div className="relative inline-block">
                         <Select
                           options={getDropdownOptions()} // Filtered options without inactive
@@ -1406,7 +1406,7 @@ const PartnerTable = ({ data, title }) => {
                       </div>
                     </td>
                   )}
-                  <td className="px-6 py-4">
+                  <td className="px-6">
                     <div className="flex justify-end space-x-2">
                       <button
                         onClick={() => {
@@ -1436,7 +1436,7 @@ const PartnerTable = ({ data, title }) => {
               <tr>
                 <td
                   colSpan={visibleColumnCount}
-                  className="px-6 py-4 text-center text-sm text-gray-500"
+                  className="px-6 text-center text-sm text-gray-500"
                 >
                   No {title.toLowerCase()} found
                 </td>
@@ -1447,7 +1447,7 @@ const PartnerTable = ({ data, title }) => {
       </div>
 
       {/* Pagination */}
-      <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="border-t border-gray-200 px-4 py-2 flex items-center justify-between">
         <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-gray-700">

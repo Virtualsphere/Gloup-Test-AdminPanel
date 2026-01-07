@@ -92,7 +92,7 @@ const Sidebar = ({ collapsed }) => {
         collapsed ? "w-10" : "w-64"
       } transition-all duration-300 flex flex-col`}
     >
-      <div className="p-4 flex items-center justify-center h-16 border-b border-[f8f9fa]">
+      <div className="p-4 flex items-center justify-center h-13 border-b border-[f8f9fa]">
         {/* <div className="bg-white p-1 rounded">
           <Home size={20} className="text-blue-700" />
         </div> */}
