@@ -46,7 +46,7 @@ const App = () => {
             <Header collapsed={collapsed} toggleSidebar={() => setCollapsed(!collapsed)} />
 
             <main
-              className={`flex-1 overflow-x-auto overflow-y-auto p-4 lg:p-6 bg-slate-50 mt-16 transition-all duration-300 ${
+              className={`flex-1 overflow-x-auto overflow-y-auto p-4 lg:p-6 bg-slate-50 mt-10 transition-all duration-300 ${
                 collapsed ? "ml-10 md:ml-20" : "ml-64"
               }`}
             >

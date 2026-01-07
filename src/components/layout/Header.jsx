@@ -27,6 +27,8 @@ const Header = ({ collapsed,toggleSidebar }) => {
     setShowProfileModal(!showProfileModal);
   };
   let profile = useSelector((state) => state.profile.profileList);
+  let username = localStorage.getItem("name");
+  let email = localStorage.getItem("email");
   // useEffect(() => {
   //   dispatch(getProfile());
   // }, [dispatch]);
@@ -73,10 +75,10 @@ const Header = ({ collapsed,toggleSidebar }) => {
   }, [showProfileModal]);
 
   return (
-    <header  className={`fixed top-0 right-0 z-40 bg-white border-b border-gray-200 h-16 transition-all duration-300 ${
+    <header  className={`fixed top-0 right-0 z-40 bg-white border-b border-gray-200 h-13 transition-all duration-300 ${
     collapsed ? 'left-10' : 'left-64'
   }`}>
-      <div className="h-16 px-4 flex items-center justify-between">
+      <div className="h-13 px-4 flex items-center justify-between">
         <div className="flex items-center">
           {/* <button
             onClick={toggleSidebar}
@@ -112,7 +114,7 @@ const Header = ({ collapsed,toggleSidebar }) => {
 
             <div className="ml-2 hidden md:block">
               <p className="text-sm font-medium text-gray-700 capitalize">
-                {profile?.username}
+                {username}
               </p>
               <p className="text-xs text-gray-500">{profile?.email}</p>
             </div>
@@ -136,7 +138,7 @@ const Header = ({ collapsed,toggleSidebar }) => {
                     />
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-800 capitalize">
-                        {profile?.username}
+                        {username}
                       </p>
                       {/* <p className="text-xs text-gray-500">Administrator</p> */}
                     </div>
@@ -146,12 +148,12 @@ const Header = ({ collapsed,toggleSidebar }) => {
                 <div className="p-4 space-y-3">
                   <div className="flex items-center text-gray-700">
                     <User size={16} className="mr-3 text-blue-600" />
-                    <p className="text-sm capitalize">{profile?.username}</p>
+                    <p className="text-sm capitalize">{username}</p>
                   </div>
 
                   <div className="flex items-center text-gray-700">
                     <Mail size={16} className="mr-3 text-blue-600" />
-                    <p className="text-sm">{profile?.email}</p>
+                    <p className="text-sm">{email}</p>
                   </div>
 
                   {/* <div className="flex items-center text-gray-700">
