@@ -23,6 +23,8 @@ const Refund = lazy(() => import("../components/data/Refund"));
 const Subscription = lazy(() => import("../components/data/Subscription"));
 const Review = lazy(() => import("../components/data/Review"));
 const VerifyPartner = lazy(() => import("../components/data/VerifyPartner"));
+const Bookings = lazy(() => import("../components/data/Bookings"));
+const BookingForm = lazy(() => import("../components/form/BookingForm"));
 
 const AppRoutes = () => {
   return (
@@ -40,6 +42,8 @@ const AppRoutes = () => {
         <Route path="/allusers" element={<AllUsers title="Users"/>} />
         <Route path="/userdetails/:id" element={<UserDetails title="UserDetails"/>} />
         <Route path="/partner" element={<Partner title="Partner"/>} />
+        <Route path="/bookings" element={<Bookings title="Bookings"/>} />
+        <Route path="/bookings/:id" element={<BookingForm />} />
         <Route path="/partnerdetails/:id" element={<PartnerDetails title="Partner Details"/>} />
         <Route path="/createPartner" element={<CreatePartner title="CreatePartner"/>} />
         <Route path="/verifypartner" element={<VerifyPartner title="Verify Partner"/>} />
