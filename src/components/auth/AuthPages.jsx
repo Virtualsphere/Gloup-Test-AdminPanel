@@ -44,7 +44,7 @@ const AuthPages = () => {
         let passwordToastId = "password incorrect";
         if (response.data?.data == "password incorrect") {
           toast.dismiss(passwordToastId);
-          toast.success("Password Incorrect", { id: passwordToastId });
+          toast.error("Password Incorrect", { id: passwordToastId });
         }
 
         const token = response?.data?.data?.token;

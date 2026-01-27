@@ -29,6 +29,8 @@ import { Autoplay } from "swiper/modules";
 import { Link } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/autoplay";
+import { useNavigate } from "react-router-dom";
+
 
 const COLORS = [
   "#0088FE",
@@ -42,7 +44,7 @@ const COLORS = [
 
 const DashboardDetail = ({ data }) => {
 
-
+  const navigate = useNavigate();
   // Chart State
   const [viewType, setViewType] = useState("monthly");
   const [selectedMetric, setSelectedMetric] = useState("revenue");
@@ -253,7 +255,7 @@ const DashboardDetail = ({ data }) => {
   ];
 
   // Metric Card Component
-  const MetricCard = ({ title, value, icon: Icon, color, subtitle }) => {
+  const MetricCard = ({ title, value, icon: Icon, color, subtitle, onpress }) => {
     const growthColor =
       subtitle && typeof subtitle === "string"
         ? subtitle.includes("% vs last month")
@@ -267,6 +269,7 @@ const DashboardDetail = ({ data }) => {
       <div
         className="bg-white rounded-lg shadow-md p-4 lg:p-6 border-l-4"
         style={{ borderLeftColor: color }}
+        onClick={onpress}
       >
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
@@ -391,12 +394,14 @@ const DashboardDetail = ({ data }) => {
             value={data?.total_partners || 0}
             icon={Store}
             color="#10B981"
+            onpress={() => navigate("/partner")}
           />
           <MetricCard
             title="Total Users"
             value={data?.total_users || 0}
             icon={Users}
             color="#F43F5E"
+            onpress={() => navigate("/allusers")}
           />
           <MetricCard
             title="Total Sales"
@@ -445,6 +450,7 @@ const DashboardDetail = ({ data }) => {
             value={data?.active_bookings_today || 0}
             icon={Calendar}
             color="#10B981"
+            onpress={() => navigate("/bookings")}
           />
           <MetricCard
             title="Cancelled/Refunded Orders"

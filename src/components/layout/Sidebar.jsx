@@ -53,7 +53,11 @@ const Sidebar = ({ collapsed }) => {
     { path: "/verifypartner",
       icon: <User size={20} />,
       text: "Verify Partner" },
-
+    {
+      path: "/bookings",
+      icon: <CalendarCheck size={20} />,
+      text: "Bookings",
+    },
     { path: "/subscription", 
       icon: <CreditCard size={20} />, 
       text: "Subscription" },

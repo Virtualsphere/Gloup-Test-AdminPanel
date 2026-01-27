@@ -648,89 +648,98 @@ dispatch(getStoreServices({ id }))
             </div>
 
               {/* TIMESLOTS */}
+         <div className="p-4">
+  <p className="mb-2 font-semibold">Timeslots</p>
+
+  <div className="max-h-72 overflow-y-auto rounded-lg">
+    <table className="min-w-full text-sm border-collapse">
+      <thead className="sticky top-0 bg-gray-100 z-10">
+        <tr>
+          <th className="px-4 py-2 text-left border-b">From</th>
+          <th className="px-4 py-2 text-left border-b">To</th>
+          <th className="px-4 py-2 text-left border-b">Notes</th>
+          <th className="px-4 py-2 text-left border-b">Status</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {data?.timeslots?.map((slot, index) => (
+          <tr
+            key={slot.id}
+             className={`hover:bg-neutral-200 cursor-pointer ${
+                                  index % 2 === 0 ? "bg-neutral-100" : "bg-white"
+                                }`}
+          >
+            <td className="border-x border-neutral-200 px-4 py-2">{slot.from}</td>
+            <td className="border-x border-neutral-200 px-4 py-2">{slot.to}</td>
+            <td className="border-x border-neutral-200 px-4 py-2">{slot.notes || "-"}</td>
+            <td className="border-x border-neutral-200 px-4 py-2 capitalize">{slot.status}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+              {/* EDIT SERVICES */}
               <div className="p-4">
-                <p className="mb-2 font-semibold">Timeslots</p>
+                <p className="mb-2 font-semibold">Services</p>
+                <button
+                  onClick={handleEditService}
+                  className="px-3 py-2 bg-black hover:bg-neutral-800 text-white flex gap-2"
+                >
+                  <Plus /> Add Service
+                </button>
+                <div className="mt-3 max-h-72 overflow-y-auto rounded-lg">
+                  {Array.isArray(servicesData) && servicesData.length > 0 && (
+                        <table className="min-w-full text-sm border-collapse">
+                          <thead className="sticky top-0 bg-gray-100 z-10">
+                            <tr>
+                              <th className="px-4 py-2 text-left border-b">Service</th>
+                              <th className="px-4 py-2 text-left border-b">Amount</th>
+                              <th className="px-4 py-2 text-left border-b">Discounted Amount</th>
+                              <th className="px-4 py-2 text-left border-b">Duration</th>
+                            </tr>
+                          </thead>
 
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left">From</th>
-                        <th className="px-4 py-2 text-left">To</th>
-                        <th className="px-4 py-2 text-left">Notes</th>
-                        <th className="px-4 py-2 text-left">Status</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {data?.timeslots?.map((slot) => (
-                        <tr key={slot.id} className="border-t hover:bg-gray-50">
-                          <td className="px-4 py-2">{slot.from}</td>
-                          <td className="px-4 py-2">{slot.to}</td>
-                          <td className="px-4 py-2">{slot.notes || "-"}</td>
-                          <td className="px-4 py-2 capitalize">{slot.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          <tbody>
+                            {servicesData.map((item, index) => (
+                              <tr
+                                key={item.id}
+                                className={`hover:bg-neutral-200 cursor-pointer ${
+                                  index % 2 === 0 ? "bg-neutral-100" : "bg-white"
+                                }`}
+                                onClick={() => {
+                                  setServiceId(item.id);
+                                  setServiceData(item);
+                                  handleUpdateService();
+                                }}
+                              >
+                                <td className="border-x border-neutral-200 px-4 py-2">
+                                  {item.service_name}
+                                </td>
+                                <td className="border-x border-neutral-200 px-4 py-2">
+                                  {item.amount}
+                                </td>
+                                <td className="border-x border-neutral-200 px-4 py-2">
+                                  {item.discounted_amount}
+                                </td>
+                                <td className="border-x border-neutral-200 px-4 py-2">
+                                  {item.duration}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    {showCreateModal && <CreateServiceModal setShowModal={setShowCreateModal} storeId={id}/>}
+                    {showUpdateModal && (<EditServiceModal setShowModal={setShowUpdateModal} storeId={id} serviceId={serviceId} serviceData={serviceData}/>)}
                 </div>
               </div>
 
-              {/* EDIT SERVICES */}
-              <div className="p-4 max-h-72">
-                <p className="mb-2 font-semibold">Services</p>
-                <button onClick={handleEditService} className="px-3 py-2 bg-black hover:bg-neutral-800 text-white flex gap-2 cursor-pointer"><Plus /> Add Service</button>
-                  {Array.isArray(servicesData) && servicesData.length > 0 && (
-  <table border="1" className="w-full mt-3">
-    <thead>
-      <tr className="bg-neutral-300">
-        <th className="border-x border-neutral-200 py-1">Service</th>
-        <th className="border-x border-neutral-200 py-1">Amount</th>
-        <th className="border-x border-neutral-200 py-1">Discounted Amount</th>
-        <th className="border-x border-neutral-200 py-1">Duration</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      {servicesData.map((item, index) => (
-        <tr
-          key={item.id}
-          className={`hover:bg-violet-300 cursor-pointer ${
-            index % 2 === 0 ? "bg-neutral-100" : "bg-white"
-          }`}
-          onClick={() => {
-            setServiceId(item.id);
-            setServiceData(item);
-            handleUpdateService();
-          }}
-        >
-          <td className="border-x border-neutral-200 px-3 py-1">
-            {item.service_name}
-          </td>
-          <td className="border-x border-neutral-200 px-3 py-1">
-            {item.amount}
-          </td>
-          <td className="border-x border-neutral-200 px-3 py-1">
-            {item.discounted_amount}
-          </td>
-          <td className="border-x border-neutral-200 px-3 py-1">
-            {item.duration}
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-)}
-
-                  
-             
-
-                  {showCreateModal && <CreateServiceModal setShowModal={setShowCreateModal} storeId={id}/>}
-                  {showUpdateModal && (<EditServiceModal setShowModal={setShowUpdateModal} storeId={id} serviceId={serviceId} serviceData={serviceData}/>)}
-              </div>
-
               {/* STYLISTS */}
-              <div className="p-4 max-h-72">
+              <div className="p-4 max-h-72 overflow-y-auto">
                 <h3 className="text-sm font-semibold mb-2">Stylists</h3>
 
                 {data?.professionals?.length > 0 ? (
