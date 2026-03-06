@@ -3,6 +3,7 @@ import {
   Search,
   Download,
   Printer,
+  Eye,
   EyeOff,
   ChevronDown,
   Edit,
@@ -341,10 +342,10 @@ const NotificationTable = ({ data, title, onEdit, onDelete }) => {
                   Date
                 </th>
               )}
-              
-              {/* <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
-              </th> */}
+              </th> 
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -402,7 +403,16 @@ const NotificationTable = ({ data, title, onEdit, onDelete }) => {
                   )}
                   
 
-                  
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      style={{ cursor: "pointer" }}
+                      onClick={() => onEdit(item)}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                      title="Edit"
+                    >
+                      <Edit size={18} />
+                    </button>
+                  </td>
                   {/* <td className="px-6 py-4 text-right"> */}
                     {/* <button
                         onClick={() => onEdit(item)}
@@ -426,7 +436,8 @@ const NotificationTable = ({ data, title, onEdit, onDelete }) => {
                   colSpan="6"
                   className="px-6 py-4 text-center text-sm text-gray-500"
                 >
-                  No {title.toLowerCase()} found
+                  No (item.title || "").toLowerCase() found
+                  
                 </td>
               </tr>
             )}

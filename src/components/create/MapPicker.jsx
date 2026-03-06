@@ -81,7 +81,7 @@ export default function MapPicker({
           <input
             type="text"
             placeholder="Search location"
-            className="border px-3 py-2 rounded-md w-full mb-2"
+            className="border border-gray-300 px-3 py-2 rounded-md w-full mb-2"
           />
         </Autocomplete>
       )}

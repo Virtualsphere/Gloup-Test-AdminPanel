@@ -6,7 +6,8 @@ const NotificationForm = ({
   onSubmit,
   onCancel,
   defaultValues = {},
-  partnerOptions= []
+  partnerOptions= [],
+  report = null,
 }) => {
   // const [dropdownOpen, setDropdownOpen] = useState(false);
   //   const dropdownRef = useRef(null);
@@ -220,6 +221,58 @@ const NotificationForm = ({
           {defaultValues.notification_type ? "Update" : "Save"}
         </button>
       </div>
+
+      {report && (
+  <div className="mt-6 border rounded-md p-4 bg-gray-50">
+    <h3 className="text-lg font-semibold mb-3">Notification Report</h3>
+
+    <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="p-3 bg-blue-100 rounded">
+        <p>Total Sent</p>
+        <p className="font-bold">{report.total_sent}</p>
+      </div>
+
+      <div className="p-3 bg-green-100 rounded">
+        <p>Success</p>
+        <p className="font-bold text-green-700">
+          {report.success_count}
+        </p>
+      </div>
+
+      <div className="p-3 bg-red-100 rounded">
+        <p>Failed</p>
+        <p className="font-bold text-red-700">
+          {report.failed_count}
+        </p>
+      </div>
+    </div>
+
+    {report.failed_details?.length > 0 && (
+      <div>
+        <h4 className="font-semibold mb-2">Failed Details</h4>
+        <table className="w-full border text-sm">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="p-2 border">User ID</th>
+              <th className="p-2 border">Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.failed_details.map((item, index) => (
+              <tr key={index}>
+                <td className="p-2 border">{item.user_id}</td>
+                <td className="p-2 border text-red-600">
+                  {item.error_code}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+      )}
+      
     </form>
   );
 };
