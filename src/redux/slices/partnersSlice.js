@@ -27,6 +27,7 @@ export const getAllPartnersList = createAsyncThunk(
   }
 );
 
+// get VerifiedPartners
 export const getVerifiedPartnersList = createAsyncThunk(
   "allPartners/getVerifiedPartnersList",
   async (_, { rejectWithValue }) => { 
@@ -49,7 +50,6 @@ export const getVerifiedPartnersList = createAsyncThunk(
     }
   }
 );
-
 
 // create partner
 export const createPartner = createAsyncThunk(
@@ -76,6 +76,7 @@ return rejectWithValue(message);
   }
 );
 
+// create service
 export const createService = createAsyncThunk(
   "allPartners/createService",
   async(payload, {rejectWithValue}) => {
@@ -96,6 +97,7 @@ export const createService = createAsyncThunk(
   }
 );
 
+// edit service
 export const editService = createAsyncThunk(
   "allPartners/editService",
   async(payload, {rejectWithValue}) => {
@@ -111,6 +113,26 @@ export const editService = createAsyncThunk(
       error.response?.data?.error?.message ||
       error.message ||
       "Failed to edit Service";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// get service category
+export const fetchServiceCategories = createAsyncThunk(  
+  "allPartners/getserivecategory",
+  async(_, {rejectWithValue}) => {
+    try {
+      const response = await api.post('/admin/app/getservicecategorylist', {}, {
+        withCredentials: false,
+      });
+      return response.data.data;
+    }
+    catch (error) {
+      const message =
+      error.response?.data?.error?.message ||
+      error.message ||
+      "Failed to fetch service category";
       return rejectWithValue(message);
     }
   }
@@ -310,6 +332,73 @@ export const updateMultiplePartner = createAsyncThunk(
   }
 );
 
+// generate default slots
+export const generateDefaultSlots = createAsyncThunk(
+  "allPartners/generateDefaultSlots",
+  async (storeId, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/app/generateDefaultSlots", { storeId }, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to generate default slots";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// block and unblock slot
+export const BlockAndUnblockSlot = createAsyncThunk(  
+  "allPartners/BlockAndUnblockSlot",
+  async ({ storeId ,slotId, status, date }, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/app/blockandunblockslot", { storeId, slotId, status, date }, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to block/unblock slot";
+      return rejectWithValue(message);
+    }
+    } 
+);
+
+// get Blocked Slots 
+export const getBlockedSlots = createAsyncThunk(
+  "allPartners/getBlockedSlots",
+  async ({ storeId, date }, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/app/getblockedslots", { storeId, date }, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch blocked slots";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Initial state
 const initialState = {
   loading: false,
   error: null,
@@ -320,6 +409,8 @@ const initialState = {
   allPartnersList: [],
   allPayoutLogs: [],
   verifiedPartners: [],
+  serviceCategories: [],
+  blockedSlots: []
 };
 
 const allPartnersSlice = createSlice({
@@ -334,6 +425,7 @@ const allPartnersSlice = createSlice({
       state.partnerDetail = {};
       state.storeServices = {};
       state.allPayoutLogs = [];
+      state.serviceCategories = [];
     },
   },
   extraReducers: (builder) => {
@@ -407,6 +499,20 @@ const allPartnersSlice = createSlice({
         state.error = action.payload || "Failed to fetch StoreServices";
       })
 
+        // Get Service Category
+        .addCase(fetchServiceCategories.pending, (state) => {
+          state.loading = true;
+          state.error = null;
+        })
+        .addCase(fetchServiceCategories.fulfilled, (state, action) => {
+          state.loading = false;
+          state.serviceCategories = action.payload;
+        })
+        .addCase(fetchServiceCategories.rejected, (state, action) => {
+          state.loading = false;
+          state.error = action.payload || "Failed to fetch service category";
+        })
+
       // Update Partner Status
       .addCase(updatePartnerStatus.pending, (state) => {
         state.loading = true;
@@ -475,9 +581,57 @@ const allPartnersSlice = createSlice({
       .addCase(updateMultiplePartner.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to update multiple partners";
+      })
+
+      // Generate default slots
+      .addCase(generateDefaultSlots.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(generateDefaultSlots.fulfilled, (state, action) => {
+        state.loading = false;
+        state.partnerDetail = {...state.partnerDetail,timeslots: action.payload};
+      })
+      .addCase(generateDefaultSlots.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to generate default slots";
+      })
+      .addCase(BlockAndUnblockSlot.fulfilled, (state, action) => {
+        const { slotId, status, date } = action.payload;
+
+        if (state.partnerDetail?.timeslots) {
+          const slot = state.partnerDetail.timeslots.find(s => s.id === slotId);
+          if (slot) {
+            slot.status = status;
+            slot.date = date;
+          }
+        }
+      })
+      .addCase(getBlockedSlots.pending, (state) => {
+          state.loading = true;
+          state.error = null;
+      })
+      .addCase(BlockAndUnblockSlot.fulfilled, (state, action) => {
+
+        const { slotId, status } = action.meta.arg;
+
+        if (state.partnerDetail?.timeslots) {
+          const slot = state.partnerDetail.timeslots.find(s => s.id === slotId);
+
+          if (slot) {
+            slot.status = status === "block" ? "blocked" : "active";
+          }
+        }
+
+      })
+      .addCase(getBlockedSlots.rejected, (state, action) => {
+          state.loading = false;
+          state.error = action.payload || "Failed to fetch blocked slots";
       });
   },
 });
+
+
 
 export const { resetAllPartnersState } = allPartnersSlice.actions;
 export default allPartnersSlice.reducer;

@@ -64,7 +64,8 @@ export const bookingpdfDownload = createAsyncThunk(
   "allBookings/bookingpdfDownload",
   async (id, { rejectWithValue }) => {  
     try {
-      const res = await api.get(`/admin/app/downloadBookingPDF/`, {
+      const res = await api.get(`/admin/app/downloadBookingPDF/`, {id: id},
+        {
           headers: {
             "Content-Type": "application/pdf",
           },

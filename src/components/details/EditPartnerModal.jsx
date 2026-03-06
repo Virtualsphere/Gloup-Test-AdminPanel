@@ -28,6 +28,10 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
     status: "pending",
     latitude: "",
     longitude: "",
+    logo: null,
+    servicesProvidedFor: [],
+    languages: [],
+    isPremium: false,
   });
 
   const [imageFile, setImageFile] = useState(null);
@@ -51,6 +55,10 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
       status: store.status || "pending",
       latitude: store.latitude || "",
       longitude: store.longitude || "",
+      logo: store.logo || null,
+      servicesProvidedFor: store.services_provided_for || [],
+      languages: store.languages || [],
+      isPremium: store.is_premium || false,
     });
 
     if (store.images?.length) {
@@ -95,8 +103,8 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
       return;
     }
 
-    if (form.latitude && form.longitude) {
-      setError(" Please select a valid location on the map");
+    if (!form.latitude || !form.longitude) {
+      setError("Please select a valid location on the map");
       return;
     }
 

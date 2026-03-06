@@ -49,6 +49,14 @@ const dispatch=useDispatch()
 const {id} = useParams()
 const [activeTab, setActiveTab] = useState("upcoming")
 let userDetail=useSelector((state)=>state.allUsers.userDetail)
+const user = data?.userdetails || {};
+console.log("userDetail:", userDetail);
+const formatDOB = (dob) =>
+  dob ? new Date(dob).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }) : "--";
 
   useEffect(() => {
    dispatch(getUserDetail({id:Number(id)}))
@@ -131,8 +139,20 @@ let userDetail=useSelector((state)=>state.allUsers.userDetail)
               <IndianRupee className="w-4 h-4" />
               {booking?.common_data?.total_amount}
             </div>
-            <CustomBadge variant={isPast ? "secondary" : "default"}>
-              {isPast ? "Completed" : "Upcoming"}
+          <CustomBadge
+              variant={
+                booking?.common_data?.status === "upcomming"
+                  ? "default"
+                  :  booking?.common_data?.status === "not_completed"
+                  ? "destructive"
+                  : "success"
+              }
+            >
+              { booking?.common_data?.status === "upcomming"
+                ? "Upcoming"
+                : booking?.common_data?.status === "not_completed"
+                ? "Not Completed"
+                : "Completed"}
             </CustomBadge>
           </div>
         </div>
@@ -188,6 +208,69 @@ let userDetail=useSelector((state)=>state.allUsers.userDetail)
   return (
     <div className="mx-auto p-4 space-y-6 min-h-screen">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">{title}</h2>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-5">
+  
+  {/* Profile Image */}
+  <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+    {user?.profilePic ? (
+      <img
+        src={`${import.meta.env.VITE_API_BASE_URL}/images/${user.profilePic}`}
+        alt="Profile"
+        className="w-full h-full object-cover"
+      />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
+        👤
+      </div>
+    )}
+  </div>
+
+  {/* User Info */}
+  <div className="flex-1">
+    <div className="flex items-center gap-3">
+      <h3 className="text-xl font-semibold text-gray-800">
+        {user.firstname} {user.lastname}
+      </h3>
+
+      <span
+        className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          user.status === "active"
+            ? "bg-green-100 text-green-700"
+            : "bg-red-100 text-red-700"
+        }`}
+      >
+        {user.status}
+      </span>
+    </div>
+
+    {/* Contact */}
+    <div className="mt-1 text-sm text-gray-600">
+      <div>{user.email || "--"}</div>
+      <div>{user.phone || "--"}</div>
+    </div>
+  {/* Meta Info */}
+    <div className="mt-3 flex flex-wrap gap-4 text-sm text-gray-700">
+        <div>
+          <span className="text-gray-500">Gender 👤:</span>{" "}
+          <span className="font-medium capitalize">{user.gender || "--"}</span>
+        </div>
+        <div>
+          <span className="text-gray-500">DOB 🎂:</span>{" "}
+          <span className="font-medium">{formatDOB(user.date_of_birth)}</span>
+        </div>
+        <div>
+          <span className="text-gray-500">Age 🔢:</span>{" "}
+          <span className="font-medium">{user.age || "--"}</span>
+        </div>
+    </div>
+  </div>
+
+  {/* User ID */}
+  <div className="text-sm text-gray-500">
+    <div>User ID</div>
+    <div className="font-medium text-gray-700">#{user.id}</div>
+  </div>
+</div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="p-4 text-center">
