@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback, memo } from "react";
+import React, { useEffect, useState, useCallback, memo, use } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useDispatch } from "react-redux";
-import { createPartner } from "../../redux/slices/partnersSlice";
+import { createPartner, getLanguageList, getServiceProvidedForOptions } from "../../redux/slices/partnersSlice";
 import { useNavigate } from "react-router-dom";
 import MapPicker from "./MapPicker";
 import { Toaster, toast } from "react-hot-toast";
 import { useRef } from "react";
+import { get } from "react-hook-form";
 
 /* -------------------- Reusable Input -------------------- */
 const Input = memo(
@@ -53,6 +54,8 @@ const CreatePartner = () => {
   const [errors, setErrors] = useState({});
   const [previews, setPreviews] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [languageOptions, setLanguageOptions] = useState([]);
+  const [servicesProvidedFor, setServicesProvidedFor] = useState([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -96,22 +99,23 @@ const CreatePartner = () => {
     }));
   }, []);
 
-  const LANGUAGE_OPTIONS = [
-    "English",
-    "Tamil",
-    "Hindi",
-    "Malayalam",
-    "Telugu",
-    "Kannada",
-  ];
+ 
 
-  const SERVICE_FOR_OPTIONS = [
-    "Men",
-    "Women",
-    "Kids",
-    "Unisex",
-    "Bridal",
-  ];
+ useEffect(() => {
+    dispatch(getLanguageList()).then((res) => {
+      if (res.payload) {
+        setLanguageOptions(res.payload);
+      }
+    });
+  }, [dispatch]);
+
+  useEffect(() => {
+    dispatch(getServiceProvidedForOptions()).then((res) => {
+      if (res.payload) {
+        setServicesProvidedFor(res.payload);
+      }
+    });
+  }, [dispatch]);
 
   const MAX_IMAGES = 4;
   const handleImageChange = (e) => {
@@ -379,34 +383,35 @@ const CreatePartner = () => {
         <div className="grid md:grid-cols-2 gap-4">
 
           {/* Services Provided For */}
-          <div>
+           <div>
             <label className="text-sm text-gray-600 mb-2 block">
               Services Provided For
             </label>
 
             <div className="flex flex-wrap gap-2">
-              {SERVICE_FOR_OPTIONS.map((type) => {
-                const selected = form.servicesProvidedFor.includes(type);
+              {servicesProvidedFor.map((type) => {
+                const selected = form.servicesProvidedFor.includes(type.id);
 
                 return (
                   <button
-                    key={type}
+                    key={type.id}
                     type="button"
                     onClick={() => {
                       setForm((prev) => ({
                         ...prev,
                         servicesProvidedFor: selected
-                          ? prev.servicesProvidedFor.filter((t) => t !== type)
-                          : [...prev.servicesProvidedFor, type],
+                          ? prev.servicesProvidedFor.filter((t) => t !== type.id)
+                          : [...prev.servicesProvidedFor, type.id],
                       }));
                     }}
                     className={`px-4 py-2 rounded-full text-sm border transition
-            ${selected
+                    ${
+                      selected
                         ? "bg-indigo-600 text-white border-indigo-600"
                         : "bg-gray-100 hover:bg-gray-200"
-                      }`}
+                    }`}
                   >
-                    {type}
+                    {type.name}
                   </button>
                 );
               })}
@@ -418,7 +423,6 @@ const CreatePartner = () => {
               </p>
             )}
           </div>
-
           {/* Premium Toggle */}
           <div className="flex items-center justify-between">
             <label className="text-sm text-gray-600">
@@ -445,42 +449,42 @@ const CreatePartner = () => {
 
           {/* Languages */}
           <div className="md:col-span-2">
-            <label className="text-sm text-gray-600 mb-2 block">
-              Languages Known
-            </label>
+              <label className="text-sm text-gray-600 mb-2 block">
+                Languages Known
+              </label>
 
-            <div className="flex flex-wrap gap-2">
-              {LANGUAGE_OPTIONS.map((lang) => {
-                const selected = form.languages.includes(lang);
-                return (
-                  <button
-                    type="button"
-                    key={lang}
-                    onClick={() => {
-                      setForm((prev) => ({
-                        ...prev,
-                        languages: selected
-                          ? prev.languages.filter((l) => l !== lang)
-                          : [...prev.languages, lang],
-                      }));
-                    }}
-                    className={`px-3 py-1 rounded-full text-sm border transition
-            ${selected
-                        ? "bg-indigo-600 text-white border-indigo-600"
-                        : "bg-gray-100 hover:bg-gray-200"
+              <div className="flex flex-wrap gap-2">
+                {languageOptions.map((lang) => {
+                  const selected = form.languages.includes(lang.id);
+                  return (
+                    <button
+                      key={lang.id}
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => ({
+                          ...prev,
+                          languages: selected
+                            ? prev.languages.filter((l) => l !== lang.id)
+                            : [...prev.languages, lang.id],
+                        }));
+                      }}
+                      className={`px-4 py-2 rounded-full text-sm border transition
+                      ${
+                        selected
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-gray-100 hover:bg-gray-200"
                       }`}
-                  >
-                    {lang}
-                  </button>
-                );
-              })}
-            </div>
+                    >
+                      {lang.name}
+                    </button>
+                  );
+                })}
+              </div>
 
-            {errors.languages && (
-              <p className="text-xs text-red-500 mt-1">{errors.languages}</p>
-            )}
+              {errors.languages && (
+                <p className="text-xs text-red-500 mt-1">{errors.languages}</p>
+              )}
           </div>
-
         </div>
       </section>
 
