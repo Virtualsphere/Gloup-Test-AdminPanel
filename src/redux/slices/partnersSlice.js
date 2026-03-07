@@ -398,6 +398,51 @@ export const getBlockedSlots = createAsyncThunk(
   }
 );
 
+// get language list
+export const getLanguageList = createAsyncThunk(
+  "allPartners/getLanguageList",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/app/getlanguagelist", {}, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch language list";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// get service provided for options
+export const getServiceProvidedForOptions = createAsyncThunk(
+  "allPartners/getServiceProvidedForOptions",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/app/getserviceprovidedforoptions", {}, {
+        headers: {  
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    }
+    catch (error) {
+      const message =
+        error.response?.data?.error?.message || 
+        error.message ||
+        "Failed to fetch service provided for options";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   loading: false,
@@ -410,7 +455,9 @@ const initialState = {
   allPayoutLogs: [],
   verifiedPartners: [],
   serviceCategories: [],
-  blockedSlots: []
+  blockedSlots: [],
+  languageList: [],
+  serviceProvidedForOptions: [],
 };
 
 const allPartnersSlice = createSlice({
@@ -596,6 +643,8 @@ const allPartnersSlice = createSlice({
         state.loading = false;
         state.error = action.payload || "Failed to generate default slots";
       })
+
+      // Block and Unblock slot
       .addCase(BlockAndUnblockSlot.fulfilled, (state, action) => {
         const { slotId, status, date } = action.payload;
 
@@ -611,27 +660,40 @@ const allPartnersSlice = createSlice({
           state.loading = true;
           state.error = null;
       })
-      .addCase(BlockAndUnblockSlot.fulfilled, (state, action) => {
-
-        const { slotId, status } = action.meta.arg;
-
-        if (state.partnerDetail?.timeslots) {
-          const slot = state.partnerDetail.timeslots.find(s => s.id === slotId);
-
-          if (slot) {
-            slot.status = status === "block" ? "blocked" : "active";
-          }
-        }
-
-      })
       .addCase(getBlockedSlots.rejected, (state, action) => {
           state.loading = false;
           state.error = action.payload || "Failed to fetch blocked slots";
+      })
+
+      // Get Language List
+      .addCase(getLanguageList.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getLanguageList.fulfilled, (state, action) => {
+        state.loading = false;
+        state.languageList = action.payload;
+      })
+      .addCase(getLanguageList.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to fetch language list";
+      })
+
+      // Get Service Provided For Options
+      .addCase(getServiceProvidedForOptions.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getServiceProvidedForOptions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.serviceProvidedForOptions = action.payload;
+      })
+      .addCase(getServiceProvidedForOptions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to fetch service provided for options";
       });
   },
 });
-
-
 
 export const { resetAllPartnersState } = allPartnersSlice.actions;
 export default allPartnersSlice.reducer;

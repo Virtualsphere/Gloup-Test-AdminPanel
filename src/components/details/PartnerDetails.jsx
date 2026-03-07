@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { MapPin, CheckCircle, XCircle, Eye, Calendar, User, IndianRupee, Edit, Trash2, } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
-import { getPartnerDetail, getAllPayoutLogs, updatePartnerDetail, updatePartnerStatus, deletePartner, getStoreServices, generateDefaultSlots, BlockAndUnblockSlot, getBlockedSlots } from "../../redux/slices/partnersSlice";
+import { getPartnerDetail, getAllPayoutLogs, updatePartnerDetail, updatePartnerStatus, deletePartner, getStoreServices, generateDefaultSlots, BlockAndUnblockSlot, getBlockedSlots, getLanguageList, getServiceProvidedForOptions } from "../../redux/slices/partnersSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -17,6 +17,7 @@ import { fetchServiceCategories } from "../../redux/slices/partnersSlice";
 
 export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
   const [location, setLocation] = useState(null);
+  const dispatch = useDispatch();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [form, setForm] = useState({
     name: "",
@@ -45,6 +46,9 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
     languages: [],
     isPremium: false,
   });
+  const [servicesProvidedFor, setServicesProvidedFor] = useState([]);
+  const [languageOptions, setLanguageOptions] = useState([]);
+
 
   useEffect(() => {
     debugger;
@@ -84,6 +88,17 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
     setLocation({ lat: d?.latitude, lng: d?.longitude });
 
   }, [partnerData]);
+
+  
+  useEffect(() => {
+  dispatch(getServiceProvidedForOptions()).then((res) => {
+    setServicesProvidedFor(res.payload || []);
+  });
+
+  dispatch(getLanguageList()).then((res) => {
+    setLanguageOptions(res.payload || []);
+  });
+}, [dispatch]);
 
   // ✅ FIX — sync MapPicker → form
   useEffect(() => {
@@ -172,82 +187,91 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
           </div>
           {/* Salon Services Provided For */}
           <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">
-              Services Provided For
-            </h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                Services Provided For
+              </h3>
 
-            <div className="flex flex-wrap gap-3">
-              {["Men", "Women", "Kids", "Unisex", "Bridal"].map((lang) => {
-                const active = form.servicesProvidedFor.includes(lang);
+              <div className="flex flex-wrap gap-3">
+                {servicesProvidedFor.map((item) => {
+                  const active = form.servicesProvidedFor.includes(item.id);
 
-                return (
-                  <button
-                    type="button"
-                    key={lang}
-                    onClick={() => {
-                      const updated = active
-                        ? form.servicesProvidedFor.filter((l) => l !== lang)
-                        : [...form.servicesProvidedFor, lang];
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => {
+                        const updated = active
+                          ? form.servicesProvidedFor.filter((l) => l !== item.id)
+                          : [...form.servicesProvidedFor, item.id];
 
-                      handleChange("servicesProvidedFor", updated);
-                    }}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
-                        ${active
-                        ? "bg-indigo-600 text-white shadow-md scale-105"
-                        : "bg-gray-200 hover:bg-gray-300"
-                      }`}
-                  >
-                    {lang}
-                  </button>
-                );
-              })}
+                        handleChange("servicesProvidedFor", updated);
+                      }}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
+                        ${
+                          active
+                            ? "bg-indigo-600 text-white shadow-md scale-105"
+                            : "bg-gray-200 hover:bg-gray-300"
+                        }`}
+                    >
+                      {item.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {form.servicesProvidedFor.length > 0 && (
+                <p className="text-sm text-gray-500 mt-3">
+                  Selected: {form.servicesProvidedFor
+                    .map(
+                      (id) =>
+                        servicesProvidedFor.find((s) => s.id === id)?.name
+                    )
+                    .join(", ")}
+                </p>
+              )}
             </div>
-
-            {form.servicesProvidedFor.length > 0 && (
-              <p className="text-sm text-gray-500 mt-3">
-                Selected: {form.servicesProvidedFor.join(", ")}
-              </p>
-            )}
-          </div>
           {/* Languages Known */}
           <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">
-              Languages Known
-            </h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                Languages Known
+              </h3>
 
-            <div className="flex flex-wrap gap-3">
-              {["English", "Tamil", "Hindi", "Malayalam", "Telugu", "Kannada"].map((lang) => {
-                const active = form.languages.includes(lang);
+              <div className="flex flex-wrap gap-3">
+                {languageOptions.map((lang) => {
+                  const active = form.languages.includes(lang.id);
 
-                return (
-                  <button
-                    type="button"
-                    key={lang}
-                    onClick={() => {
-                      const updated = active
-                        ? form.languages.filter((l) => l !== lang)
-                        : [...form.languages, lang];
+                  return (
+                    <button
+                      type="button"
+                      key={lang.id}
+                      onClick={() => {
+                        const updated = active
+                          ? form.languages.filter((l) => l !== lang.id)
+                          : [...form.languages, lang.id];
 
-                      handleChange("languages", updated);
-                    }}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
-                        ${active
-                        ? "bg-indigo-600 text-white shadow-md scale-105"
-                        : "bg-gray-200 hover:bg-gray-300"
-                      }`}
-                  >
-                    {lang}
-                  </button>
-                );
-              })}
+                        handleChange("languages", updated);
+                      }}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
+                        ${
+                          active
+                            ? "bg-indigo-600 text-white shadow-md scale-105"
+                            : "bg-gray-200 hover:bg-gray-300"
+                        }`}
+                    >
+                      {lang.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {form.languages.length > 0 && (
+                <p className="text-sm text-gray-500 mt-3">
+                  Selected: {form.languages
+                    .map((id) => languageOptions.find((l) => l.id === id)?.name)
+                    .join(", ")}
+                </p>
+              )}
             </div>
-
-            {form.languages.length > 0 && (
-              <p className="text-sm text-gray-500 mt-3">
-                Selected: {form.languages.join(", ")}
-              </p>
-            )}
-          </div>
           {/* Premium Partner */}
           <div className="flex items-center gap-4">
             <span className="font-medium text-gray-700">Premium Partner</span>
@@ -934,7 +958,7 @@ const unblockSelectedSlots = async () => {
 };
 
 useEffect(() => {
-
+  debugger;
   if (!selectedDate) return;
 
   dispatch(
@@ -945,12 +969,12 @@ useEffect(() => {
   )
     .unwrap()
     .then((blockedSlots) => {
-
-      const blockedIds = blockedSlots.map(s => s.slot_id);
+      console.log("Blocked slots for", selectedDate.full, blockedSlots);
+      const blockedIds = (blockedSlots || []).map(s => s.slot_id);
 
       setData(prev => ({
         ...prev,
-        timeslots: prev.timeslots.map(slot => ({
+        timeslots: (prev.timeslots || []).map(slot => ({
           ...slot,
           status: blockedIds.includes(slot.id) ? "blocked" : "active"
         }))
@@ -1174,14 +1198,14 @@ useEffect(() => {
                     <p>
                       <span className="font-bold">Services For:</span>{" "}
                       {data?.store_details?.services_provided_for?.length
-                        ? data.store_details.services_provided_for.join(", ")
+                        ? data.servicesProvidedFor.join(", ")
                         : "N/A"}
                     </p>
 
                     <p>
                       <span className="font-bold">Languages:</span>{" "}
-                      {data?.store_details?.languages?.length
-                        ? data.store_details.languages.join(", ")
+                      {data?.languages?.length
+                        ? data.languages.join(", ")
                         : "N/A"}
                     </p>
 
@@ -1300,7 +1324,7 @@ useEffect(() => {
                       <div key={slot.id} className="relative group">
 
                         <button
-                          disabled={slot.status === "active" && isSlotDisabled(slot)}
+                          disabled={slot.status === "blocked" || isSlotDisabled(slot)}
                           onClick={() => toggleSelectSlot(slot.id)}
                           className={`w-full py-3 rounded-full border text-sm font-medium transition
 
