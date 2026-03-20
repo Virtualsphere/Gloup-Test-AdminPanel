@@ -117,7 +117,7 @@ const CreatePartner = () => {
     });
   }, [dispatch]);
 
-  const MAX_IMAGES = 4;
+  const MAX_IMAGES = 6;
   const handleImageChange = (e) => {
     debugger;
     const files = Array.from(e.target.files);

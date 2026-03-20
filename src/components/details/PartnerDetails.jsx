@@ -15,7 +15,7 @@ import { Plus } from "lucide-react";
 import EditServiceModal from "../create/EditService";
 import { fetchServiceCategories } from "../../redux/slices/partnersSlice";
 
-export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
+export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving  }) => {
   const [location, setLocation] = useState(null);
   const dispatch = useDispatch();
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -48,7 +48,6 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
   });
   const [servicesProvidedFor, setServicesProvidedFor] = useState([]);
   const [languageOptions, setLanguageOptions] = useState([]);
-
 
   useEffect(() => {
     debugger;
@@ -127,8 +126,10 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
   };
 
   const handleImageChange = (e) => {
-    const files = [...e.target.files];
-    handleChange("images", files);
+    const files = Array.from(e.target.files);
+
+    handleChange("images", [...form.images, ...files]);
+
     handleChange("newImagesAdded", true);
   };
 
@@ -411,10 +412,11 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
             </label>
 
             {/* Preview Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-5">
+           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-5">
               {(form.images || []).map((img, i) => {
+
                 const src =
-                  form.newImagesAdded
+                  img instanceof File
                     ? URL.createObjectURL(img)
                     : `${API}/images/${img}`;
 
@@ -423,13 +425,20 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
                     key={i}
                     className="relative group rounded-xl overflow-hidden shadow border bg-white"
                   >
+
+                     {/* NEW BADGE */}
+                    {img instanceof File && (
+                      <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
+                        New
+                      </span>
+                    )}
+
                     <img
                       src={src}
                       className="w-full h-32 object-cover"
                       alt="Salon"
                     />
 
-                    {/* Hover Overlay */}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
                       <button
                         type="button"
@@ -460,10 +469,37 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
             Cancel
           </button>
           <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            onClick={() => handleSave(form)}
+            disabled={saving}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md disabled:opacity-50 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save
+            {saving ? (
+              <>
+                <svg
+                  className="animate-spin h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                  ></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              "Save"
+            )}
           </button>
         </div>
       </div>
@@ -491,7 +527,7 @@ const PartnerDetails = ({ title }) => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     dispatch(fetchServiceCategories())
@@ -619,6 +655,7 @@ const PartnerDetails = ({ title }) => {
 
   const handleSaveEdit = async (updatedData) => {
     try {
+      setSaving(true);
       console.log('handling save', updatedData);
       // -----------------------------
       // 1️⃣ BASIC REQUIRED VALIDATION
@@ -715,53 +752,62 @@ const PartnerDetails = ({ title }) => {
       formData.append("isPremium", updatedData.isPremium);
 
       // -----------------------------
-      // LOGO HANDLING (CORRECT WAY)
+      // LOGO HANDLING
       // -----------------------------
 
-      if (updatedData.newLogoAdded) {
+      // New logo uploaded
+      if (updatedData.logo instanceof File) {
+        formData.append("logo", updatedData.logo);
+      }
 
-        // New logo uploaded
-        if (updatedData.logo instanceof File) {
-          formData.append("logo", updatedData.logo);
-        }
+      // Logo removed
+      if (!updatedData.logo && updatedData.newLogoAdded) {
+        formData.append("removeLogo", "true");
+      }
 
-        // Logo removed
-        if (!updatedData.logo) {
-          formData.append("removeLogo", "true");
-        }
-
-      } else {
-
-        // Old logo unchanged
-        if (typeof updatedData.logo === "string") {
-          formData.append("oldLogo", updatedData.logo);
-        }
-
+      // Keep existing logo
+      if (typeof updatedData.logo === "string") {
+        formData.append("oldLogo", updatedData.logo);
       }
 
 
-      if (!updatedData.newImagesAdded) {
-        updatedData.images.forEach((img) => {
-          formData.append("oldImages", img);
-        });
-      }
+      // -----------------------------
+      // IMAGE HANDLING
+      // -----------------------------
 
-      if (updatedData.newImagesAdded) {
-        updatedData.images.forEach((file) => {
-          formData.append("images", file);
-        });
-      }
+      const oldImages = [];
+      const newImages = [];
+
+      (updatedData.images || []).forEach((img) => {
+        if (img instanceof File) {
+          newImages.push(img);
+        } else {
+          oldImages.push(img);
+        }
+      });
+
+      // remaining old images (after remove)
+      oldImages.forEach((img) => {
+        formData.append("oldImages", img);
+      });
+
+      // new uploaded images
+      newImages.forEach((file) => {
+        formData.append("images", file);
+      });
 
       console.log('formdata: ', formData)
 
       await dispatch(updatePartnerDetail(formData)).unwrap();
 
       alert("Partner Updated Successfully ✅");
-      window.location.reload();
       dispatch(getPartnerDetail({ id }));
       setShowEditModal(false);
     } catch (err) {
       alert("Failed to save changes. Please try again.");
+    }
+    finally {
+      setSaving(false);
     }
   };
 
@@ -1519,6 +1565,7 @@ useEffect(() => {
         onClose={() => setShowEditModal(false)}
         partnerData={data}
         onSave={handleSaveEdit}
+        saving={saving}
       />
     </div>
   );

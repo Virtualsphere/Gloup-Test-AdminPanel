@@ -53,34 +53,33 @@ const BookingForm = () => {
     (state) => state.allBookings
   );
 
-  const downloadPDF = async () => {
-    try {
-      const toastId = toast.loading("Generating PDF...");
+const downloadPDF = async () => {
+  const toastId = toast.loading("Generating PDF...");
 
-      const result = await dispatch(bookingpdfDownload(bookingView.id));
+  try {
 
-      if (bookingpdfDownload.fulfilled.match(result)) {
+    const blob = await dispatch(
+      bookingpdfDownload(bookingView.id)
+    ).unwrap();
 
-        toast.success("PDF Generated Successfully", { id: toastId });
-        const blob = result.payload; // ✅ already a Blob
-        console.log("PDF Blob:", blob);
-        const url = window.URL.createObjectURL(blob);
+    const url = window.URL.createObjectURL(blob);
 
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `Booking_${bookingView.id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Booking_${bookingView.id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
 
-        a.remove();
-        window.URL.revokeObjectURL(url);
-      } else {
-        toast.error("Failed to download PDF", { id: toastId });
-      }
-    } catch (err) {
-      toast.error("Something went wrong");
-    }
-  };
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    toast.success("PDF Generated Successfully", { id: toastId });
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to download PDF", { id: toastId });
+  }
+};
 
   if (loading) return <div className="flex items-center justify-center py-10 text-gray-500">
     <svg

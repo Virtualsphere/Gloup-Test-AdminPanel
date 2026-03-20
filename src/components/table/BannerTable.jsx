@@ -379,8 +379,8 @@ const BannerTable = ({ data, title, onEdit, onDelete }) => {
                         {item?.image ? (
                           <div className="w-16 h-16 sm:w-20 sm:h-20  rounded-xl overflow-hidden">
                             <img
-                            src={`${import.meta.env.VITE_API_BASE_URL}/profilepic/${item?.image}`}
-                            alt={`category-image-${item.id}`}
+                            src={`${import.meta.env.VITE_API_BASE_URL}/bannerimage/${item?.image}`}
+                            alt={`banner-image-${item.id}`}
                             className="w-full h-full object-cover"
                             />
                                 
