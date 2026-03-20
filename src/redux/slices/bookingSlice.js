@@ -62,29 +62,29 @@ export const getBookingById = createAsyncThunk(
 
 export const bookingpdfDownload = createAsyncThunk(
   "allBookings/bookingpdfDownload",
-  async (id, { rejectWithValue }) => {  
+  async (id, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/admin/app/downloadBookingPDF/`, {id: id},
+       const res = await api.post(
+        `/admin/app/downloadBookingPDF/${id}`,
+        {},
         {
-          headers: {
-            "Content-Type": "application/pdf",
-          },
-          withCredentials: false,
-          responseType: "blob",
-        });
+          responseType: "blob"
+        }
+      );
+
       console.log("PDF Download response:", res);
+
       return res.data;
-    }
-    catch (error) {
+
+    } catch (error) {
       return rejectWithValue(
         error.response?.data?.error?.message ||
-          error.message ||
-          "Failed to download PDF"
+        error.message ||
+        "Failed to download PDF"
       );
     }
   }
 );
-
 export const updateBookingStatus = createAsyncThunk(
   "allBookings/updateStatus",
   async ({ id, status }, { rejectWithValue }) => {

@@ -9,7 +9,7 @@ const DashboardPage = lazy(() =>
 const Admin = lazy(() => import("../components/data/Admin"));
 const Auth = lazy(() => import("../components/auth/AuthPages"));
 const UserDetails = lazy(() => import("../components/details/UserDetails"));
-const Partner = lazy(() => import("../components/data/partner"));
+const Partner = lazy(() => import("../components/data/Partner"));
 const PartnerDetails = lazy(() => import("../components/details/PartnerDetails"));
 const CreatePartner = lazy(() => import("../components/create/CreatePartner"));
 const Appointments = lazy(() => import("../components/create/Appointments"));
@@ -25,6 +25,8 @@ const Review = lazy(() => import("../components/data/Review"));
 const VerifyPartner = lazy(() => import("../components/data/VerifyPartner"));
 const Bookings = lazy(() => import("../components/data/Bookings"));
 const BookingForm = lazy(() => import("../components/form/BookingForm"));
+const PartnerSubscription = lazy(() => import("../components/data/PartnerSubscription"));
+const PartnerSubscriptionForm = lazy(() => import("../components/form/PartnerSubscriptionForm"));
 
 const AppRoutes = () => {
   return (
@@ -40,16 +42,19 @@ const AppRoutes = () => {
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin title="Admin" />} />
         <Route path="/allusers" element={<AllUsers title="Users"/>} />
-        <Route path="/userdetails/:id" element={<UserDetails title="UserDetails"/>} />
+        <Route path="/userdetails/:id" element={<UserDetails title="User Details"/>} />
         <Route path="/partner" element={<Partner title="Partner"/>} />
         <Route path="/bookings" element={<Bookings title="Bookings"/>} />
         <Route path="/bookings/:id" element={<BookingForm />} />
+        <Route path="/partnersubscriptionplans" element={<PartnerSubscription title="Partner Subscription" />} />
+        <Route path="/partnersubscription/add" element={<PartnerSubscriptionForm />} />
+        <Route path="/partnersubscription/edit/:id" element={<PartnerSubscriptionForm />} />
         <Route path="/partnerdetails/:id" element={<PartnerDetails title="Partner Details"/>} />
         <Route path="/createPartner" element={<CreatePartner title="CreatePartner"/>} />
         <Route path="/verifypartner" element={<VerifyPartner title="Verify Partner"/>} />
         <Route path="/appointments" element={<Appointments title="Appointments"/>} />
         <Route path="/services" element={<Services title="Services"/>} />
-        <Route path="/storeservices/:id" element={<StoreServices title="StoreServices"/>} />
+        <Route path="/storeservices/:id" element={<StoreServices title="Store Services"/>} />
         <Route path="/category" element={<Category title="Category"/>} />
         <Route path="/notification" element={<Notification title="Notification"/>} />
         <Route path="/banner" element={<Banner title="Banner"/>} />

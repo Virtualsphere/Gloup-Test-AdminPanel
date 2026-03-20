@@ -73,6 +73,7 @@ const handleAddData = async (newData) => {
     }
   };
   const handleUpdateData = async (updatedData) => {
+    debugger;
     const formDataToSend = new FormData();
     formDataToSend.append("id", updatedData.id); // important for update
     formDataToSend.append("name", updatedData.name);
@@ -119,10 +120,11 @@ const handleAddData = async (newData) => {
   };
 
   const handleEditClick = async (record) => {
+    debugger;
     let imageFile = null;
       // Convert existing image to File object
     if (record.image) {
-      const imageUrl = `${import.meta.env.VITE_API_BASE_URL}/profilepic/${record.image}`;
+      const imageUrl = `${import.meta.env.VITE_API_BASE_URL}/categoryimage/${record.image}`;
       imageFile = await convertImageUrlToFile(imageUrl, record.image);
     }
     setFormData({

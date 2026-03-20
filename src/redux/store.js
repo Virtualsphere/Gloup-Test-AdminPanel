@@ -21,6 +21,7 @@ import refundReducer from "./slices/refundSlice";
 import subscriptionReducer from "./slices/subscriptionSlice";
 import reviewReducer from "./slices/reviewSlice";
 import bookingReducer from "./slices/bookingSlice";
+import partnerSubscriptionReducer from "./slices/partnersubscriptionSlice";
 
 const persistConfig = {
   key: "root", // key for localStorage
@@ -44,6 +45,7 @@ const rootReducer = combineReducers({
   allSubscriptions: subscriptionReducer,
   allReviews: reviewReducer,
   allBookings: bookingReducer,
+  allpartnerSubscription: partnerSubscriptionReducer,
 });
 
 // Wrap the rootReducer with persistReducer
