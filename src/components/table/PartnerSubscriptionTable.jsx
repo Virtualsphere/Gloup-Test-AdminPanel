@@ -110,7 +110,7 @@ const PartnerSubscriptionTable = ({ data = [], title }) => {
                 {plan.featuresMapping?.length > 0 ? (
                     plan.featuresMapping.map((f, i) => (
                     <li key={i}>
-                        ✔ {f.feature?.feature_name || "Feature"}
+                        ✔ {f.featureDetails?.feature_name || "Feature"}
                     </li>
                     ))
                 ) : (
@@ -205,7 +205,7 @@ const PartnerSubscriptionTable = ({ data = [], title }) => {
                         <ul className="text-xs space-y-1">
                           {plan.featuresMapping.map((f, i) => (
                             <li key={i}>
-                              • {f.feature?.feature_name}
+                              • {f.featureDetails?.feature_name}
                             </li>
                           ))}
                         </ul>
