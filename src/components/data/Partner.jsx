@@ -29,7 +29,7 @@ const Partner = ({ title }) => {
   return (
     <div className="space-y-6">
       <div>
-        {/* <h2 className="text-2xl font-bold text-gray-800 mb-6">{title}</h2>*/}
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">{title}</h2>
         {/* Error Message */}
         {error ? (
           <div className="text-red-600 bg-red-50 border border-red-200 p-4 rounded-md mb-4">
@@ -58,7 +58,7 @@ const Partner = ({ title }) => {
             Loading partners...
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
             <PartnerTable data={data} title={title} />
           </div>
         )}

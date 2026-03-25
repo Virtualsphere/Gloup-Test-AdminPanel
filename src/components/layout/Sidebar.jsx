@@ -13,7 +13,8 @@ import {
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const Sidebar = ({ collapsed }) => {
+
+const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -21,11 +22,7 @@ const Sidebar = ({ collapsed }) => {
     { path: "/", icon: <BarChart size={18} />, text: "Dashboard" },
     { path: "/partner", icon: <Handshake size={18} />, text: "Partners" },
     { path: "/verifypartner", icon: <User size={18} />, text: "Verify Partner" },
-    {
-      path: "/partnersubscriptionplans",
-      icon: <CreditCard size={18} />,
-      text: "Plans",
-    },
+    { path: "/partnersubscriptionplans", icon: <CreditCard size={18} />, text: "Plans" },
     { path: "/bookings", icon: <CalendarCheck size={18} />, text: "Bookings" },
     { path: "/subscription", icon: <CreditCard size={18} />, text: "Subscription" },
     { path: "/category", icon: <Layers size={18} />, text: "Category" },
@@ -38,24 +35,35 @@ const Sidebar = ({ collapsed }) => {
   ];
 
   return (
-    <aside
-      className={`fixed top-0 left-0 h-screen z-50 
-      bg-gradient-to-b from-[#0f172a] via-[#020617] to-black 
-      backdrop-blur-xl border-r border-white/10
-      ${collapsed ? "w-16" : "w-64"} 
-      transition-all duration-300 flex flex-col`}
+   <aside
+      className={`
+        fixed top-0 left-0 h-screen z-50
+        bg-gradient-to-b from-[#0f172a]/95 via-[#020617]/95 to-black/95
+        backdrop-blur-xl border-r border-white/10 shadow-2xl
+        transition-all duration-300 flex flex-col
+
+        w-64
+        ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+        md:translate-x-0
+        ${collapsed ? "md:w-20" : "md:w-64"}
+      `}
     >
-      {/* Logo */}
-      <div className="h-16 flex items-center justify-center border-b border-white/10">
+      {/* LOGO */}
+       <div className="h-13 flex items-center gap-3 px-4 py-4 border-b border-white/10">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+          <span className="text-white font-bold text-lg">G</span>
+        </div>
+
         {!collapsed && (
-          <h2 className="text-lg font-semibold tracking-wide text-white">
-            GloUp Admin
-          </h2>
+          <div>
+            <h2 className="text-white text-sm font-semibold">GloUp Admin</h2>
+            <p className="text-xs text-gray-400">Management Panel</p>
+          </div>
         )}
       </div>
 
-      {/* Menu */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      {/* MENU */}
+      <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto custom-scroll">
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path;
 
@@ -63,25 +71,34 @@ const Sidebar = ({ collapsed }) => {
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
-              className={`group flex items-center w-full rounded-xl px-3 py-2.5 transition-all duration-200
-              
-              ${
-                isActive
-                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
-              }
+              className={`
+                relative group flex items-center w-full rounded-xl px-2 py-2
+                transition-all duration-200
 
-              ${collapsed ? "justify-center" : ""}
-              `}
-            >
-              {/* Icon */}
-              <div
-                className={`flex items-center justify-center w-9 h-9 rounded-lg transition
                 ${
                   isActive
-                    ? "bg-white/20"
-                    : "bg-white/5 group-hover:bg-white/10"
-                }`}
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }
+
+                ${collapsed ? "justify-center" : ""}
+              `}
+            >
+              {/* Active Indicator */}
+              {isActive && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-blue-400 rounded-r-full"></span>
+              )}
+
+              {/* Icon */}
+              <div
+                className={`
+                  flex items-center justify-center w-6 h-6 rounded-lg
+                  ${
+                    isActive
+                      ? "bg-white/20"
+                      : "bg-white/5 group-hover:bg-white/10"
+                  }
+                `}
               >
                 {item.icon}
               </div>
@@ -97,7 +114,7 @@ const Sidebar = ({ collapsed }) => {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* FOOTER */}
       {!collapsed && (
         <div className="p-4 border-t border-white/10 text-xs text-gray-500">
           © 2026 GloUp

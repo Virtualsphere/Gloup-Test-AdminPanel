@@ -50,7 +50,6 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
   const [languageOptions, setLanguageOptions] = useState([]);
 
   useEffect(() => {
-    debugger;
     if (!partnerData) return;
     const d = partnerData.store_details;
 
@@ -125,6 +124,11 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
     }));
   };
 
+  const cleanLogo = (logo) => {
+  if (!logo) return null;
+  return logo.replace(/^"+|"+$/g, ""); // remove extra quotes
+};
+
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
 
@@ -136,6 +140,10 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
   const handleSave = () => onSave(form);
 
   const API = import.meta.env.VITE_API_BASE_URL;
+
+  const IMAGEAPI = import.meta.env.VITE_IMAGE_BASE_URL;
+
+  const { id } = useParams();
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center items-center p-6">
@@ -328,21 +336,32 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
 
               {/* Logo Preview */}
               <div className="relative group">
+                
                 {form.logo ? (
-                  <img
-                    src={
-                      form.newLogoAdded
-                        ? URL.createObjectURL(form.logo)
-                        : `${API}/images/${form.logo}`
-                    }
-                    className="w-28 h-28 rounded-full object-cover border-4 border-indigo-200 shadow"
-                    alt="Salon Logo"
-                  />
-                ) : (
-                  <div className="w-28 h-28 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                    No Logo
-                  </div>
-                )}
+  <img
+    src={
+      form.logo instanceof File
+        ? URL.createObjectURL(form.logo) // ✅ new upload
+        : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(form.logo)}` // ✅ S3/CDN
+    }
+    alt="Store Logo"
+    className="w-28 h-28 rounded-full object-cover border-4 border-indigo-200 shadow"
+    onError={(e) => {
+      const target = e.target;
+
+      if (!target.dataset.fallback) {
+        target.dataset.fallback = "true";
+        target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(form.logo)}`; // ✅ local fallback
+      } else {
+        target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+      }
+    }}
+  />
+) : (
+  <div className="w-28 h-28 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+    No Logo
+  </div>
+)}
 
                 {/* Remove Logo */}
                 {form.logo && (
@@ -414,12 +433,6 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
             {/* Preview Grid */}
            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-5">
               {(form.images || []).map((img, i) => {
-
-                const src =
-                  img instanceof File
-                    ? URL.createObjectURL(img)
-                    : `${API}/images/${img}`;
-
                 return (
                   <div
                     key={i}
@@ -434,9 +447,24 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
                     )}
 
                     <img
-                      src={src}
-                      className="w-full h-32 object-cover"
-                      alt="Salon"
+                      src={
+                        img instanceof File
+                          ? URL.createObjectURL(img)
+                          : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
+                      }
+                      alt="store"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target;
+
+                        // prevent infinite loop
+                        if (!target.dataset.fallback) {
+                          target.dataset.fallback = "true";
+                          target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${img}`;
+                        } else {
+                          target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`; // final fallback
+                        }
+                      }}
                     />
 
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
@@ -528,6 +556,8 @@ const PartnerDetails = ({ title }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const API = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
     dispatch(fetchServiceCategories())
@@ -653,8 +683,53 @@ const PartnerDetails = ({ title }) => {
     }
   };
 
+  const urlToFile1 = async (url) => {
+    const res = await fetch(url);
+    const blob = await res.blob();
+
+    let fileName = url.split("/").pop().split("?")[0];
+
+    const disposition = res.headers.get("content-disposition");
+    if (disposition && disposition.includes("filename=")) {
+      fileName = disposition.split("filename=")[1].replace(/"/g, "");
+    }
+
+    if (!fileName.includes(".")) {
+      const ext = blob.type.split("/")[1] || "jpg";
+      fileName = `file.${ext}`;
+    }
+
+    return new File([blob], fileName, {
+      type: blob.type,
+    });
+  };
+
+const fetchWithFallback = async (img) => {
+  try {
+    const s3Url = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`;
+    const res = await fetch(s3Url);
+
+    if (!res.ok) throw new Error("S3 failed");
+
+    return await urlToFile(s3Url, img);
+  } catch {
+    const localUrl = `${API}/images/${img}`;
+    return await urlToFile(localUrl, img);
+  }
+};
+
+const urlToFile = async (url, filename) => {
+  const res = await fetch(url);
+  const blob = await res.blob();
+
+  return new File([blob], filename, {
+    type: blob.type,
+  });
+};
+
   const handleSaveEdit = async (updatedData) => {
     try {
+      debugger;
       setSaving(true);
       console.log('handling save', updatedData);
       // -----------------------------
@@ -778,7 +853,7 @@ const PartnerDetails = ({ title }) => {
       const oldImages = [];
       const newImages = [];
 
-      (updatedData.images || []).forEach((img) => {
+     (updatedData.images || []).forEach((img) => {
         if (img instanceof File) {
           newImages.push(img);
         } else {
@@ -786,12 +861,22 @@ const PartnerDetails = ({ title }) => {
         }
       });
 
-      // remaining old images (after remove)
-      oldImages.forEach((img) => {
-        formData.append("oldImages", img);
+      const oldFiles = await Promise.all(
+        oldImages.map((img) => fetchWithFallback(img))
+      );
+
+      // ✅ send old images as JSON
+     oldFiles.forEach((file) => {
+      console.log("File Info:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
       });
 
-      // new uploaded images
+      formData.append("images", file);
+    });
+
+      // ✅ send full files (already correct)
       newImages.forEach((file) => {
         formData.append("images", file);
       });
@@ -1003,8 +1088,13 @@ const unblockSelectedSlots = async () => {
   }
 };
 
+
+const cleanLogo = (logo) => {
+  if (!logo) return null;
+  return logo.replace(/^"+|"+$/g, ""); // remove extra quotes
+};
+
 useEffect(() => {
-  debugger;
   if (!selectedDate) return;
 
   dispatch(
@@ -1124,16 +1214,26 @@ useEffect(() => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6">
                   <div className="flex gap-4">
 
-                    {/* LOGO */}
-                    {data?.store_details?.logo && (
-                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-indigo-500 shadow">
-                        <img
-                          src={`${import.meta.env.VITE_API_BASE_URL}/images/${data.store_details.logo}`}
-                          alt="logo"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
+                   {/* LOGO */}
+{data?.store_details?.logo && (
+  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-indigo-500 shadow">
+    <img
+      src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(data.store_details.logo)}`}
+      alt="logo"
+      className="w-full h-full object-cover"
+      onError={(e) => {
+        const target = e.target;
+
+        if (!target.dataset.fallback) {
+          target.dataset.fallback = "true";
+          target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(data.store_details.logo)}`;
+        } else {
+          target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+        }
+      }}
+    />
+  </div>
+)}
 
                     {/* IMAGE SLIDER */}
                     {data?.store_details?.images?.length ? (
@@ -1147,10 +1247,16 @@ useEffect(() => {
                           {data.store_details.images.map((img, i) => (
                             <SwiperSlide key={i}>
                               <img
-                                src={`${import.meta.env.VITE_API_BASE_URL}/images/${img}`}
-                                alt={`store-image-${i}`}
-                                className="w-full h-full object-cover"
-                              />
+                                  src={
+                                    img instanceof File
+                                      ? URL.createObjectURL(img)
+                                      : img
+                                        ? `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
+                                        : `${import.meta.env.VITE_API_BASE_URL}/images/${img}`
+                                  }
+                                  alt={`store-image-${i}`}
+                                  className="w-full h-full object-cover"
+                                />
                             </SwiperSlide>
                           ))}
                         </Swiper>
@@ -1175,19 +1281,25 @@ useEffect(() => {
 
 
 
-                  <div className="flex items-center space-x-4 mt-4 sm:mt-0">
+                 <div className="grid grid-cols-2 sm:flex gap-2 mt-4 sm:mt-0">
 
                     {data?.store_details?.is_premium && (
                       <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
                         ⭐ Premium Partner
                       </span>
                     )}
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(data?.store_details?.status)}`}>
-                      {data?.store_details?.status
-                        ? data.store_details.status.charAt(0).toUpperCase() +
+                   <span
+                    className={`
+                      px-3 py-1 rounded-full text-sm font-medium
+                      flex items-center justify-center
+                      ${getStatusColor(data?.store_details?.status)}
+                    `}
+                  >
+                    {data?.store_details?.status
+                      ? data.store_details.status.charAt(0).toUpperCase() +
                         data.store_details.status.slice(1)
-                        : "Unknown"}
-                    </span>
+                      : "Unknown"}
+                  </span>
 
                     <button
                       onClick={() => setShowEditModal(true)}
@@ -1307,33 +1419,39 @@ useEffect(() => {
 
                 </div>
                 {/* DATE STRIP */}
-                <div className="flex justify-center items-center gap-3 mb-6 px-2 w-full max-w-xl mx-auto">
-                  {days.map((d) => (
-                    <button
-                      key={d.full}
-                      disabled={d.isPast}
-                      onClick={() => setSelectedDate(d)}
-                      className={`flex flex-col items-center min-w-[70px] px-4 py-2 rounded-xl border transition
-                      ${d.isPast
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : selectedDate?.full === d.full
-                            ? "bg-teal-600 text-white border-teal-600"
-                            : d.isToday
-                              ? "border-teal-500 text-teal-600 font-semibold"
-                              : "border-gray-300 hover:bg-gray-100"
-                        }`}
-                    >
-                      <span className="text-xs">{d.label}</span>
-                      <span className="text-lg font-semibold">{d.number}</span>
+            <div className="
+  flex gap-2 mb-4 px-2 w-full
+  overflow-x-auto no-scrollbar
+  justify-start md:justify-center
+">
+  {days.map((d) => (
+    <button
+      key={d.full}
+      disabled={d.isPast}
+      onClick={() => setSelectedDate(d)}
+      className={`flex flex-col items-center justify-center 
+      min-w-[70px] flex-shrink-0 px-3 py-2 rounded-xl border transition
+      ${
+        d.isPast
+          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+          : selectedDate?.full === d.full
+          ? "bg-teal-600 text-white border-teal-600 shadow-md"
+          : d.isToday
+          ? "border-teal-500 text-teal-600 font-semibold"
+          : "border-gray-300 hover:bg-gray-100"
+      }`}
+    >
+      <span className="text-xs leading-none">{d.label}</span>
+      <span className="text-lg font-semibold leading-none">{d.number}</span>
 
-                      {d.isToday && (
-                        <span className="text-[10px] text-teal-600">Today</span>
-                      )}
-
-                    </button>
-                  ))}
-
-                </div>
+      {d.isToday && (
+        <span className="text-[10px] text-teal-600 leading-none">
+          Today
+        </span>
+      )}
+    </button>
+  ))}
+</div>
                 {/* SELECTED DAY */}
                 <h2 className="text-center text-lg font-semibold mb-4">
                   {selectedDate?.day}

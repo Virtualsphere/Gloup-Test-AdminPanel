@@ -1,248 +1,6 @@
-// import { useForm } from "react-hook-form";
-// import { Save, X } from "lucide-react";
-// import { useState } from "react";
-// import ImageModal from "../modal/ImageModal";
-
-// const BannerForm = ({
-//   onSubmit,
-//   onCancel,
-//   defaultValues = {},
-//   partnerOptions = [],
-// }) => {
-//   const {
-//     register,
-//     handleSubmit,
-//     formState: { errors },
-//     reset,
-//     watch,
-//     setValue,
-//   } = useForm({
-//     defaultValues: {
-//       id: defaultValues.id || null,
-//       type: defaultValues.type || "",
-//       appType: defaultValues.appType || "",
-//       issub: defaultValues.issub || false,
-//       image: [],
-//     },
-//   });
-
-//   const [isModalOpen, setIsModalOpen] = useState(false);
-//   const [selectedImageUrl, setSelectedImageUrl] = useState("");
-//   const imageFiles = watch("image");
-
-//   const onFormSubmit = (data) => {
-//     const selectedFiles = data.image?.length ? Array.from(data.image) : [];
-
-//     const finalData = {
-//       ...data,
-//       image:
-//         selectedFiles.length > 0 ? selectedFiles : defaultValues.image || [],
-//     };
-
-//     onSubmit(finalData);
-//     reset();
-//   };
-
-//   const handleImagePreview = (url) => {
-//     setSelectedImageUrl(url);
-//     setIsModalOpen(true);
-//   };
-
-//   const baseURL = import.meta.env.VITE_API_BASE_URL;
-
-//   return (
-//     <form
-//       onSubmit={handleSubmit(onFormSubmit)}
-//       className="grid grid-cols-1 md:grid-cols-2 gap-6"
-//     >
-//       {/* Image Upload */}
-//       <div className="flex flex-col md:col-span-2">
-//         <label className="text-sm font-medium text-gray-700 mb-1">
-//           Upload Banner Images
-//         </label>
-
-//         <input
-//           type="file"
-//           accept="image/*"
-//           multiple
-//           {...register("image", {
-//             required:
-//               !defaultValues.image?.length && "At least one image is required",
-//             validate: {
-//               maxSize: (fileList) => {
-//                 if (!fileList.length) return true;
-//                 for (const file of fileList) {
-//                   if (file.size > 4 * 1024 * 1024)
-//                     return "Each image must be less than 4MB";
-//                 }
-//                 return true;
-//               },
-//             },
-//           })}
-//           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-//             errors.image
-//               ? "border-red-500 focus:ring-red-500"
-//               : "border-gray-300 focus:ring-blue-500"
-//           }`}
-//         />
-
-//         {errors.image && (
-//           <p className="text-sm text-red-500 mt-1">{errors.image.message}</p>
-//         )}
-
-//         {/* Preview newly selected image */}
-//         {imageFiles?.length > 0 && (
-//           <div className="flex flex-wrap gap-3 mt-3">
-//             {Array.from(imageFiles).map((file, index) => {
-//               const previewUrl = URL.createObjectURL(file);
-//               return (
-//                 <div
-//                   key={index}
-//                   className="relative border rounded-md p-1 cursor-pointer"
-//                   onClick={() => handleImagePreview(previewUrl)}
-//                 >
-//                   <img
-//                     src={previewUrl}
-//                     alt={`Preview ${index + 1}`}
-//                     className="h-20 w-20 object-cover rounded-md"
-//                   />
-//                 </div>
-//               );
-//             })}
-//           </div>
-//         )}
-
-//         {/* Preview existing image (edit mode) */}
-//         {!imageFiles?.length && defaultValues.image?.length > 0 && (
-//           <div className="flex flex-wrap gap-3 mt-3">
-//             {defaultValues.image.map((img, index) => (
-//               <div
-//                 key={index}
-//                 className="relative border rounded-md p-1 cursor-pointer"
-//                 onClick={() =>
-//                   handleImagePreview(`${baseURL}/profilepic/${img}`)
-//                 }
-//               >
-//                 <img
-//                   src={`${baseURL}/profilepic/${img}`}
-//                   alt={`Existing ${index + 1}`}
-//                   className="h-20 w-20 object-cover rounded-md"
-//                 />
-//               </div>
-//             ))}
-//           </div>
-//         )}
-
-//         <ImageModal
-//           isOpen={isModalOpen}
-//           onClose={() => setIsModalOpen(false)}
-//           imageUrl={selectedImageUrl}
-//         />
-//       </div>
-
-//       {/* Type Dropdown */}
-//       <div className="flex flex-col">
-//         <label className="text-sm font-medium text-gray-700 mb-1">Type</label>
-//         <select
-//           {...register("type", { required: "Type is required" })}
-//           value={watch("type")}
-//           onChange={(e) => setValue("type", e.target.value)}
-//           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-//             errors.type
-//               ? "border-red-500 focus:ring-red-500"
-//               : "border-gray-300 focus:ring-blue-500"
-//           }`}
-//         >
-//           <option value="">Select type</option>
-//           <option value="main">Main</option>
-//           <option value="sub">Section-One</option>
-//           <option value="sub2">Section-two</option>
-//         </select>
-//         {errors.type && (
-//           <p className="mt-1 text-sm text-red-500">{errors.type.message}</p>
-//         )}
-//       </div>
-
-//       {/* Partner Dropdown */}
-//       <div className="flex flex-col">
-//         <label className="text-sm font-medium text-gray-700 mb-1">
-//           Partner
-//         </label>
-//         <select
-//           {...register("id", { required: "Partner is required" })}
-//           value={watch("id")}
-//           onChange={(e) => setValue("id", e.target.value)}
-//           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-//             errors.id
-//               ? "border-red-500 focus:ring-red-500"
-//               : "border-gray-300 focus:ring-blue-500"
-//           }`}
-//         >
-//           <option value="">Select a partner</option>
-//           {partnerOptions.map((partner) => (
-//             <option key={partner.id} value={partner.id}>
-//               {partner.label}
-//             </option>
-//           ))}
-//         </select>
-//         {errors.id && (
-//           <p className="mt-1 text-sm text-red-500">{errors.id.message}</p>
-//         )}
-//       </div>
-
-//       {/* App Type Dropdown */}
-//       <div className="flex flex-col">
-//         <label className="text-sm font-medium text-gray-700 mb-1">
-//           App Type
-//         </label>
-//         <select
-//           {...register("appType", { required: "App type is required" })}
-//           value={watch("appType")}
-//           onChange={(e) => setValue("appType", e.target.value)}
-//           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-//             errors.appType
-//               ? "border-red-500 focus:ring-red-500"
-//               : "border-gray-300 focus:ring-blue-500"
-//           }`}
-//         >
-//           <option value="">Select app type</option>
-//           <option value="partner">Partner</option>
-//           <option value="user">User</option>
-//           <option value="web">Website</option>
-//         </select>
-//         {errors.appType && (
-//           <p className="mt-1 text-sm text-red-500">{errors.appType.message}</p>
-//         )}
-//       </div>
-
-//       {/* Buttons */}
-//       <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-//         <button
-//           type="button"
-//           onClick={onCancel}
-//           className="flex items-center cursor-pointer px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
-//         >
-//           <X size={16} className="mr-1" />
-//           Cancel
-//         </button>
-//         <button
-//           type="submit"
-//           className="flex items-center cursor-pointer px-4 py-2 bg-black hover:bg-black text-white rounded-md"
-//         >
-//           <Save size={16} className="mr-1" />
-//           {defaultValues.id ? "Update" : "Save"}
-//         </button>
-//       </div>
-//     </form>
-//   );
-// };
-
-// export default BannerForm;
-
-import { useForm } from "react-hook-form";
-import { Save, X } from "lucide-react";
 import { useState } from "react";
-import ImageModal from "../modal/ImageModal";
+import { useForm } from "react-hook-form";
+import { X, Save, UploadCloud } from "lucide-react";
 
 const BannerForm = ({
   onSubmit,
@@ -267,255 +25,261 @@ const BannerForm = ({
     },
   });
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedImageUrl, setSelectedImageUrl] = useState("");
+  const [previewImages, setPreviewImages] = useState([]);
+  const [loading, setLoading] = useState(false);
   const imageFiles = watch("image");
 
-  const onFormSubmit = (data) => {
-    const selectedFiles = data.image?.length ? Array.from(data.image) : [];
-    console.log(data,"data");
-    
+  const baseURL = import.meta.env.VITE_API_BASE_URL;
+
+  // Handle Image Change
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    setValue("image", files);
+
+    const previews = files.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+    }));
+
+    setPreviewImages(previews);
+  };
+
+  // Remove image
+  const removeImage = (index) => {
+    const updated = [...previewImages];
+    updated.splice(index, 1);
+    setPreviewImages(updated);
+    setValue(
+      "image",
+      updated.map((img) => img.file)
+    );
+  };
+
+const onFormSubmit = async (data) => {
+  try {
+    setLoading(true);
+
     const finalData = {
       ...data,
       issub: data.issub === "true",
       image:
-        selectedFiles.length > 0 ? selectedFiles : defaultValues.image || [],
+        previewImages.length > 0
+          ? previewImages.map((i) => i.file)
+          : defaultValues.image || [],
     };
 
-    onSubmit(finalData);
+    await onSubmit(finalData); 
+
     reset();
-  };
-
-  const handleImagePreview = (url) => {
-    setSelectedImageUrl(url);
-    setIsModalOpen(true);
-  };
-
-  const baseURL = import.meta.env.VITE_API_BASE_URL;
+    setPreviewImages([]);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
-    <form
-      onSubmit={handleSubmit(onFormSubmit)}
-      className="grid grid-cols-1 md:grid-cols-2 gap-6"
-    >
-      {/* Image Upload */}
-      <div className="flex flex-col md:col-span-2">
-        <label className="text-sm font-medium text-gray-700 mb-1">
-          Upload Banner Images
-        </label>
+    <div>
+      <h2 className="text-xl font-semibold mb-6">
+        {defaultValues.id ? "Update Banner" : "Create Banner"}
+      </h2>
 
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          {...register("image", {
-            required:
-              !defaultValues.image?.length && "At least one image is required",
-            validate: {
-              maxSize: (fileList) => {
-                if (!fileList.length) return true;
-                for (const file of fileList) {
-                  if (file.size > 4 * 1024 * 1024)
-                    return "Each image must be less than 4MB";
-                }
-                return true;
-              },
-            },
-          })}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-            errors.image
-              ? "border-red-500 focus:ring-red-500"
-              : "border-gray-300 focus:ring-blue-500"
-          }`}
-        />
+      <form
+        onSubmit={handleSubmit(onFormSubmit)}
+        className="grid grid-cols-1 md:grid-cols-2 gap-8"
+      >
+        {/* IMAGE UPLOAD */}
+        <div className="md:col-span-2">
+          <label className="text-sm font-medium text-gray-600 mb-2 block">
+            Upload Banner Images
+          </label>
 
-        {errors.image && (
-          <p className="text-sm text-red-500 mt-1">{errors.image.message}</p>
-        )}
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-6 cursor-pointer hover:border-black transition">
+            <UploadCloud size={28} className="text-gray-500 mb-2" />
+            <span className="text-gray-600 text-sm">
+              Click or drag images to upload
+            </span>
+            <span className="text-xs text-gray-400">
+              Max 4MB per image
+            </span>
 
-        {/* Preview newly selected image */}
-        {imageFiles?.length > 0 && (
-          <div className="flex flex-wrap gap-3 mt-3">
-            {Array.from(imageFiles).map((file, index) => {
-              const previewUrl = URL.createObjectURL(file);
-              return (
-                <div
-                  key={index}
-                  className="relative border rounded-md p-1 cursor-pointer"
-                  onClick={() => handleImagePreview(previewUrl)}
-                >
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleImageChange}
+              className="hidden"
+            />
+          </label>
+
+          {/* PREVIEW */}
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mt-4">
+            {previewImages.length > 0
+              ? previewImages.map((img, index) => (
+                  <div
+                    key={index}
+                    className="relative group rounded-xl overflow-hidden border"
+                  >
+                    <img
+                      src={img.url}
+                      className="h-24 w-full object-cover group-hover:scale-105 transition"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-black text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))
+              : defaultValues.image?.map((img, index) => (
                   <img
-                    src={previewUrl}
-                    alt={`Preview ${index + 1}`}
-                    className="h-20 w-20 object-cover rounded-md"
+                    key={index}
+                    src={`${baseURL}/profilepic/${img}`}
+                    className="h-24 w-full object-cover rounded-xl border"
                   />
-                </div>
-              );
-            })}
+                ))}
           </div>
-        )}
 
-        {/* Preview existing image (edit mode) */}
-        {!imageFiles?.length && defaultValues.image?.length > 0 && (
-          <div className="flex flex-wrap gap-3 mt-3">
-            {defaultValues.image.map((img, index) => (
-              <div
-                key={index}
-                className="relative border rounded-md p-1 cursor-pointer"
-                onClick={() =>
-                  handleImagePreview(`${baseURL}/profilepic/${img}`)
-                }
-              >
-                <img
-                  src={`${baseURL}/profilepic/${img}`}
-                  alt={`Existing ${index + 1}`}
-                  className="h-20 w-20 object-cover rounded-md"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        <ImageModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          imageUrl={selectedImageUrl}
-        />
-      </div>
-
-      {/* App Type Dropdown */}
-      <div className="flex flex-col">
-        <label className="text-sm font-medium text-gray-700 mb-1">
-          App Type
-        </label>
-        <select
-          {...register("appType", { required: "App type is required" })}
-          value={watch("appType")}
-          onChange={(e) => setValue("appType", e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-            errors.appType
-              ? "border-red-500 focus:ring-red-500"
-              : "border-gray-300 focus:ring-blue-500"
-          }`}
-        >
-          <option value="">Select app type</option>
-          <option value="partner">Partner</option>
-          <option value="user">User</option>
-          <option value="web">Website</option>
-        </select>
-        {errors.appType && (
-          <p className="mt-1 text-sm text-red-500">{errors.appType.message}</p>
-        )}
-      </div>
-
-      {/* Type Dropdown (conditionally rendered) */}
-      {(watch("appType") === "web" ||
-        watch("appType") === "user" ||
-        watch("appType") === "partner") && (
-        <div className="flex flex-col">
-          <label className="text-sm font-medium text-gray-700 mb-1">Type</label>
-          <select
-            {...register("type", { required: "Type is required" })}
-            value={watch("type")}
-            onChange={(e) => setValue("type", e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-              errors.type
-                ? "border-red-500 focus:ring-red-500"
-                : "border-gray-300 focus:ring-blue-500"
-            }`}
-          >
-            <option value="">Select type</option>
-            <option value="main">Main</option>
-
-            <option value="sub">Section-One</option>
-            {watch("appType") === "web" && (
-              <option value="sub2">Section-two</option>
-            )}
-          </select>
-          {errors.type && (
-            <p className="mt-1 text-sm text-red-500">{errors.type.message}</p>
+          {errors.image && (
+            <p className="text-sm text-red-500 mt-2">
+              {errors.image.message}
+            </p>
           )}
         </div>
-      )}
 
-      {/* Partner Dropdown */}
-      {watch("issub") === "true" && (
-        <div className="flex flex-col">
-          <label className="text-sm font-medium text-gray-700 mb-1">
-            Partner
+        {/* APP TYPE */}
+        <div>
+          <label className="text-sm text-gray-600 mb-1 block">
+            App Type
           </label>
           <select
-            {...register(
-              "id"
-              //  { required: "Partner is required" }
-            )}
-            value={watch("id")}
-            onChange={(e) => setValue("id", e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-              errors.id
-                ? "border-red-500 focus:ring-red-500"
-                : "border-gray-300 focus:ring-blue-500"
+            {...register("appType", { required: "Required" })}
+            className={`w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black ${
+              errors.appType ? "border-red-500" : "border-gray-200"
             }`}
           >
-            <option value="">Select a partner</option>
-            {partnerOptions.map((partner) => (
-              <option key={partner.id} value={partner.id}>
-                {partner.label}
-              </option>
-            ))}
+            <option value="">Select</option>
+            <option value="partner">Partner</option>
+            <option value="user">User</option>
+            <option value="web">Website</option>
           </select>
-          {errors.id && (
-            <p className="mt-1 text-sm text-red-500">{errors.id.message}</p>
-          )}
         </div>
-      )}
 
-      {/* Subscription Type Dropdown 👇 */}
-      <div className="flex flex-col">
-        <label className="text-sm font-medium text-gray-700 mb-1">
-          Subscription Type
-        </label>
-        <select
-          {...register("issub", { required: "Select subscription type" })}
-          value={watch("issub").toString()}
-          onChange={(e) => setValue("issub", e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-            errors.issub
-              ? "border-red-500 focus:ring-red-500"
-              : "border-gray-300 focus:ring-blue-500"
-          }`}
-        >
-          <option value="">Select type</option>
-          {watch("appType") === "partner" && (
-            <option value="true">Subscription</option>
-          )}
-
-          <option value="false">Normal</option>
-        </select>
-        {errors.issub && (
-          <p className="mt-1 text-sm text-red-500">{errors.issub.message}</p>
+        {/* TYPE */}
+        {(watch("appType") === "web" ||
+          watch("appType") === "user" ||
+          watch("appType") === "partner") && (
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">
+              Type
+            </label>
+            <select
+              {...register("type", { required: "Required" })}
+              className={`w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black ${
+                errors.type ? "border-red-500" : "border-gray-200"
+              }`}
+            >
+              <option value="">Select</option>
+              <option value="main">Main</option>
+              <option value="sub">Section One</option>
+              {watch("appType") === "web" && (
+                <option value="sub2">Section Two</option>
+              )}
+            </select>
+          </div>
         )}
-      </div>
 
-      {/* Buttons */}
-      <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex items-center cursor-pointer px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
-        >
-          <X size={16} className="mr-1" />
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="flex items-center cursor-pointer px-4 py-2 bg-black hover:bg-black text-white rounded-md"
-        >
-          <Save size={16} className="mr-1" />
-          {defaultValues.id ? "Update" : "Save"}
-        </button>
-      </div>
-    </form>
+        {/* SUBSCRIPTION */}
+        <div>
+          <label className="text-sm text-gray-600 mb-1 block">
+            Subscription Type
+          </label>
+          <select
+            {...register("issub", { required: "Required" })}
+            className="w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black border-gray-200"
+          >
+            <option value="">Select</option>
+            {watch("appType") === "partner" && (
+              <option value="true">Subscription</option>
+            )}
+            <option value="false">Normal</option>
+          </select>
+        </div>
+
+        {/* PARTNER */}
+        {watch("issub") === "true" && (
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">
+              Partner
+            </label>
+            <select
+              {...register("id")}
+              className="w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black border-gray-200"
+            >
+              <option value="">Select Partner</option>
+              {partnerOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* ACTIONS */}
+        <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-5 py-2.5 rounded-lg border text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+<button
+  type="submit"
+  disabled={loading}
+  className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-white transition 
+  ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-black hover:opacity-90"}`}
+>
+  {loading ? (
+    <>
+      {/* Spinner */}
+      <svg
+        className="animate-spin h-4 w-4"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="white"
+          strokeWidth="4"
+          fill="none"
+        />
+        <path
+          className="opacity-75"
+          fill="white"
+          d="M4 12a8 8 0 018-8v8H4z"
+        />
+      </svg>
+
+      Processing...
+    </>
+  ) : (
+    <>
+      <Save size={16} />
+      {defaultValues.id ? "Updating..." : "Save"}
+    </>
+  )}
+</button>
+        </div>
+      </form>
+    </div>
   );
 };
 

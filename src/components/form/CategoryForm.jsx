@@ -21,7 +21,7 @@ const CategoryForm = ({
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const imageUrl = defaultValues.image ? `${import.meta.env.VITE_API_BASE_URL}/categoryimage/${defaultValues.image.name}`   : "";
+  const imageUrl = defaultValues.image ? `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/category/${defaultValues.image.name}`  : "";
   const imageFile = watch("image");
 
   const onFormSubmit = (data) => {

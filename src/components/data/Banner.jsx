@@ -261,7 +261,7 @@ const Banner = ({ title }) => {
             </div>
 
             {/* Tab Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="max-w-8xl mx-auto bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
               {activeTab === "form" ? (
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">
