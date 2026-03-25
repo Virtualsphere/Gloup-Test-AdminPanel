@@ -267,30 +267,40 @@ const DashboardDetail = ({ data }) => {
         : "text-gray-500";
     return (
       <div
-        className="bg-white rounded-lg shadow-md p-4 lg:p-6 border-l-4"
-        style={{ borderLeftColor: color }}
-        onClick={onpress}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs lg:text-sm font-medium text-gray-600 truncate">
-              {title}
-            </p>
-            <p className="text-lg lg:text-2xl font-bold text-gray-900 truncate">
-              {value}
-            </p>
-            {subtitle && (
-              <p className={`text-xs ${growthColor} mt-1 truncate font-medium`}>
-                {subtitle}
-              </p>
-            )}
-          </div>
-          <Icon
-            className="h-6 w-6 lg:h-8 lg:w-8 flex-shrink-0 ml-2"
-            style={{ color }}
-          />
-        </div>
-      </div>
+  onClick={onpress}
+  className="
+    relative bg-white rounded-2xl p-4 sm:p-5
+    shadow-sm hover:shadow-xl
+    border border-gray-100
+    transition-all duration-300
+    hover:-translate-y-1 cursor-pointer
+  "
+>
+  {/* Glow Border */}
+  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 opacity-0 hover:opacity-100 transition" />
+
+  <div className="flex items-center justify-between">
+    <div className="min-w-0">
+      <p className="text-xs sm:text-sm text-gray-500">{title}</p>
+      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+        {value}
+      </p>
+
+      {subtitle && (
+        <p className={`text-xs mt-1 font-medium ${growthColor}`}>
+          {subtitle}
+        </p>
+      )}
+    </div>
+
+    <div
+      className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center"
+      style={{ backgroundColor: `${color}20` }}
+    >
+      <Icon size={20} style={{ color }} />
+    </div>
+  </div>
+</div>
     );
   };
 
@@ -388,7 +398,13 @@ const DashboardDetail = ({ data }) => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div>
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+       <div className="
+  grid grid-cols-1 
+  sm:grid-cols-2 
+  lg:grid-cols-3 
+  xl:grid-cols-4 
+  gap-4 sm:gap-6 mb-6
+">
           <MetricCard
             title="Total Partners"
             value={data?.total_partners || 0}
@@ -468,10 +484,10 @@ const DashboardDetail = ({ data }) => {
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 mb-6">
           {/* Revenue Overview Chart */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+          <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 border border-gray-100">
+           <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
               <h3 className="text-lg font-semibold text-gray-900">
                 {metricName} Overview (
                 {viewType.charAt(0).toUpperCase() + viewType.slice(1)})
@@ -716,14 +732,22 @@ const DashboardDetail = ({ data }) => {
               placeholder="Search by Email"
               value={searchEmail}
               onChange={(e) => setSearchEmail(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
+              className="
+    px-3 py-2 rounded-xl border border-gray-200
+    focus:ring-2 focus:ring-blue-500 focus:outline-none
+    text-sm w-full
+  "
             />
             <input
               type="text"
               placeholder="Search by Location"
               value={searchLocation}
               onChange={(e) => setSearchLocation(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
+               className="
+    px-3 py-2 rounded-xl border border-gray-200
+    focus:ring-2 focus:ring-blue-500 focus:outline-none
+    text-sm w-full
+  "
             />
             <button
               onClick={resetFilters}
@@ -734,10 +758,10 @@ const DashboardDetail = ({ data }) => {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr className="hover:bg-blue-50/40 transition">
                   {[
                     "SNo",
                     "Images",
@@ -771,7 +795,7 @@ const DashboardDetail = ({ data }) => {
                     }
 
                     return (
-                      <tr key={salon.id} className="hover:bg-gray-50">
+                      <tr key={salon.id} className="hover:bg-blue-50/40 transition">
                         <td className="px-6 py-4 text-sm text-gray-900">
                           {(currentPage - 1) * rowsPerPage + index + 1}
                         </td>
@@ -898,6 +922,16 @@ const DashboardDetail = ({ data }) => {
                 )}
               </tbody>
             </table>
+            <div className="md:hidden space-y-4">
+              {currentSalons.map((salon, index) => (
+                <div key={salon.id} className="bg-white p-4 rounded-xl shadow-sm border">
+                  <p className="font-semibold">{salon.name}</p>
+                  <p className="text-sm text-gray-500">{salon.email}</p>
+                  <p className="text-sm">{salon.phone}</p>
+                  <p className="text-xs text-gray-400">{salon.cityLocation}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Pagination */}
@@ -961,7 +995,11 @@ const DashboardDetail = ({ data }) => {
               return (
                 <div
                   key={index}
-                  className="border border-gray-300 rounded-lg p-4"
+                  className="
+                    bg-white rounded-2xl p-4
+                    shadow-sm hover:shadow-md
+                    transition border border-gray-100
+                  "
                 >
                   <h4 className="font-medium text-gray-900">
                     {category?.category}

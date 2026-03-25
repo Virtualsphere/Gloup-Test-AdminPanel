@@ -15,7 +15,7 @@ import {
 
 import moment from "moment";
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL;
+const baseUrl = import.meta.env.VITE_IMAGE_BASE_URL;
 
 const BannerTable = ({ data, title, onEdit, onDelete }) => {
   // Original state
@@ -379,7 +379,7 @@ const BannerTable = ({ data, title, onEdit, onDelete }) => {
                         {item?.image ? (
                           <div className="w-16 h-16 sm:w-20 sm:h-20  rounded-xl overflow-hidden">
                             <img
-                            src={`${import.meta.env.VITE_API_BASE_URL}/bannerimage/${item?.image}`}
+                            src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/banner/${item?.image}`}
                             alt={`banner-image-${item.id}`}
                             className="w-full h-full object-cover"
                             />

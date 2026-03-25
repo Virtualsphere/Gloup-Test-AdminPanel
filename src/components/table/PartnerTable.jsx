@@ -13,7 +13,7 @@ import {
   X,
   Eye,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   updatePartnerStatus,
   getAllPartnersList,
@@ -24,6 +24,12 @@ import { useDispatch } from "react-redux";
 import Select from "react-select";
 import moment from "moment";
 import { Plus } from "lucide-react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
+
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -38,6 +44,8 @@ const PartnerTable = ({ data, title }) => {
   { value: "terminated", label: "Terminated" },
   { value: "rejected", label: "Rejected" },
 ];
+
+const [viewType, setViewType] = useState("card");
 
   // Filter out inactive from dropdown options for row updates, but keep it for display and global filter
   const getDropdownOptions = () => {
@@ -98,7 +106,7 @@ const PartnerTable = ({ data, title }) => {
 
   // New state for filters, pagination
   const [filters, setFilters] = useState({
-    status: "",
+    status: "active",
     city: "",
     categoryName: "",
     startDate: "",
@@ -538,540 +546,134 @@ const PartnerTable = ({ data, title }) => {
     }
   };
 
+
+const getPrimaryImageUrl = (img, storeId) => {
+  if (!img) return `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+
+  return `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${storeId}/images/${img}`;
+};
+
+const getFallbackImageUrl = (img) => {
+  return `${import.meta.env.VITE_API_BASE_URL}/images/${img}`;
+};
+
   // Calculate colSpan for no data row
   const visibleColumnCount =
     Object.keys(visibleColumns).filter((key) => visibleColumns[key]).length + 2; // +1 for checkbox +1 for actions
 
   return (
     <div>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-2 border-b border-gray-200">
-        <div className="relative w-full md:w-64 mb-4 md:mb-0">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search size={16} className="text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-          />
-        </div>
+     <div >
 
-        {/* Status Filter */}
-        <div className="relative w-full md:w-48 mb-4 md:mb-0">
-          <Select
-            options={statusOptions}
-            value={
-              filters.status
-                ? statusOptions.find((opt) => opt.value === filters.status)
-                : null
-            }
-            onChange={(selectedOption) =>
-              setFilters((prev) => ({
-                ...prev,
-                status: selectedOption ? selectedOption.value : "",
-              }))
-            }
-            placeholder="All Statuses"
-            isSearchable={false}
-            isClearable={true}
-            className="text-sm"
-            classNamePrefix="minimal-border-select"
-            menuPortalTarget={document.body}
-            components={{
-              IndicatorSeparator: () => null,
-            }}
-            styles={{
-              control: (base, state) => ({
-                ...base,
-                minHeight: "32px",
-                height: "32px",
-                minWidth: "120px",
-                boxShadow: "none",
-                backgroundColor: "white",
-                cursor: "pointer",
-                border: state.isFocused
-                  ? "1px solid #3B82F6"
-                  : "1px solid #D1D5DB",
-                borderRadius: "6px",
-                display: "flex",
-                alignItems: "center",
-                "&:hover": {
-                  borderColor: "#9CA3AF",
-                },
-              }),
-              valueContainer: (base) => ({
-                ...base,
-                padding: "0 2px 0 8px",
-                margin: 0,
-                display: "flex",
-                alignItems: "center",
-                height: "30px",
-                flex: "1 1 auto",
-              }),
-              singleValue: (base) => ({
-                ...base,
-                margin: 0,
-                padding: 0,
-                textTransform: "capitalize",
-                fontSize: "13px",
-                fontWeight: "500",
-                color: "#374151",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }),
-              indicatorsContainer: (base) => ({
-                ...base,
-                padding: 0,
-                margin: 0,
-                height: "30px",
-                width: "16px",
-                flexShrink: 0,
-              }),
-              dropdownIndicator: (base) => ({
-                ...base,
-                padding: "0 4px",
-                margin: 0,
-                width: "16px",
-                height: "30px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#9CA3AF",
-                "&:hover": {
-                  color: "#6B7280",
-                },
-                svg: {
-                  width: "12px",
-                  height: "12px",
-                },
-              }),
-              clearIndicator: (base) => ({
-                ...base,
-                padding: "0 4px",
-                margin: 0,
-                width: "16px",
-                height: "30px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#9CA3AF",
-                "&:hover": {
-                  color: "#6B7280",
-                },
-                svg: {
-                  width: "12px",
-                  height: "12px",
-                },
-              }),
-              option: (base, state) => ({
-                ...base,
-                backgroundColor: state.isFocused ? "#000000" : "white",
-                color: state.isFocused ? "white" : "#374151",
-                cursor: "pointer",
-                textTransform: "capitalize",
-                fontSize: "13px",
-                padding: "8px 12px",
-                "&:active": {
-                  backgroundColor: "#000000",
-                },
-              }),
-              menu: (base) => ({
-                ...base,
-                marginTop: "2px",
-                zIndex: 9999,
-                borderRadius: "6px",
-                boxShadow:
-                  "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-                border: "1px solid #E5E7EB",
-                minWidth: "120px",
-              }),
-              menuList: (base) => ({
-                ...base,
-                padding: "4px",
-              }),
-              menuPortal: (base) => ({
-                ...base,
-                zIndex: 9999,
-              }),
-            }}
-          />
-        </div>
+  {/* 🔍 ROW 1 → Search + Filters */}
+  <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
 
-        {/* Category Filter */}
-        <div className="relative w-full md:w-48 mb-4 md:mb-0">
-          <Select
-            options={uniqueCategories}
-            value={
-              filters.categoryName
-                ? uniqueCategories.find(
-                    (opt) => opt.value === filters.categoryName
-                  )
-                : null
-            }
-            onChange={(selectedOption) =>
-              setFilters((prev) => ({
-                ...prev,
-                categoryName: selectedOption ? selectedOption.value : "",
-              }))
-            }
-            placeholder="All Categories"
-            isSearchable={false}
-            isClearable={true}
-            className="text-sm"
-            classNamePrefix="minimal-border-select"
-            menuPortalTarget={document.body}
-            components={{
-              IndicatorSeparator: () => null,
-            }}
-            styles={{
-              control: (base, state) => ({
-                ...base,
-                minHeight: "32px",
-                height: "32px",
-                minWidth: "120px",
-                boxShadow: "none",
-                backgroundColor: "white",
-                cursor: "pointer",
-                border: state.isFocused
-                  ? "1px solid #3B82F6"
-                  : "1px solid #D1D5DB",
-                borderRadius: "6px",
-                display: "flex",
-                alignItems: "center",
-                "&:hover": {
-                  borderColor: "#9CA3AF",
-                },
-              }),
-              valueContainer: (base) => ({
-                ...base,
-                padding: "0 2px 0 8px",
-                margin: 0,
-                display: "flex",
-                alignItems: "center",
-                height: "30px",
-                flex: "1 1 auto",
-              }),
-              singleValue: (base) => ({
-                ...base,
-                margin: 0,
-                padding: 0,
-                fontSize: "13px",
-                fontWeight: "500",
-                color: "#374151",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }),
-              indicatorsContainer: (base) => ({
-                ...base,
-                padding: 0,
-                margin: 0,
-                height: "30px",
-                width: "16px",
-                flexShrink: 0,
-              }),
-              dropdownIndicator: (base) => ({
-                ...base,
-                padding: "0 4px",
-                margin: 0,
-                width: "16px",
-                height: "30px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#9CA3AF",
-                "&:hover": {
-                  color: "#6B7280",
-                },
-                svg: {
-                  width: "12px",
-                  height: "12px",
-                },
-              }),
-              clearIndicator: (base) => ({
-                ...base,
-                padding: "0 4px",
-                margin: 0,
-                width: "16px",
-                height: "30px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#9CA3AF",
-                "&:hover": {
-                  color: "#6B7280",
-                },
-                svg: {
-                  width: "12px",
-                  height: "12px",
-                },
-              }),
-              option: (base, state) => ({
-                ...base,
-                backgroundColor: state.isFocused ? "#000000" : "white",
-                color: state.isFocused ? "white" : "#374151",
-                cursor: "pointer",
-                fontSize: "13px",
-                padding: "8px 12px",
-                "&:active": {
-                  backgroundColor: "#000000",
-                },
-              }),
-              menu: (base) => ({
-                ...base,
-                marginTop: "2px",
-                zIndex: 9999,
-                borderRadius: "6px",
-                boxShadow:
-                  "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-                border: "1px solid #E5E7EB",
-                minWidth: "120px",
-              }),
-              menuList: (base) => ({
-                ...base,
-                padding: "4px",
-              }),
-              menuPortal: (base) => ({
-                ...base,
-                zIndex: 9999,
-              }),
-            }}
-          />
-        </div>
+    {/* LEFT */}
+    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
 
-        {/* Location Filter */}
-        <div className="relative w-full md:w-48 mb-4 md:mb-0">
-          <Select
-            options={uniqueLocations}
-            value={
-              filters.city
-                ? uniqueLocations.find((opt) => opt.value === filters.city)
-                : null
-            }
-            onChange={(selectedOption) =>
-              setFilters((prev) => ({
-                ...prev,
-                city: selectedOption ? selectedOption.value : "",
-              }))
-            }
-            placeholder="All Locations"
-            isSearchable={false}
-            isClearable={true}
-            className="text-sm"
-            classNamePrefix="minimal-border-select"
-            menuPortalTarget={document.body}
-            components={{
-              IndicatorSeparator: () => null,
-            }}
-            styles={{
-              control: (base, state) => ({
-                ...base,
-                minHeight: "32px",
-                height: "32px",
-                minWidth: "120px",
-                boxShadow: "none",
-                backgroundColor: "white",
-                cursor: "pointer",
-                border: state.isFocused
-                  ? "1px solid #3B82F6"
-                  : "1px solid #D1D5DB",
-                borderRadius: "6px",
-                display: "flex",
-                alignItems: "center",
-                "&:hover": {
-                  borderColor: "#9CA3AF",
-                },
-              }),
-              valueContainer: (base) => ({
-                ...base,
-                padding: "0 2px 0 8px",
-                margin: 0,
-                display: "flex",
-                alignItems: "center",
-                height: "30px",
-                flex: "1 1 auto",
-              }),
-              singleValue: (base) => ({
-                ...base,
-                margin: 0,
-                padding: 0,
-                fontSize: "13px",
-                fontWeight: "500",
-                color: "#374151",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }),
-              indicatorsContainer: (base) => ({
-                ...base,
-                padding: 0,
-                margin: 0,
-                height: "30px",
-                width: "16px",
-                flexShrink: 0,
-              }),
-              dropdownIndicator: (base) => ({
-                ...base,
-                padding: "0 4px",
-                margin: 0,
-                width: "16px",
-                height: "30px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#9CA3AF",
-                "&:hover": {
-                  color: "#6B7280",
-                },
-                svg: {
-                  width: "12px",
-                  height: "12px",
-                },
-              }),
-              clearIndicator: (base) => ({
-                ...base,
-                padding: "0 4px",
-                margin: 0,
-                width: "16px",
-                height: "30px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#9CA3AF",
-                "&:hover": {
-                  color: "#6B7280",
-                },
-                svg: {
-                  width: "12px",
-                  height: "12px",
-                },
-              }),
-              option: (base, state) => ({
-                ...base,
-                backgroundColor: state.isFocused ? "#000000" : "white",
-                color: state.isFocused ? "white" : "#374151",
-                cursor: "pointer",
-                fontSize: "13px",
-                padding: "8px 12px",
-                "&:active": {
-                  backgroundColor: "#000000",
-                },
-              }),
-              menu: (base) => ({
-                ...base,
-                marginTop: "2px",
-                zIndex: 9999,
-                borderRadius: "6px",
-                boxShadow:
-                  "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-                border: "1px solid #E5E7EB",
-                minWidth: "120px",
-              }),
-              menuList: (base) => ({
-                ...base,
-                padding: "4px",
-              }),
-              menuPortal: (base) => ({
-                ...base,
-                zIndex: 9999,
-              }),
-            }}
-          />
-        </div>
-
-        {/* Registration Date Range Filter */}
-        {/* <div className="w-full md:w-80 mb-4 md:mb-0 flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
-          <div className="relative flex-1">
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, startDate: e.target.value }))
-              }
-              className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 text-sm"
-            />
-          </div>
-          <div className="relative flex-1">
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, endDate: e.target.value }))
-              }
-              className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 text-sm"
-            />
-          </div>
-        </div> */}
-
-        <div className="flex space-x-2">
-          <button
-            style={{ cursor: "pointer" }}
-            onClick={handleCreatePartner}
-            className="flex items-center px-3 py-2 bg-gray-900 text-gray-200 rounded-md hover:bg-gray-600 transition-colors"
-          >
-            <Plus size={16} className="mr-1" />
-            <span className="text-sm">Create New</span>
-          </button>
-
-          <button
-            style={{ cursor: "pointer" }}
-            onClick={handleDownloadCSV}
-            className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-          >
-            <Download size={16} className="mr-1" />
-            <span className="text-sm">Export</span>
-          </button>
-
-          <button
-            style={{ cursor: "pointer" }}
-            onClick={handlePrint}
-            className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-          >
-            <Printer size={16} className="mr-1" />
-            <span className="text-sm">Print</span>
-          </button>
-
-          <div className="relative column-toggle-container">
-            <button
-              style={{ cursor: "pointer" }}
-              onClick={() => setShowColumnToggle(!showColumnToggle)}
-              className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-            >
-              <EyeOff size={16} className="mr-1" />
-              <span className="text-sm">Columns</span>
-              <ChevronDown size={16} className="ml-1" />
-            </button>
-
-            {showColumnToggle && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                <div className="p-2">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">
-                    Toggle Columns
-                  </h4>
-                  <div className="space-y-1">
-                    {Object.keys(visibleColumns).map((column) => (
-                      <label key={column} className="flex items-center text-sm">
-                        <input
-                          style={{ cursor: "pointer" }}
-                          type="checkbox"
-                          checked={visibleColumns[column]}
-                          onChange={() => toggleColumn(column)}
-                          className="mr-2"
-                        />
-                        {column.charAt(0).toUpperCase() +
-                          column.slice(1).replace(/([A-Z])/g, " $1")}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* SEARCH */}
+      <div className="relative w-full sm:w-64">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+        <input
+          type="text"
+          placeholder="Search salons..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+        />
       </div>
+
+      {/* FILTERS GROUP */}
+      <div className="flex flex-wrap gap-2">
+
+        <Select
+          options={statusOptions}
+          value={statusOptions.find(opt => opt.value === filters.status)}
+          onChange={(opt) =>
+            setFilters((prev) => ({ ...prev, status: opt ? opt.value : "" }))
+          }
+          placeholder="Status"
+          className="min-w-[120px] text-sm"
+        />
+
+        <Select
+          options={uniqueCategories}
+          value={uniqueCategories.find(opt => opt.value === filters.categoryName)}
+          onChange={(opt) =>
+            setFilters((prev) => ({ ...prev, categoryName: opt ? opt.value : "" }))
+          }
+          placeholder="Category"
+          className="min-w-[120px] text-sm"
+        />
+
+        <Select
+      options={uniqueLocations}
+      value={uniqueLocations.find(opt => opt.value === filters.city)}
+      onChange={(opt) => setFilters((prev) => ({ ...prev, city: opt ? opt.value : "" }))}
+      placeholder="Location"
+      isSearchable={false}
+      isClearable
+      menuPortalTarget={document.body}
+      menuPosition="fixed"
+      menuShouldScrollIntoView={false}
+      className="min-w-[120px] text-sm"
+      styles={{
+        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+        menu: (base) => ({ ...base, zIndex: 9999 }),
+      }}
+    />
+
+      </div>
+    </div>
+
+    {/* RIGHT → PRIMARY ACTION */}
+    <button
+      onClick={handleCreatePartner}
+      className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition"
+    >
+      <Plus size={16} />
+      Create Partner
+    </button>
+  </div>
+
+  {/* ⚙️ ROW 2 → ACTION BUTTONS */}
+  <div className="flex flex-wrap justify-between items-center mt-4 gap-3">
+
+    {/* LEFT */}
+    <button
+      onClick={() => setViewType(viewType === "table" ? "card" : "table")}
+      className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+    >
+      {viewType === "table" ? "Card View" : "Table View"}
+    </button>
+
+    {/* RIGHT */}
+    <div className="flex flex-wrap gap-2">
+
+      <button
+        onClick={handleDownloadCSV}
+        className="flex items-center gap-1 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm"
+      >
+        <Download size={14} /> Export
+      </button>
+
+      <button
+        onClick={handlePrint}
+        className="flex items-center gap-1 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm"
+      >
+        <Printer size={14} /> Print
+      </button>
+
+      <button
+        onClick={() => setShowColumnToggle(!showColumnToggle)}
+        className="flex items-center gap-1 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm"
+      >
+        <EyeOff size={14} /> Columns
+      </button>
+
+    </div>
+  </div>
+     </div>
 
       {/* Bulk Actions Bar */}
       {selectedRows.length > 0 && (
@@ -1115,6 +717,134 @@ const PartnerTable = ({ data, title }) => {
         </div>
       )}
 
+      {viewType === "card" && (
+        <div className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {currentItems.map((item) => {
+    console.log("item:", item); // ✅ log works
+
+    return (
+      <div
+        key={item.id}
+        className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group" >
+        {/* IMAGE */}
+
+  <div className="relative h-44 w-full overflow-hidden rounded-t-2xl">
+    {/* IMAGE / SLIDER */}
+    {item?.images?.length > 0 ? (
+      <Swiper
+        modules={[Navigation, Pagination, Autoplay]}
+        navigation={item.images.length > 1}
+        pagination={item.images.length > 1 ? { clickable: true } : false}
+        autoplay={item.images.length > 1 ? { delay: 3000 } : false}
+        loop={item.images.length > 1}
+        className="h-full w-full"
+      >
+        {item.images.map((img, index) => (
+          <SwiperSlide key={index}>
+            <img
+              src={getPrimaryImageUrl(img, item.id)} // ✅ try S3 first
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.onerror = null;
+
+                if (!e.target.dataset.fallback) {
+                  // 👉 First fallback → local server
+                  e.target.dataset.fallback = "true";
+                  e.target.src = getFallbackImageUrl(img);
+                } else {
+                  // 👉 Final fallback → default image
+                  e.target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+                }
+              }}
+            />
+          </SwiperSlide>
+        ))}
+      </Swiper>
+    ) : (
+       <img
+        src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`}
+        className="w-full h-full object-cover opacity-60"
+      />
+    )}
+
+    {/* LIGHT GRADIENT (FIXED) */}
+    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+
+    {/* TITLE */}
+    <div className="absolute bottom-2 left-3 right-3">
+      <h2 className="text-white text-sm font-semibold truncate">
+        {item?.name || "No Name"}
+      </h2>
+    </div>
+
+    {/* STATUS BADGE */}
+    <span className="absolute top-2 right-2 text-xs px-2 py-1 rounded-full bg-green-500 text-white shadow">
+      {item.status}
+    </span>
+  </div>
+      
+
+        {/* CONTENT */}
+        <div className="p-4 flex flex-col justify-between h-[220px]">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="font-semibold text-gray-800 capitalize truncate">
+              {item?.name || "No Name"}
+            </h2>
+
+            <span
+              className={`text-xs px-2 py-1 rounded-full capitalize ${
+                item.status === "active"
+                  ? "bg-green-100 text-green-700"
+                  : item.status === "inactive"
+                  ? "bg-gray-100 text-gray-600"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}
+            >
+              {item.status}
+            </span>
+          </div>
+
+        <div className="p-4 space-y-2">
+            <p className="text-sm text-gray-600">
+              <b>Owner:</b> {item?.ownerDetails?.name || "-"}
+            </p>
+            <p className="text-sm text-gray-600">
+              <b>Phone:</b> {item?.ownerDetails?.phone || "-"}
+            </p>
+            <p className="text-sm text-gray-600">
+              <b>City:</b> {item?.location?.city || "-"}
+            </p>
+          </div>
+
+        <div className="flex justify-between items-center px-4 pb-4">
+        <span className="text-base font-semibold text-gray-800">
+          ₹{new Intl.NumberFormat("en-IN").format(item?.totalRevenue || 0)}
+        </span>
+
+        <div className="flex gap-2">
+          <Link
+            to={`/partnerdetails/${item?.id}`}
+            className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition inline-flex"
+          >
+            <Eye size={18} />
+          </Link>
+          <button 
+           onClick={() => handleDelete(item?.id)}
+          className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition">
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+        </div>
+      </div>
+    );
+  })}
+          </div>
+        </div>
+      )}
+
+      {viewType === "table" && (
       <div className="overflow-x-scroll full overflow-y-scroll max-h-[600px]">
         <table className="w-full" ref={tableRef}>
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -1300,9 +1030,7 @@ const PartnerTable = ({ data, title }) => {
                           className="text-sm"
                           classNamePrefix="minimal-border-select"
                           menuPortalTarget={document.body}
-                          components={{
-                            IndicatorSeparator: () => null,
-                          }}
+                          menuPosition="fixed"   
                           styles={{
                             control: (base, state) => ({
                               ...base,
@@ -1445,6 +1173,7 @@ const PartnerTable = ({ data, title }) => {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Pagination */}
       <div className="border-t border-gray-200 px-4 py-2 flex items-center justify-between">
@@ -1676,6 +1405,8 @@ const PartnerTable = ({ data, title }) => {
           </div>
         </div>
       </div>
+
+     
     </div>
   );
 };

@@ -1,65 +1,124 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, useLocation } from "react-router-dom";
 import Header from "./components/layout/Header";
 import Sidebar from "./components/layout/Sidebar";
-import AuthPages from "./components/auth/AuthPages"; 
 import AppRoutes from "./routes/AppRoutes";
 import { Toaster } from "react-hot-toast";
-import "./index.css";
 import { useState, useEffect } from "react";
+import "./index.css";
 
-const App = () => {
-  const { pathname } = window.location;
-  const [collapsed, setCollapsed] = useState(window.innerWidth < 768);
+const Layout = () => {
+  const location = useLocation();
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // ✅ Handle resize properly
   useEffect(() => {
     const handleResize = () => {
-      setCollapsed(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+
+      if (!mobile) {
+        setIsMobileOpen(false);
+      }
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const isAuth = !!localStorage.getItem("token");
+
+  // ✅ If not logged in → go to auth
+  if (!isAuth && location.pathname !== "/auth") {
+    return <Navigate to="/auth" replace />;
+  }
+
+  // ✅ If logged in → prevent going back to auth
+  if (isAuth && location.pathname === "/auth") {
+    return <Navigate to="/" replace />;
+  }
+
+  // ✅ Auth page without layout
+  if (location.pathname === "/auth") {
+    return <AppRoutes />;
+  }
+
+  return (
+    <div className="max-w-[1600px] mx-auto">
+      
+      {/* SIDEBAR */}
+    <Sidebar
+      collapsed={isCollapsed}
+      isMobileOpen={isMobileOpen}
+      setIsMobileOpen={setIsMobileOpen}
+    />
+
+      {/* MOBILE OVERLAY */}
+      {isMobile && isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* MOBILE MENU BUTTON 
+      {isMobile && (
+        <button
+          onClick={() => setIsMobileOpen(true)}
+          className="
+            fixed top-4 left-3 z-50
+            bg-white/80 backdrop-blur-lg
+            border border-gray-200
+            shadow-md
+            p-2 rounded-xl
+            hover:scale-105 transition
+          "
+        >
+          ☰
+        </button>
+      )}*/}
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col">
+
+        {/* HEADER */}
+        <Header
+          collapsed={isCollapsed}
+          toggleSidebar={() => {
+            if (isMobile) {
+              setIsMobileOpen(!isMobileOpen);
+            } else {
+              setIsCollapsed(!isCollapsed);
+            }
+          }}
+        />
+
+        {/* PAGE CONTENT */}
+       <main
+          className={`pt-[70px] p-4 lg:p-6 
+          ${!isMobile && (isCollapsed ? "ml-16" : "ml-64")} 
+          transition-all duration-300`}
+        >
+          <AppRoutes />
+        </main>
+      </div>
+    </div>
+  );
+};
+
+const App = () => {
   return (
     <BrowserRouter>
       <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
-          style: {
-            marginTop: "55px",
-            transition: "all 0.3s ease-in-out",
-          },
+          style: { marginTop: "60px" },
         }}
       />
-      {pathname !== "/auth" ? (
-          <div className="flex bg-slate-50" style={{ minHeight: "100vh" }}>
-          <Sidebar collapsed={collapsed} />
-
-          <button
-            className="md:hidden fixed top-4 left-3 z-50 bg-black text-white p-1 rounded"
-            onClick={() => setCollapsed((prev) => !prev)}
-          >
-            ☰
-          </button>
-
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header collapsed={collapsed} toggleSidebar={() => setCollapsed(!collapsed)} />
-
-            <main
-              className={`flex-1 overflow-x-auto overflow-y-auto p-4 lg:p-6 bg-slate-50 mt-10 transition-all duration-300 ${
-                collapsed ? "ml-10 md:ml-20" : "ml-64"
-              }`}
-            >
-              <div className="min-w-full">
-                <AppRoutes />
-              </div>
-            </main>
-          </div>
-        </div>
-
-      ) : (
-        <AppRoutes />
-      )}
+      <Layout />
     </BrowserRouter>
   );
 };
