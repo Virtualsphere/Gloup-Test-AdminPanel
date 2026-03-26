@@ -46,7 +46,7 @@ const Layout = () => {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto">
+   <div className="w-full min-h-screen bg-gray-50">
       
       {/* SIDEBAR */}
     <Sidebar
@@ -98,7 +98,7 @@ const Layout = () => {
         {/* PAGE CONTENT */}
        <main
           className={`pt-[70px] p-4 lg:p-6 
-          ${!isMobile && (isCollapsed ? "ml-16" : "ml-64")} 
+          ${!isMobile ? (isCollapsed ? "lg:ml-16" : "lg:ml-64") : ""}
           transition-all duration-300`}
         >
           <AppRoutes />

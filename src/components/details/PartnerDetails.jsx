@@ -15,7 +15,7 @@ import { Plus } from "lucide-react";
 import EditServiceModal from "../create/EditService";
 import { fetchServiceCategories } from "../../redux/slices/partnersSlice";
 
-export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving  }) => {
+export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving }) => {
   const [location, setLocation] = useState(null);
   const dispatch = useDispatch();
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -87,16 +87,16 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
 
   }, [partnerData]);
 
-  
-  useEffect(() => {
-  dispatch(getServiceProvidedForOptions()).then((res) => {
-    setServicesProvidedFor(res.payload || []);
-  });
 
-  dispatch(getLanguageList()).then((res) => {
-    setLanguageOptions(res.payload || []);
-  });
-}, [dispatch]);
+  useEffect(() => {
+    dispatch(getServiceProvidedForOptions()).then((res) => {
+      setServicesProvidedFor(res.payload || []);
+    });
+
+    dispatch(getLanguageList()).then((res) => {
+      setLanguageOptions(res.payload || []);
+    });
+  }, [dispatch]);
 
   // ✅ FIX — sync MapPicker → form
   useEffect(() => {
@@ -125,9 +125,9 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
   };
 
   const cleanLogo = (logo) => {
-  if (!logo) return null;
-  return logo.replace(/^"+|"+$/g, ""); // remove extra quotes
-};
+    if (!logo) return null;
+    return logo.replace(/^"+|"+$/g, ""); // remove extra quotes
+  };
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -196,91 +196,89 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
           </div>
           {/* Salon Services Provided For */}
           <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                Services Provided For
-              </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+              Services Provided For
+            </h3>
 
-              <div className="flex flex-wrap gap-3">
-                {servicesProvidedFor.map((item) => {
-                  const active = form.servicesProvidedFor.includes(item.id);
+            <div className="flex flex-wrap gap-3">
+              {servicesProvidedFor.map((item) => {
+                const active = form.servicesProvidedFor.includes(item.id);
 
-                  return (
-                    <button
-                      type="button"
-                      key={item.id}
-                      onClick={() => {
-                        const updated = active
-                          ? form.servicesProvidedFor.filter((l) => l !== item.id)
-                          : [...form.servicesProvidedFor, item.id];
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => {
+                      const updated = active
+                        ? form.servicesProvidedFor.filter((l) => l !== item.id)
+                        : [...form.servicesProvidedFor, item.id];
 
-                        handleChange("servicesProvidedFor", updated);
-                      }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
-                        ${
-                          active
-                            ? "bg-indigo-600 text-white shadow-md scale-105"
-                            : "bg-gray-200 hover:bg-gray-300"
-                        }`}
-                    >
-                      {item.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {form.servicesProvidedFor.length > 0 && (
-                <p className="text-sm text-gray-500 mt-3">
-                  Selected: {form.servicesProvidedFor
-                    .map(
-                      (id) =>
-                        servicesProvidedFor.find((s) => s.id === id)?.name
-                    )
-                    .join(", ")}
-                </p>
-              )}
+                      handleChange("servicesProvidedFor", updated);
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
+                        ${active
+                        ? "bg-indigo-600 text-white shadow-md scale-105"
+                        : "bg-gray-200 hover:bg-gray-300"
+                      }`}
+                  >
+                    {item.name}
+                  </button>
+                );
+              })}
             </div>
+
+            {form.servicesProvidedFor.length > 0 && (
+              <p className="text-sm text-gray-500 mt-3">
+                Selected: {form.servicesProvidedFor
+                  .map(
+                    (id) =>
+                      servicesProvidedFor.find((s) => s.id === id)?.name
+                  )
+                  .join(", ")}
+              </p>
+            )}
+          </div>
           {/* Languages Known */}
           <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                Languages Known
-              </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+              Languages Known
+            </h3>
 
-              <div className="flex flex-wrap gap-3">
-                {languageOptions.map((lang) => {
-                  const active = form.languages.includes(lang.id);
+            <div className="flex flex-wrap gap-3">
+              {languageOptions.map((lang) => {
+                const active = form.languages.includes(lang.id);
 
-                  return (
-                    <button
-                      type="button"
-                      key={lang.id}
-                      onClick={() => {
-                        const updated = active
-                          ? form.languages.filter((l) => l !== lang.id)
-                          : [...form.languages, lang.id];
+                return (
+                  <button
+                    type="button"
+                    key={lang.id}
+                    onClick={() => {
+                      const updated = active
+                        ? form.languages.filter((l) => l !== lang.id)
+                        : [...form.languages, lang.id];
 
-                        handleChange("languages", updated);
-                      }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
-                        ${
-                          active
-                            ? "bg-indigo-600 text-white shadow-md scale-105"
-                            : "bg-gray-200 hover:bg-gray-300"
-                        }`}
-                    >
-                      {lang.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {form.languages.length > 0 && (
-                <p className="text-sm text-gray-500 mt-3">
-                  Selected: {form.languages
-                    .map((id) => languageOptions.find((l) => l.id === id)?.name)
-                    .join(", ")}
-                </p>
-              )}
+                      handleChange("languages", updated);
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 
+                        ${active
+                        ? "bg-indigo-600 text-white shadow-md scale-105"
+                        : "bg-gray-200 hover:bg-gray-300"
+                      }`}
+                  >
+                    {lang.name}
+                  </button>
+                );
+              })}
             </div>
+
+            {form.languages.length > 0 && (
+              <p className="text-sm text-gray-500 mt-3">
+                Selected: {form.languages
+                  .map((id) => languageOptions.find((l) => l.id === id)?.name)
+                  .join(", ")}
+              </p>
+            )}
+          </div>
           {/* Premium Partner */}
           <div className="flex items-center gap-4">
             <span className="font-medium text-gray-700">Premium Partner</span>
@@ -336,32 +334,32 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
 
               {/* Logo Preview */}
               <div className="relative group">
-                
-                {form.logo ? (
-  <img
-    src={
-      form.logo instanceof File
-        ? URL.createObjectURL(form.logo) // ✅ new upload
-        : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(form.logo)}` // ✅ S3/CDN
-    }
-    alt="Store Logo"
-    className="w-28 h-28 rounded-full object-cover border-4 border-indigo-200 shadow"
-    onError={(e) => {
-      const target = e.target;
 
-      if (!target.dataset.fallback) {
-        target.dataset.fallback = "true";
-        target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(form.logo)}`; // ✅ local fallback
-      } else {
-        target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
-      }
-    }}
-  />
-) : (
-  <div className="w-28 h-28 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-    No Logo
-  </div>
-)}
+                {form.logo ? (
+                  <img
+                    src={
+                      form.logo instanceof File
+                        ? URL.createObjectURL(form.logo) // ✅ new upload
+                        : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(form.logo)}` // ✅ S3/CDN
+                    }
+                    alt="Store Logo"
+                    className="w-28 h-28 rounded-full object-cover border-4 border-indigo-200 shadow"
+                    onError={(e) => {
+                      const target = e.target;
+
+                      if (!target.dataset.fallback) {
+                        target.dataset.fallback = "true";
+                        target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(form.logo)}`; // ✅ local fallback
+                      } else {
+                        target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="w-28 h-28 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                    No Logo
+                  </div>
+                )}
 
                 {/* Remove Logo */}
                 {form.logo && (
@@ -431,7 +429,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
             </label>
 
             {/* Preview Grid */}
-           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-5">
               {(form.images || []).map((img, i) => {
                 return (
                   <div
@@ -439,7 +437,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
                     className="relative group rounded-xl overflow-hidden shadow border bg-white"
                   >
 
-                     {/* NEW BADGE */}
+                    {/* NEW BADGE */}
                     {img instanceof File && (
                       <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
                         New
@@ -704,28 +702,28 @@ const PartnerDetails = ({ title }) => {
     });
   };
 
-const fetchWithFallback = async (img) => {
-  try {
-    const s3Url = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`;
-    const res = await fetch(s3Url);
+  const fetchWithFallback = async (img) => {
+    try {
+      const s3Url = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`;
+      const res = await fetch(s3Url);
 
-    if (!res.ok) throw new Error("S3 failed");
+      if (!res.ok) throw new Error("S3 failed");
 
-    return await urlToFile(s3Url, img);
-  } catch {
-    const localUrl = `${API}/images/${img}`;
-    return await urlToFile(localUrl, img);
-  }
-};
+      return await urlToFile(s3Url, img);
+    } catch {
+      const localUrl = `${API}/images/${img}`;
+      return await urlToFile(localUrl, img);
+    }
+  };
 
-const urlToFile = async (url, filename) => {
-  const res = await fetch(url);
-  const blob = await res.blob();
+  const urlToFile = async (url, filename) => {
+    const res = await fetch(url);
+    const blob = await res.blob();
 
-  return new File([blob], filename, {
-    type: blob.type,
-  });
-};
+    return new File([blob], filename, {
+      type: blob.type,
+    });
+  };
 
   const handleSaveEdit = async (updatedData) => {
     try {
@@ -853,7 +851,7 @@ const urlToFile = async (url, filename) => {
       const oldImages = [];
       const newImages = [];
 
-     (updatedData.images || []).forEach((img) => {
+      (updatedData.images || []).forEach((img) => {
         if (img instanceof File) {
           newImages.push(img);
         } else {
@@ -866,15 +864,15 @@ const urlToFile = async (url, filename) => {
       );
 
       // ✅ send old images as JSON
-     oldFiles.forEach((file) => {
-      console.log("File Info:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
+      oldFiles.forEach((file) => {
+        console.log("File Info:", {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        });
 
-      formData.append("images", file);
-    });
+        formData.append("images", file);
+      });
 
       // ✅ send full files (already correct)
       newImages.forEach((file) => {
@@ -975,7 +973,7 @@ const urlToFile = async (url, filename) => {
 
 
 
- const [selectedSlots, setSelectedSlots] = useState([]);
+  const [selectedSlots, setSelectedSlots] = useState([]);
 
   const formatTime = (t) =>
     new Date(`1970-01-01T${t}`).toLocaleTimeString([], {
@@ -984,144 +982,144 @@ const urlToFile = async (url, filename) => {
       hour12: true
     });
 
-    const toggleSelectSlot = (id) => {
-  setSelectedSlots((prev) =>
-    prev.includes(id)
-      ? prev.filter((s) => s !== id)
-      : [...prev, id]
-  );
-};
-
-const toggleSlot = async (slot) => {
-
-  const action = slot.status === "active" ? "block" : "unblock";
-  const updatedStatus = action === "block" ? "blocked" : "active";
-
-  try {
-
-    await dispatch(
-      BlockAndUnblockSlot({
-        storeId: id,
-        slotId: slot.id,
-        status: action,
-        date: selectedDate.full
-      })
-    ).unwrap();
-
-    setData(prev => ({
-      ...prev,
-      timeslots: prev.timeslots.map(s =>
-        s.id === slot.id
-          ? { ...s, status: updatedStatus }
-          : s
-      )
-    }));
-
-  } catch (err) {
-    alert("Failed to update slot");
-  }
-};
-
-const blockSelectedSlots = async () => {
-
-  try {
-
-    await Promise.all(
-      selectedSlots.map(id =>
-        dispatch(
-          BlockAndUnblockSlot({
-            storeId: id,
-            slotId: id,
-            status: "block",
-            date: selectedDate.full
-          })
-        ).unwrap()
-      )
+  const toggleSelectSlot = (id) => {
+    setSelectedSlots((prev) =>
+      prev.includes(id)
+        ? prev.filter((s) => s !== id)
+        : [...prev, id]
     );
+  };
 
-    setData(prev => ({
-      ...prev,
-      timeslots: prev.timeslots.map(slot =>
-        selectedSlots.includes(slot.id)
-          ? { ...slot, status: "blocked" }
-          : slot
-      )
-    }));
+  const toggleSlot = async (slot) => {
 
-    setSelectedSlots([]);
+    const action = slot.status === "active" ? "block" : "unblock";
+    const updatedStatus = action === "block" ? "blocked" : "active";
 
-  } catch {
-    alert("Failed to block slots");
-  }
-};
+    try {
 
-const unblockSelectedSlots = async () => {
-
-  try {
-
-    await Promise.all(
-      selectedSlots.map(id =>
-        dispatch(
-          BlockAndUnblockSlot({
-            storeId: id,
-            slotId: id,
-            status: "unblock",
-            date: selectedDate.full
-          })
-        ).unwrap()
-      )
-    );
-
-    setData(prev => ({
-      ...prev,
-      timeslots: prev.timeslots.map(slot =>
-        selectedSlots.includes(slot.id)
-          ? { ...slot, status: "active" }
-          : slot
-      )
-    }));
-
-    setSelectedSlots([]);
-
-  } catch {
-    alert("Failed to unblock slots");
-  }
-};
-
-
-const cleanLogo = (logo) => {
-  if (!logo) return null;
-  return logo.replace(/^"+|"+$/g, ""); // remove extra quotes
-};
-
-useEffect(() => {
-  if (!selectedDate) return;
-
-  dispatch(
-    getBlockedSlots({
-      storeId: id,
-      date: selectedDate.full
-    })
-  )
-    .unwrap()
-    .then((blockedSlots) => {
-      console.log("Blocked slots for", selectedDate.full, blockedSlots);
-      const blockedIds = (blockedSlots || []).map(s => s.slot_id);
+      await dispatch(
+        BlockAndUnblockSlot({
+          storeId: id,
+          slotId: slot.id,
+          status: action,
+          date: selectedDate.full
+        })
+      ).unwrap();
 
       setData(prev => ({
         ...prev,
-        timeslots: (prev.timeslots || []).map(slot => ({
-          ...slot,
-          status: blockedIds.includes(slot.id) ? "blocked" : "active"
-        }))
+        timeslots: prev.timeslots.map(s =>
+          s.id === slot.id
+            ? { ...s, status: updatedStatus }
+            : s
+        )
       }));
 
-    })
-    .catch(() => {
-      console.log("Failed to fetch blocked slots");
-    });
+    } catch (err) {
+      alert("Failed to update slot");
+    }
+  };
 
-}, [selectedDate, id, dispatch]);
+  const blockSelectedSlots = async () => {
+
+    try {
+
+      await Promise.all(
+        selectedSlots.map(id =>
+          dispatch(
+            BlockAndUnblockSlot({
+              storeId: id,
+              slotId: id,
+              status: "block",
+              date: selectedDate.full
+            })
+          ).unwrap()
+        )
+      );
+
+      setData(prev => ({
+        ...prev,
+        timeslots: prev.timeslots.map(slot =>
+          selectedSlots.includes(slot.id)
+            ? { ...slot, status: "blocked" }
+            : slot
+        )
+      }));
+
+      setSelectedSlots([]);
+
+    } catch {
+      alert("Failed to block slots");
+    }
+  };
+
+  const unblockSelectedSlots = async () => {
+
+    try {
+
+      await Promise.all(
+        selectedSlots.map(id =>
+          dispatch(
+            BlockAndUnblockSlot({
+              storeId: id,
+              slotId: id,
+              status: "unblock",
+              date: selectedDate.full
+            })
+          ).unwrap()
+        )
+      );
+
+      setData(prev => ({
+        ...prev,
+        timeslots: prev.timeslots.map(slot =>
+          selectedSlots.includes(slot.id)
+            ? { ...slot, status: "active" }
+            : slot
+        )
+      }));
+
+      setSelectedSlots([]);
+
+    } catch {
+      alert("Failed to unblock slots");
+    }
+  };
+
+
+  const cleanLogo = (logo) => {
+    if (!logo) return null;
+    return logo.replace(/^"+|"+$/g, ""); // remove extra quotes
+  };
+
+  useEffect(() => {
+    if (!selectedDate) return;
+
+    dispatch(
+      getBlockedSlots({
+        storeId: id,
+        date: selectedDate.full
+      })
+    )
+      .unwrap()
+      .then((blockedSlots) => {
+        console.log("Blocked slots for", selectedDate.full, blockedSlots);
+        const blockedIds = (blockedSlots || []).map(s => s.slot_id);
+
+        setData(prev => ({
+          ...prev,
+          timeslots: (prev.timeslots || []).map(slot => ({
+            ...slot,
+            status: blockedIds.includes(slot.id) ? "blocked" : "active"
+          }))
+        }));
+
+      })
+      .catch(() => {
+        console.log("Failed to fetch blocked slots");
+      });
+
+  }, [selectedDate, id, dispatch]);
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -1149,7 +1147,7 @@ useEffect(() => {
 
   };
 
-  
+
 
   const isSlotDisabled = (slot) =>
     slot.status !== "active" ||
@@ -1214,26 +1212,26 @@ useEffect(() => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6">
                   <div className="flex gap-4">
 
-                   {/* LOGO */}
-{data?.store_details?.logo && (
-  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-indigo-500 shadow">
-    <img
-      src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(data.store_details.logo)}`}
-      alt="logo"
-      className="w-full h-full object-cover"
-      onError={(e) => {
-        const target = e.target;
+                    {/* LOGO */}
+                    {data?.store_details?.logo && (
+                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-indigo-500 shadow">
+                        <img
+                          src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(data.store_details.logo)}`}
+                          alt="logo"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target;
 
-        if (!target.dataset.fallback) {
-          target.dataset.fallback = "true";
-          target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(data.store_details.logo)}`;
-        } else {
-          target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
-        }
-      }}
-    />
-  </div>
-)}
+                            if (!target.dataset.fallback) {
+                              target.dataset.fallback = "true";
+                              target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(data.store_details.logo)}`;
+                            } else {
+                              target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
 
                     {/* IMAGE SLIDER */}
                     {data?.store_details?.images?.length ? (
@@ -1247,16 +1245,16 @@ useEffect(() => {
                           {data.store_details.images.map((img, i) => (
                             <SwiperSlide key={i}>
                               <img
-                                  src={
-                                    img instanceof File
-                                      ? URL.createObjectURL(img)
-                                      : img
-                                        ? `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
-                                        : `${import.meta.env.VITE_API_BASE_URL}/images/${img}`
-                                  }
-                                  alt={`store-image-${i}`}
-                                  className="w-full h-full object-cover"
-                                />
+                                src={
+                                  img instanceof File
+                                    ? URL.createObjectURL(img)
+                                    : img
+                                      ? `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
+                                      : `${import.meta.env.VITE_API_BASE_URL}/images/${img}`
+                                }
+                                alt={`store-image-${i}`}
+                                className="w-full h-full object-cover"
+                              />
                             </SwiperSlide>
                           ))}
                         </Swiper>
@@ -1281,25 +1279,25 @@ useEffect(() => {
 
 
 
-                 <div className="grid grid-cols-2 sm:flex gap-2 mt-4 sm:mt-0">
+                  <div className="grid grid-cols-2 sm:flex gap-2 mt-4 sm:mt-0">
 
                     {data?.store_details?.is_premium && (
                       <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
                         ⭐ Premium Partner
                       </span>
                     )}
-                   <span
-                    className={`
+                    <span
+                      className={`
                       px-3 py-1 rounded-full text-sm font-medium
                       flex items-center justify-center
                       ${getStatusColor(data?.store_details?.status)}
                     `}
-                  >
-                    {data?.store_details?.status
-                      ? data.store_details.status.charAt(0).toUpperCase() +
+                    >
+                      {data?.store_details?.status
+                        ? data.store_details.status.charAt(0).toUpperCase() +
                         data.store_details.status.slice(1)
-                      : "Unknown"}
-                  </span>
+                        : "Unknown"}
+                    </span>
 
                     <button
                       onClick={() => setShowEditModal(true)}
@@ -1419,39 +1417,38 @@ useEffect(() => {
 
                 </div>
                 {/* DATE STRIP */}
-            <div className="
+                <div className="
   flex gap-2 mb-4 px-2 w-full
   overflow-x-auto no-scrollbar
   justify-start md:justify-center
 ">
-  {days.map((d) => (
-    <button
-      key={d.full}
-      disabled={d.isPast}
-      onClick={() => setSelectedDate(d)}
-      className={`flex flex-col items-center justify-center 
+                  {days.map((d) => (
+                    <button
+                      key={d.full}
+                      disabled={d.isPast}
+                      onClick={() => setSelectedDate(d)}
+                      className={`flex flex-col items-center justify-center 
       min-w-[70px] flex-shrink-0 px-3 py-2 rounded-xl border transition
-      ${
-        d.isPast
-          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-          : selectedDate?.full === d.full
-          ? "bg-teal-600 text-white border-teal-600 shadow-md"
-          : d.isToday
-          ? "border-teal-500 text-teal-600 font-semibold"
-          : "border-gray-300 hover:bg-gray-100"
-      }`}
-    >
-      <span className="text-xs leading-none">{d.label}</span>
-      <span className="text-lg font-semibold leading-none">{d.number}</span>
+      ${d.isPast
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : selectedDate?.full === d.full
+                            ? "bg-teal-600 text-white border-teal-600 shadow-md"
+                            : d.isToday
+                              ? "border-teal-500 text-teal-600 font-semibold"
+                              : "border-gray-300 hover:bg-gray-100"
+                        }`}
+                    >
+                      <span className="text-xs leading-none">{d.label}</span>
+                      <span className="text-lg font-semibold leading-none">{d.number}</span>
 
-      {d.isToday && (
-        <span className="text-[10px] text-teal-600 leading-none">
-          Today
-        </span>
-      )}
-    </button>
-  ))}
-</div>
+                      {d.isToday && (
+                        <span className="text-[10px] text-teal-600 leading-none">
+                          Today
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
                 {/* SELECTED DAY */}
                 <h2 className="text-center text-lg font-semibold mb-4">
                   {selectedDate?.day}
@@ -1459,25 +1456,25 @@ useEffect(() => {
 
 
                 {/* SLOTS GRID */}
-               {selectedSlots.length > 0 && (
-                    <div className="flex justify-center gap-3 mb-4">
+                {selectedSlots.length > 0 && (
+                  <div className="flex justify-center gap-3 mb-4">
 
-                      <button
-                        onClick={blockSelectedSlots}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600"
-                      >
-                        Block ({selectedSlots.length})
-                      </button>
+                    <button
+                      onClick={blockSelectedSlots}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600"
+                    >
+                      Block ({selectedSlots.length})
+                    </button>
 
-                      <button
-                        onClick={unblockSelectedSlots}
-                        className="px-4 py-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-600"
-                      >
-                        Unblock ({selectedSlots.length})
-                      </button>
+                    <button
+                      onClick={unblockSelectedSlots}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-600"
+                    >
+                      Unblock ({selectedSlots.length})
+                    </button>
 
-                    </div>
-              )}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[420px] overflow-y-auto">
 
                   {slotsData
@@ -1504,13 +1501,13 @@ useEffect(() => {
 
                         {/* Show Block/Unblock ONLY for active slots */}
                         {!isPastSelectedDate && (
-                            <button
-                              onClick={() => toggleSlot(slot)}
-                              className="absolute top-1 right-2 text-xs bg-white px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition"
-                            >
-                              {slot.status === "active" ? "Block" : "Unblock"}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => toggleSlot(slot)}
+                            className="absolute top-1 right-2 text-xs bg-white px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition"
+                          >
+                            {slot.status === "active" ? "Block" : "Unblock"}
+                          </button>
+                        )}
                       </div>
 
                     ))}
@@ -1544,8 +1541,8 @@ useEffect(() => {
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
                       className={`px-4 py-2 rounded-md whitespace-nowrap text-sm font-medium transition ${selectedCategory === cat.id
-                          ? "bg-black text-white shadow-md"
-                          : "bg-gray-200 hover:bg-gray-300"
+                        ? "bg-black text-white shadow-md"
+                        : "bg-gray-200 hover:bg-gray-300"
                         }`}
                     >
                       {cat.name}
