@@ -593,7 +593,15 @@ const getFallbackImageUrl = (img) => {
             setFilters((prev) => ({ ...prev, status: opt ? opt.value : "" }))
           }
           placeholder="Status"
+          isClearable
+          menuPortalTarget={document.body}
+          menuPosition="fixed"
+          menuShouldScrollIntoView={false}
           className="min-w-[120px] text-sm"
+          styles={{
+            menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+            menu: (base) => ({ ...base, zIndex: 9999 }),
+          }}
         />
 
         <Select
@@ -603,7 +611,15 @@ const getFallbackImageUrl = (img) => {
             setFilters((prev) => ({ ...prev, categoryName: opt ? opt.value : "" }))
           }
           placeholder="Category"
+          menuPosition="fixed"
+          isClearable
+          menuPortalTarget={document.body}
+          menuShouldScrollIntoView={false}
           className="min-w-[120px] text-sm"
+          styles={{
+            menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+            menu: (base) => ({ ...base, zIndex: 9999 }),
+          }}
         />
 
         <Select
