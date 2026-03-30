@@ -75,13 +75,16 @@ const Header = ({ collapsed,toggleSidebar }) => {
   }, [showProfileModal]);
 
   return (
-   <header className={`
-  fixed top-0 right-0 z-40 h-13
-  bg-white/70 backdrop-blur-xl
-  border-b border-gray-200/50
-  transition-all duration-300 ease-in-out
-  left-0 ${collapsed ? "md:left-16" : "md:left-64"}
-`}>
+  <header
+      className={`
+        fixed top-0 right-0 z-40 h-13
+        bg-white/70 backdrop-blur-xl
+        border-b border-gray-200/50
+        transition-all duration-300
+
+        ${collapsed ? "md:left-20" : "md:left-64"} left-0
+      `}
+    >
       <div className="h-13 px-4 flex items-center justify-between">
         <div className="flex items-center">
           <button
