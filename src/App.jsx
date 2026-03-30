@@ -1,9 +1,15 @@
-import { BrowserRouter, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Header from "./components/layout/Header";
 import Sidebar from "./components/layout/Sidebar";
-import AppRoutes from "./routes/AppRoutes";
 import { Toaster } from "react-hot-toast";
-import { useState, useEffect } from "react";
+
+// صفحات (example)
+import Dashboard from "./components/dashboard/DashboardPage";
+
+import Auth from "./components/auth/AuthPages";
+import AppRoutes from "./routes/AppRoutes";
+
 import "./index.css";
 
 const Layout = () => {
@@ -13,108 +19,90 @@ const Layout = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // ✅ Handle resize properly
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
+  // ✅ Responsive detection
+useEffect(() => {
+  const handleResize = () => {
+    const mobile = window.innerWidth < 768;
+    setIsMobile(mobile);
 
-      if (!mobile) {
-        setIsMobileOpen(false);
-      }
-    };
+    if (!mobile) {
+      setIsMobileOpen(false);
+    }
+  };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  handleResize(); // ✅ important
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
 
   const isAuth = !!localStorage.getItem("token");
 
-  // ✅ If not logged in → go to auth
+  // ✅ Auth protection
   if (!isAuth && location.pathname !== "/auth") {
     return <Navigate to="/auth" replace />;
   }
 
-  // ✅ If logged in → prevent going back to auth
   if (isAuth && location.pathname === "/auth") {
     return <Navigate to="/" replace />;
   }
 
-  // ✅ Auth page without layout
+  // ✅ Auth page (no layout)
   if (location.pathname === "/auth") {
-    return <AppRoutes />;
+    return (
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+      </Routes>
+    );
   }
 
   return (
-   <div className="w-full min-h-screen bg-gray-50">
-      
-      {/* SIDEBAR */}
-    <Sidebar
-      collapsed={isCollapsed}
-      isMobileOpen={isMobileOpen}
-      setIsMobileOpen={setIsMobileOpen}
-    />
+    <div className="flex w-full min-h-screen bg-gray-50">
 
-      {/* MOBILE OVERLAY */}
+      {/* ✅ SIDEBAR */}
+      <Sidebar
+        collapsed={isCollapsed}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
+      />
+
+      {/* ✅ MOBILE OVERLAY */}
       {isMobile && isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/40 z-40"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
-      {/* MOBILE MENU BUTTON 
-      {isMobile && (
-        <button
-          onClick={() => setIsMobileOpen(true)}
-          className="
-            fixed top-4 left-3 z-50
-            bg-white/80 backdrop-blur-lg
-            border border-gray-200
-            shadow-md
-            p-2 rounded-xl
-            hover:scale-105 transition
-          "
-        >
-          ☰
-        </button>
-      )}*/}
-
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col">
+      {/* ✅ MAIN CONTENT */}
+      <div className="flex-1 flex flex-col w-full">
 
         {/* HEADER */}
         <Header
-          collapsed={isCollapsed}
           toggleSidebar={() => {
-            if (isMobile) {
-              setIsMobileOpen(!isMobileOpen);
-            } else {
-              setIsCollapsed(!isCollapsed);
-            }
-          }}
+              setIsMobileOpen((prev) => !prev);
+            }}
         />
 
         {/* PAGE CONTENT */}
-       <main
-          className={`pt-[70px] p-4 lg:p-6 
-          ${!isMobile ? (isCollapsed ? "lg:ml-16" : "lg:ml-64") : ""}
-          transition-all duration-300`}
+        <main
+          className={`pt-[70px] p-4 transition-all duration-300
+          ${!isMobile ? (isCollapsed ? "lg:ml-16" : "lg:ml-64") : ""}`}
         >
-          <AppRoutes />
+          <AppRoutes/>
         </main>
       </div>
     </div>
   );
 };
 
+// ✅ ROOT APP
 const App = () => {
   return (
     <BrowserRouter>
       <Toaster
         position="top-right"
         toastOptions={{
-          duration: 4000,
+          duration: 3000,
           style: { marginTop: "60px" },
         }}
       />

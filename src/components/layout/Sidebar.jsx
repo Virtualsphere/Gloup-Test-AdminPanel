@@ -36,18 +36,18 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
 
   return (
    <aside
-      className={`
-        fixed top-0 left-0 h-screen z-50
-        bg-gradient-to-b from-[#0f172a]/95 via-[#020617]/95 to-black/95
-        backdrop-blur-xl border-r border-white/10 shadow-2xl
-        transition-all duration-300 flex flex-col
+  className={`
+    fixed top-0 left-0 h-screen z-50
+    bg-gradient-to-b from-[#0f172a]/95 via-[#020617]/95 to-black/95
+    backdrop-blur-xl border-r border-white/10 shadow-2xl
+    transition-all duration-300 flex flex-col
 
-        w-64
-        ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
-        md:translate-x-0
-        ${collapsed ? "md:w-20" : "md:w-64"}
-      `}
-    >
+    ${collapsed ? "w-20" : "w-64"}
+
+    ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+    md:translate-x-0
+  `}
+>
       {/* LOGO */}
        <div className="h-13 flex items-center gap-3 px-4 py-4 border-b border-white/10">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
@@ -70,7 +70,14 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                navigate(item.path);
+
+                // ✅ CLOSE sidebar in mobile
+                if (window.innerWidth < 768) {
+                  setIsMobileOpen(false);
+                }
+              }}
               className={`
                 relative group flex items-center w-full rounded-xl px-2 py-2
                 transition-all duration-200
