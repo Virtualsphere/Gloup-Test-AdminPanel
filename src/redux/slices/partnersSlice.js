@@ -118,6 +118,27 @@ export const editService = createAsyncThunk(
   }
 );
 
+export const deleteService = createAsyncThunk(
+  "allPartners/deleteService",
+  async(serviceId, {rejectWithValue}) => {
+    console.log('Delete Service ID: ', serviceId);
+ 
+    try {
+      const response = await api.post('/admin/app/deleteservice', { service_id: serviceId }, {
+        withCredentials: false,
+      });
+ 
+      return response.data.data;
+    } catch (error) {
+      const message =
+      error.response?.data?.error?.message ||
+      error.message ||
+      "Failed to delete Service";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // get service category
 export const fetchServiceCategories = createAsyncThunk(  
   "allPartners/getserivecategory",
@@ -614,6 +635,19 @@ const allPartnersSlice = createSlice({
       .addCase(deletePartner.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to delete partner";
+      })
+
+      .addCase(deleteService.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteService.fulfilled, (state, action) => {
+        state.loading = false;
+        state.success = true;
+      })
+      .addCase(deleteService.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to delete service";
       })
 
       // Update Multiple Partners
