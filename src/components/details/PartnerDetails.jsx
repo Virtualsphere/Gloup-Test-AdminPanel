@@ -165,9 +165,35 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
                 Salon {field}
               </label>
               <input
-                type={field === "phone" ? "number" : "text"}
-                value={form[field]}
-                onChange={(e) => handleChange(field, e.target.value)}
+                type={
+        field === "phone" || field === "radius" || field === "income"
+          ? "number"
+          : "text"
+      }
+      min={field === "radius" ? "0" : undefined}
+      step={field === "radius" ? "any" : undefined}
+      value={form[field]}
+      onChange={(e) => {
+        let value = e.target.value;
+
+        // ✅ SPECIAL VALIDATION FOR RADIUS
+        if (field === "radius") {
+          if (value === "" || Number(value) >= 0) {
+            handleChange(field, value);
+          }
+          return;
+        }
+
+        handleChange(field, value);
+      }}
+      onKeyDown={(e) => {
+        // ✅ BLOCK invalid characters for radius
+        if (field === "radius") {
+          if (["e", "E", "+", "-"].includes(e.key)) {
+            e.preventDefault();
+          }
+        }
+      }}
                 className="mt-1 block w-full bg-white border border-gray-300 px-3 py-2 rounded-md focus:ring-indigo-500"
               />
             </div>
