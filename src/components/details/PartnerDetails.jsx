@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { MapPin, CheckCircle, XCircle, Eye, Calendar, User, IndianRupee, Edit, Trash2, } from "lucide-react";
+import { MapPin, CheckCircle, XCircle, Eye, Calendar, User, IndianRupee, Edit, Trash2, Upload } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { getPartnerDetail, getAllPayoutLogs, updatePartnerDetail, updatePartnerStatus, deletePartner, getStoreServices, generateDefaultSlots, BlockAndUnblockSlot, getBlockedSlots, getLanguageList, getServiceProvidedForOptions } from "../../redux/slices/partnersSlice";
 import { useDispatch, useSelector } from "react-redux";
@@ -14,6 +14,274 @@ import CreateServiceModal from "../create/CreateService";
 import { Plus } from "lucide-react";
 import EditServiceModal from "../create/EditService";
 import { fetchServiceCategories, deleteService } from "../../redux/slices/partnersSlice";
+
+const useDragAndDrop = () => {
+  const [isDragging, setIsDragging] = useState(false);
+ 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+ 
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+ 
+  const handleDrop = (e, callback) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+ 
+    const files = Array.from(e.dataTransfer.files);
+    const imageFiles = files.filter((file) =>
+      file.type.startsWith("image/")
+    );
+ 
+    if (imageFiles.length > 0) {
+      callback(imageFiles);
+    }
+  };
+ 
+  return {
+    isDragging,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  };
+};
+
+const LogoUploadSection = ({ form, handleChange }) => {
+  const dragDropLogo = useDragAndDrop();
+  const logoInputRef = React.useRef(null);
+ 
+  const cleanLogo = (logo) => {
+    if (!logo) return null;
+    return logo.replace(/^"+|"+$/g, "");
+  };
+ 
+  const handleLogoDrop = (files) => {
+    if (files[0]) {
+      handleChange("logo", files[0]);
+      handleChange("newLogoAdded", true);
+    }
+  };
+ 
+  return (
+    <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4">
+        Store Logo
+      </h3>
+ 
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Logo Preview */}
+        <div className="relative group">
+          {form.logo ? (
+            <>
+              <img
+                src={
+                  form.logo instanceof File
+                    ? URL.createObjectURL(form.logo)
+                    : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${window.location.pathname.split("/")[2]}/logo/${cleanLogo(form.logo)}`
+                }
+                alt="Store Logo"
+                className="w-32 h-32 rounded-full object-cover border-4 border-indigo-200 shadow-lg transition-transform group-hover:scale-105"
+                onError={(e) => {
+                  const target = e.target;
+                  if (!target.dataset.fallback) {
+                    target.dataset.fallback = "true";
+                    target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+                  }
+                }}
+              />
+ 
+              {/* Remove Logo Button */}
+              <button
+                type="button"
+                onClick={() =>
+                  handleChange("logo", null) || handleChange("newLogoAdded", true)
+                }
+                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-7 h-7 text-sm flex items-center justify-center shadow hover:bg-red-700 transition transform hover:scale-110"
+              >
+                ✕
+              </button>
+            </>
+          ) : (
+            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-300">
+              <Upload className="w-8 h-8" />
+            </div>
+          )}
+        </div>
+ 
+        {/* Upload Area */}
+        <div className="flex-1 flex flex-col gap-3">
+          {/* Drag & Drop Zone */}
+          <div
+            onDragOver={dragDropLogo.handleDragOver}
+            onDragLeave={dragDropLogo.handleDragLeave}
+            onDrop={(e) => dragDropLogo.handleDrop(e, handleLogoDrop)}
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition cursor-pointer ${
+              dragDropLogo.isDragging
+                ? "border-indigo-500 bg-indigo-50 scale-105"
+                : "border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
+            }`}
+          >
+            <Upload className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+            <p className="text-sm font-medium text-gray-700">
+              Drag & drop your logo here
+            </p>
+            <p className="text-xs text-gray-500 mt-1">or click to browse</p>
+ 
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files[0]) {
+                  handleLogoDrop([e.target.files[0]]);
+                }
+              }}
+            />
+ 
+            <button
+              type="button"
+              onClick={() => logoInputRef.current?.click()}
+              className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium"
+            >
+              Browse Files
+            </button>
+          </div>
+ 
+          <p className="text-xs text-gray-500">
+            📦 Supported: PNG, JPG, GIF (Max 5MB)
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SalonImagesSection = ({ form, handleChange, id }) => {
+  const dragDropImages = useDragAndDrop();
+  const imagesInputRef = React.useRef(null);
+ 
+  const handleImagesDrop = (files) => {
+    handleChange("images", [...form.images, ...files]);
+    handleChange("newImagesAdded", true);
+  };
+ 
+  const removeImage = (index) => {
+    const updated = form.images.filter((_, i) => i !== index);
+    handleChange("images", updated);
+  };
+ 
+  return (
+    <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4">
+        Salon Images
+      </h3>
+ 
+      {/* Drag & Drop Zone */}
+      <div
+        onDragOver={dragDropImages.handleDragOver}
+        onDragLeave={dragDropImages.handleDragLeave}
+        onDrop={(e) => dragDropImages.handleDrop(e, handleImagesDrop)}
+        className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl transition cursor-pointer ${
+          dragDropImages.isDragging
+            ? "border-indigo-500 bg-indigo-50 scale-105"
+            : "border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
+        }`}
+      >
+        <Upload className="w-10 h-10 text-indigo-500 mb-2" />
+        <p className="text-sm font-medium text-gray-700">
+          Drag & drop images here
+        </p>
+        <p className="text-xs text-gray-500 mt-1">or click to browse</p>
+ 
+        <input
+          ref={imagesInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length > 0) {
+              handleImagesDrop(Array.from(e.target.files));
+            }
+          }}
+        />
+ 
+        <button
+          type="button"
+          onClick={() => imagesInputRef.current?.click()}
+          className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium"
+        >
+          Browse Files
+        </button>
+      </div>
+ 
+      <p className="text-xs text-gray-500 mt-2">
+        📦 Supported: PNG, JPG, GIF up to 5MB each | Drag multiple files at once
+      </p>
+ 
+      {/* Image Preview Grid */}
+      {(form.images || []).length > 0 && (
+        <div className="mt-5">
+          <p className="text-sm font-semibold text-gray-700 mb-3">
+            Preview ({form.images.length} images)
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {(form.images || []).map((img, i) => (
+              <div
+                key={i}
+                className="relative group rounded-lg overflow-hidden shadow-md border border-gray-200 bg-white aspect-square"
+              >
+                {/* New Badge */}
+                {img instanceof File && (
+                  <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md z-10 font-semibold">
+                    NEW
+                  </span>
+                )}
+ 
+                {/* Image */}
+                <img
+                  src={
+                    img instanceof File
+                      ? URL.createObjectURL(img)
+                      : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
+                  }
+                  alt={`salon-${i}`}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                  onError={(e) => {
+                    const target = e.target;
+                    if (!target.dataset.fallback) {
+                      target.dataset.fallback = "true";
+                      target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+                    }
+                  }}
+                />
+ 
+                {/* Overlay with Remove Button */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition duration-200">
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg hover:bg-red-700 transition transform hover:scale-105 flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" /> Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving }) => {
   const [location, setLocation] = useState(null);
@@ -351,165 +619,15 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
           </div>
 
           {/* LOGO */}
-          <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Store Logo
-            </h3>
-
-            <div className="flex items-center gap-6">
-
-              {/* Logo Preview */}
-              <div className="relative group">
-
-                {form.logo ? (
-                  <img
-                    src={
-                      form.logo instanceof File
-                        ? URL.createObjectURL(form.logo) // ✅ new upload
-                        : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(form.logo)}` // ✅ S3/CDN
-                    }
-                    alt="Store Logo"
-                    className="w-28 h-28 rounded-full object-cover border-4 border-indigo-200 shadow"
-                    onError={(e) => {
-                      const target = e.target;
-
-                      if (!target.dataset.fallback) {
-                        target.dataset.fallback = "true";
-                        target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(form.logo)}`; // ✅ local fallback
-                      } else {
-                        target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="w-28 h-28 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                    No Logo
-                  </div>
-                )}
-
-                {/* Remove Logo */}
-                {form.logo && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        logo: null,
-                        newLogoAdded: true, // means remove old logo
-                      }))
-                    }
-                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center shadow hover:bg-red-700"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              {/* Upload Button */}
-              <label className="cursor-pointer bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition shadow">
-                Change Logo
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files[0]) {
-                      setForm((prev) => ({
-                        ...prev,
-                        logo: e.target.files[0],
-                        newLogoAdded: true,
-                      }));
-                    }
-                  }}
-                />
-              </label>
-
-            </div>
-          </div>
+          <LogoUploadSection form={form} handleChange={handleChange} />
 
 
           {/* SALON IMAGES */}
-          <div className="col-span-full bg-white rounded-xl p-5 shadow-sm border border-gray-300">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Salon Images
-            </h3>
-
-            {/* Upload Box */}
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 transition">
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-600">
-                  Click to upload or drag & drop
-                </p>
-                <p className="text-xs text-gray-400">
-                  PNG, JPG up to 5MB
-                </p>
-              </div>
-
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageChange}
-                className="hidden"
-              />
-            </label>
-
-            {/* Preview Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-5">
-              {(form.images || []).map((img, i) => {
-                return (
-                  <div
-                    key={i}
-                    className="relative group rounded-xl overflow-hidden shadow border bg-white"
-                  >
-
-                    {/* NEW BADGE */}
-                    {img instanceof File && (
-                      <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
-                        New
-                      </span>
-                    )}
-
-                    <img
-                      src={
-                        img instanceof File
-                          ? URL.createObjectURL(img)
-                          : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
-                      }
-                      alt="store"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target;
-
-                        // prevent infinite loop
-                        if (!target.dataset.fallback) {
-                          target.dataset.fallback = "true";
-                          target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${img}`;
-                        } else {
-                          target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`; // final fallback
-                        }
-                      }}
-                    />
-
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = form.images.filter(
-                            (_, index) => index !== i
-                          );
-                          handleChange("images", updated);
-                        }}
-                        className="bg-white text-red-600 px-3 py-1 rounded-lg text-sm shadow hover:bg-red-600 hover:text-white transition"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <SalonImagesSection
+            form={form}
+            handleChange={handleChange}
+            id={id}
+          />
         </div>
 
         {/* FOOTER */}
