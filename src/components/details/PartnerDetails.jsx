@@ -427,10 +427,10 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Inputs */}
-          {["name", "email", "phone", "income", "Full Address", "area", "city", "district", "state", "zipcode", "landmark", "radius"].map((field) => (
+          {["name", "email", "phone", "income", "addressLine1", "area", "city", "district", "state", "zipcode", "landmark", "radius"].map((field) => (
             <div className="mb-4" key={field}>
               <label className="block text-sm font-medium text-gray-700 capitalize">
-                Salon {field}
+                {field === "addressLine1" ? "Salon Full Address" : `Salon ${field}`}
               </label>
               <input
                 type={
@@ -907,7 +907,7 @@ const PartnerDetails = ({ title }) => {
 
   const handleSaveEdit = async (updatedData) => {
     try {
-      debugger;
+      // debugger;
       setSaving(true);
       console.log('handling save', updatedData);
       // -----------------------------
