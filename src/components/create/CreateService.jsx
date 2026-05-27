@@ -9,6 +9,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
   const { serviceCategories } = useSelector((state) => state.allPartners);
   const [serviceName, setServiceName] = useState("");
   const [amount, setAmount] = useState("");
+  const [priority, setPriority] = useState(false);
   const [discountedAmount, setDiscountedAmount] = useState("");
   const [duration, setDuration] = useState("00:00:00");
   const [time, setTime] = useState({ hh: "", mm: "", ss: "" });
@@ -27,6 +28,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
       service_for: serviceFor,
       amount,
       discounted_amount: discountedAmount,
+      priority,
       duration,
       status: serviceStatus,
     };
@@ -40,6 +42,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
     setAmount("");
     setDiscountedAmount("");
     setDuration("");
+    setPriority(false);
     setServiceStatus("");
     setServiceCategory("");
     setServiceFor("unisex");
@@ -102,24 +105,60 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
             />
           </div>
 
-          {/* Category */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-600">
-              Category
-            </label>
-            <select
-              value={serviceCategory}
-              onChange={(e) => setServiceCategory(e.target.value)}
-              className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
-              required
-            >
-              <option value="">Select Category</option>
-              {serviceCategories?.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
+          {/* Category + Priority */}
+          <div className="grid grid-cols-2 gap-4">
+            
+            {/* Category */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-600">
+                Category
+              </label>
+
+              <select
+                value={serviceCategory}
+                onChange={(e) => setServiceCategory(e.target.value)}
+                className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
+                required
+              >
+                <option value="">Select Category</option>
+
+                {serviceCategories?.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-600">
+                Priority
+              </label>
+
+              <div className="flex items-center gap-6 h-[44px] border border-gray-300 rounded-lg px-4">
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="priority"
+                    checked={priority === true}
+                    onChange={() => setPriority(true)}
+                  />
+                  <span className="text-sm">Yes</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="priority"
+                    checked={priority === false}
+                    onChange={() => setPriority(false)}
+                  />
+                  <span className="text-sm">No</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Amounts */}
