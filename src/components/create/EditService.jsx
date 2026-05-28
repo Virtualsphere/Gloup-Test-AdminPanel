@@ -6,6 +6,7 @@ import {
   fetchServiceCategories,
   getStoreServices,
 } from "../../redux/slices/partnersSlice";
+import toast from "react-hot-toast";
 
 const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => {
   const dispatch = useDispatch();
@@ -16,6 +17,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
   const [serviceName, setServiceName] = useState("");
   const [amount, setAmount] = useState("");
   const [discountedAmount, setDiscountedAmount] = useState("");
+  const [priority, setPriority] = useState(0);
   const [duration, setDuration] = useState("00:00:00");
   const [serviceStatus, setServiceStatus] = useState("active");
   const [serviceCategory, setServiceCategory] = useState("");
@@ -36,6 +38,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       setServiceStatus(serviceData.status || "active");
       setServiceCategory(serviceData.service_category || "");
       setServiceFor(serviceData.service_for || "unisex");
+      setPriority(serviceData.priority || 0);
 
       const [hh = "00", mm = "00", ss = "00"] =
         (serviceData.duration || "00:00:00").split(":");
@@ -71,6 +74,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       duration,
       status: serviceStatus,
       serviceFor: serviceFor,
+      priority,
     };
 
     try {
@@ -79,6 +83,11 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       setShowModal(false);
     } catch (error) {
       console.error(error);
+      toast.error(
+        error?.message ||
+        error ||
+        "Failed to update service"
+      );
     } finally {
       setLoading(false);
     }
@@ -117,24 +126,52 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
             />
           </div>
 
-          {/* Category */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-600">
-              Category
-            </label>
-            <select
-              value={serviceCategory}
-              onChange={(e) => setServiceCategory(e.target.value)}
-              className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
-              required
-            >
-              <option value="">Select Category</option>
-              {serviceCategories?.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
+          {/* Category + Priority */}
+          <div className="grid grid-cols-2 gap-4">
+
+            {/* Category */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-600">
+                Category
+              </label>
+
+              <select
+                value={serviceCategory}
+                onChange={(e) => setServiceCategory(e.target.value)}
+                className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
+                required
+              >
+                <option value="">Select Category</option>
+
+                {serviceCategories?.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-600">
+                Priority
+              </label>
+
+              <select
+                value={priority}
+                onChange={(e) => setPriority(Number(e.target.value))}
+                className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
+              >
+                <option value={0}>No Priority</option>
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+                <option value={4}>4</option>
+                <option value={5}>5</option>
+                <option value={6}>6</option>
+              </select>
+            </div>
+
           </div>
 
           {/* Amounts */}

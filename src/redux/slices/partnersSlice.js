@@ -89,11 +89,13 @@ export const createService = createAsyncThunk(
 
       return response.data.data;
     } catch (error) {
-      error.response?.data?.error?.message ||
-      error.message ||
-      "Failed to create Service";
-      return rejectWithValue(message);
-    }
+        const message =
+          error.response?.data?.error?.message ||
+          error.message ||
+          "Failed to create Service";
+
+        return rejectWithValue(message);
+      }
   }
 );
 
@@ -110,9 +112,12 @@ export const editService = createAsyncThunk(
 
       return response.data.data;
     } catch (error) {
-      error.response?.data?.error?.message ||
-      error.message ||
-      "Failed to edit Service";
+
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to edit Service";
+
       return rejectWithValue(message);
     }
   }
