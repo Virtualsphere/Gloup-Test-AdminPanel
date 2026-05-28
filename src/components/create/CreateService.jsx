@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { createService, fetchServiceCategories } from "../../redux/slices/partnersSlice";
+import toast from "react-hot-toast";
 
 const CreateServiceModal = ({ setShowModal, storeId }) => {
 
@@ -9,7 +10,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
   const { serviceCategories } = useSelector((state) => state.allPartners);
   const [serviceName, setServiceName] = useState("");
   const [amount, setAmount] = useState("");
-  const [priority, setPriority] = useState(false);
+  const [priority, setPriority] = useState(0);
   const [discountedAmount, setDiscountedAmount] = useState("");
   const [duration, setDuration] = useState("00:00:00");
   const [time, setTime] = useState({ hh: "", mm: "", ss: "" });
@@ -21,37 +22,49 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
   async function handleSubmitService(e) {
     e.preventDefault();
 
-    const payload = {
-      store_id: storeId,
-      service_name: serviceName,
-      category: serviceCategory,
-      service_for: serviceFor,
-      amount,
-      discounted_amount: discountedAmount,
-      priority,
-      duration,
-      status: serviceStatus,
-    };
+    try {
 
-    console.log("CREATE SERVICE PAYLOAD:", payload);
+      const payload = {
+        store_id: storeId,
+        service_name: serviceName,
+        category: serviceCategory,
+        service_for: serviceFor,
+        amount,
+        discounted_amount: discountedAmount,
+        priority,
+        duration,
+        status: serviceStatus,
+      };
 
-    await dispatch(createService(payload)).unwrap();
+      console.log("CREATE SERVICE PAYLOAD:", payload);
 
-    // Clear form after submit
-    setServiceName("");
-    setAmount("");
-    setDiscountedAmount("");
-    setDuration("");
-    setPriority(false);
-    setServiceStatus("");
-    setServiceCategory("");
-    setServiceFor("unisex");
+      await dispatch(createService(payload)).unwrap();
 
-    setShowModal(false);
+      toast.success("Service created successfully!");
 
-    alert("Service created successfully!");
+      // Reset form
+      setServiceName("");
+      setAmount("");
+      setDiscountedAmount("");
+      setPriority(0);
+      setDuration("00:00:00");
+      setTime({ hh: "", mm: "", ss: "" });
+      setServiceStatus("active");
+      setServiceCategory("");
+      setServiceFor("unisex");
 
-    window.location.reload();
+      setShowModal(false);
+
+    } catch (error) {
+
+      console.log(error);
+
+      toast.error(
+        error?.message ||
+        error ||
+        "Failed to create service"
+      );
+    }
   }
 
   useEffect(() => {
@@ -107,7 +120,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
 
           {/* Category + Priority */}
           <div className="grid grid-cols-2 gap-4">
-            
+
             {/* Category */}
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-600">
@@ -136,28 +149,19 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
                 Priority
               </label>
 
-              <div className="flex items-center gap-6 h-[44px] border border-gray-300 rounded-lg px-4">
-                
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="priority"
-                    checked={priority === true}
-                    onChange={() => setPriority(true)}
-                  />
-                  <span className="text-sm">Yes</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="priority"
-                    checked={priority === false}
-                    onChange={() => setPriority(false)}
-                  />
-                  <span className="text-sm">No</span>
-                </label>
-              </div>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(Number(e.target.value))}
+                className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
+              >
+                <option value={0}>No Priority</option>
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+                <option value={4}>4</option>
+                <option value={5}>5</option>
+                <option value={6}>6</option>
+              </select>
             </div>
           </div>
 

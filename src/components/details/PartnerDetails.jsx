@@ -1773,7 +1773,10 @@ const PartnerDetails = ({ title }) => {
                             <td className="border-x border-neutral-200 px-4 py-2">
                               {/* DELETE BUTTON */}
                               <button
-                                onClick={() => handleDeleteService(item.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteService(item.id);
+                                }}
                                 className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs flex items-center gap-1"
                               >
                                 <Trash2 className="w-3 h-3" /> Delete
