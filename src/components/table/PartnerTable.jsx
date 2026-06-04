@@ -549,11 +549,17 @@ const [viewType, setViewType] = useState("card");
 
 const getPrimaryImageUrl = (img, storeId) => {
   if (!img) return `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+  if (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"))) {
+    return img;
+  }
 
   return `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${storeId}/images/${img}`;
 };
 
 const getFallbackImageUrl = (img) => {
+  if (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"))) {
+    return img;
+  }
   return `${import.meta.env.VITE_API_BASE_URL}/images/${img}`;
 };
 

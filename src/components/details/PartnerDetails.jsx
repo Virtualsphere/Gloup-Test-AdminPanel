@@ -84,7 +84,9 @@ const LogoUploadSection = ({ form, handleChange }) => {
                 src={
                   form.logo instanceof File
                     ? URL.createObjectURL(form.logo)
-                    : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${window.location.pathname.split("/")[2]}/logo/${cleanLogo(form.logo)}`
+                    : (form.logo && (cleanLogo(form.logo).startsWith("http://") || cleanLogo(form.logo).startsWith("https://")))
+                      ? cleanLogo(form.logo)
+                      : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${window.location.pathname.split("/")[2]}/logo/${cleanLogo(form.logo)}`
                 }
                 alt="Store Logo"
                 className="w-32 h-32 rounded-full object-cover border-4 border-indigo-200 shadow-lg transition-transform group-hover:scale-105"
@@ -251,7 +253,9 @@ const SalonImagesSection = ({ form, handleChange, id }) => {
                   src={
                     img instanceof File
                       ? URL.createObjectURL(img)
-                      : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
+                      : (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://")))
+                        ? img
+                        : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
                   }
                   alt={`salon-${i}`}
                   className="w-full h-full object-cover transition-transform group-hover:scale-110"
@@ -884,14 +888,18 @@ const PartnerDetails = ({ title }) => {
 
   const fetchWithFallback = async (img) => {
     try {
-      const s3Url = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`;
+      const s3Url = (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://")))
+        ? img
+        : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`;
       const res = await fetch(s3Url);
 
       if (!res.ok) throw new Error("S3 failed");
 
       return await urlToFile(s3Url, img);
     } catch {
-      const localUrl = `${API}/images/${img}`;
+      const localUrl = (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://")))
+        ? img
+        : `${API}/images/${img}`;
       return await urlToFile(localUrl, img);
     }
   };
@@ -1396,7 +1404,11 @@ const PartnerDetails = ({ title }) => {
                     {data?.store_details?.logo && (
                       <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-indigo-500 shadow">
                         <img
-                          src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(data.store_details.logo)}`}
+                          src={
+                            (typeof data.store_details.logo === "string" && (cleanLogo(data.store_details.logo).startsWith("http://") || cleanLogo(data.store_details.logo).startsWith("https://")))
+                              ? cleanLogo(data.store_details.logo)
+                              : `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/logo/${cleanLogo(data.store_details.logo)}`
+                          }
                           alt="logo"
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -1404,7 +1416,10 @@ const PartnerDetails = ({ title }) => {
 
                             if (!target.dataset.fallback) {
                               target.dataset.fallback = "true";
-                              target.src = `${import.meta.env.VITE_API_BASE_URL}/images/${cleanLogo(data.store_details.logo)}`;
+                              const cleaned = cleanLogo(data.store_details.logo);
+                              target.src = (cleaned && (cleaned.startsWith("http://") || cleaned.startsWith("https://")))
+                                ? cleaned
+                                : `${import.meta.env.VITE_API_BASE_URL}/images/${cleaned}`;
                             } else {
                               target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
                             }
@@ -1428,9 +1443,11 @@ const PartnerDetails = ({ title }) => {
                                 src={
                                   img instanceof File
                                     ? URL.createObjectURL(img)
-                                    : img
-                                      ? `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
-                                      : `${import.meta.env.VITE_API_BASE_URL}/images/${img}`
+                                    : (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://")))
+                                      ? img
+                                      : img
+                                        ? `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${id}/images/${img}`
+                                        : `${import.meta.env.VITE_API_BASE_URL}/images/${img}`
                                 }
                                 alt={`store-image-${i}`}
                                 className="w-full h-full object-cover"
