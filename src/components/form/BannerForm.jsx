@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { X, Save, UploadCloud } from "lucide-react";
+import { getImageUrl } from "../../utils/image";
 
 const BannerForm = ({
   onSubmit,
@@ -138,7 +139,7 @@ const onFormSubmit = async (data) => {
               : defaultValues.image?.map((img, index) => (
                   <img
                     key={index}
-                    src={`${baseURL}/profilepic/${img}`}
+                    src={getImageUrl(img)}
                     className="h-24 w-full object-cover rounded-xl border"
                   />
                 ))}

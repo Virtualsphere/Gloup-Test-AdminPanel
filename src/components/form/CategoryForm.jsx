@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { Save, X } from "lucide-react";
 import { useState } from 'react';
 import ImageModal from '../modal/ImageModal'; 
+import { getImageUrl } from "../../utils/image";
 const CategoryForm = ({
   onSubmit,
   onCancel,
@@ -21,7 +22,13 @@ const CategoryForm = ({
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const imageUrl = defaultValues.image ? `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/category/${defaultValues.image.name}`  : "";
+  const imageUrl = defaultValues.image
+    ? getImageUrl(
+        typeof defaultValues.image === "string"
+          ? defaultValues.image
+          : defaultValues.image.name
+      )
+    : "";
   const imageFile = watch("image");
 
   const onFormSubmit = (data) => {

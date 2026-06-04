@@ -7,6 +7,7 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/autoplay';
+import { getImageUrl } from "../../utils/image";
 
 // Badge
 const CustomBadge = ({ children, variant = "default" }) => {
@@ -108,7 +109,7 @@ const formatDOB = (dob) =>
                                           {(booking?.common_data?.images || []).map((img, index) => (
                                             <SwiperSlide key={index}>
                                               <img
-                                                src={`${import.meta.env.VITE_API_BASE_URL}/images/${img}`}
+                                                src={getImageUrl(img)}
                                                 alt={`store-image-${index}`}
                                                 className="w-full h-full object-cover"
                                               />
@@ -214,7 +215,7 @@ const formatDOB = (dob) =>
   <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
     {user?.profilePic ? (
       <img
-        src={`${import.meta.env.VITE_API_BASE_URL}/images/${user.profilePic}`}
+        src={getImageUrl(user.profilePic)}
         alt="Profile"
         className="w-full h-full object-cover"
       />

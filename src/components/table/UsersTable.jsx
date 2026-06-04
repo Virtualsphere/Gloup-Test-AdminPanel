@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import {updateUserStatus, getAllUsersList } from "../../redux/slices/allUsersSlice";
 import { useDispatch } from "react-redux";
 import Select from "react-select";
+import { getImageUrl } from "../../utils/image";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -405,7 +406,7 @@ const UsersTable = ({ data, title }) => {
                       {item?.profilepic ? (
                           <div className="w-16 h-16 sm:w-20 sm:h-20  rounded-xl overflow-hidden">
                             <img
-                            src={`${import.meta.env.VITE_API_BASE_URL}/profilepic/${item?.profilepic}`}
+                            src={getImageUrl(item?.profilepic)}
                             alt={`category-image-${item.id}`}
                             className="w-full h-full object-cover"
                             />

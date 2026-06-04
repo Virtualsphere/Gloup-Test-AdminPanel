@@ -14,6 +14,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
+import { getImageUrl } from "../../utils/image";
 import {
   updatePartnerStatus,
   getAllPartnersList,
@@ -547,21 +548,7 @@ const [viewType, setViewType] = useState("card");
   };
 
 
-const getPrimaryImageUrl = (img, storeId) => {
-  if (!img) return `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
-  if (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"))) {
-    return img;
-  }
-
-  return `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/store/${storeId}/images/${img}`;
-};
-
-const getFallbackImageUrl = (img) => {
-  if (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"))) {
-    return img;
-  }
-  return `${import.meta.env.VITE_API_BASE_URL}/images/${img}`;
-};
+// Helper functions removed in favor of the global getImageUrl utility
 
   // Calculate colSpan for no data row
   const visibleColumnCount =
@@ -765,18 +752,16 @@ const getFallbackImageUrl = (img) => {
         {item.images.map((img, index) => (
           <SwiperSlide key={index}>
             <img
-              src={getPrimaryImageUrl(img, item.id)} // ✅ try S3 first
+              src={getImageUrl(img)}
               className="w-full h-full object-cover"
               onError={(e) => {
                 e.target.onerror = null;
 
                 if (!e.target.dataset.fallback) {
-                  // 👉 First fallback → local server
                   e.target.dataset.fallback = "true";
-                  e.target.src = getFallbackImageUrl(img);
+                  e.target.src = getImageUrl(img);
                 } else {
-                  // 👉 Final fallback → default image
-                  e.target.src = `${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`;
+                  e.target.src = getImageUrl("/uploads/common/no-image.png");
                 }
               }}
             />
@@ -785,7 +770,7 @@ const getFallbackImageUrl = (img) => {
       </Swiper>
     ) : (
        <img
-        src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/no-image.png`}
+        src={getImageUrl("/uploads/common/no-image.png")}
         className="w-full h-full object-cover opacity-60"
       />
     )}

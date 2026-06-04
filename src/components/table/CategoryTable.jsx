@@ -12,6 +12,7 @@ import {
   ArrowDown,
   X,
 } from "lucide-react";
+import { getImageUrl } from "../../utils/image";
 
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -361,7 +362,7 @@ const CategoryTable = ({ data, title, onEdit, onDelete }) => {
                       {item?.image ? (
                           <div className="w-16 h-16 sm:w-20 sm:h-20  rounded-xl overflow-hidden">
                             <img
-                            src={`${import.meta.env.VITE_IMAGE_BASE_URL}/uploads/common/category/${item?.image}`}
+                            src={getImageUrl(item?.image)}
                             alt={`category-image-${item.id}`}
                             className="w-full h-full object-cover"
                             />
