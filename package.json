@@ -46,5 +46,10 @@
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.8",
     "vite": "^6.3.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
