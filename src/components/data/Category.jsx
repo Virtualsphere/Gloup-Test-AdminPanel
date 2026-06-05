@@ -82,7 +82,9 @@ const handleAddData = async (newData) => {
         console.error("Error converting image to file:", error);
         resolve(null);
       };
-      img.src = imageUrl;
+      // Add a cache buster because the browser might have cached the old response without CORS headers
+      const cacheBusterUrl = imageUrl.includes("?") ? `${imageUrl}&t=${new Date().getTime()}` : `${imageUrl}?t=${new Date().getTime()}`;
+      img.src = cacheBusterUrl;
     });
   };
   const handleUpdateData = async (updatedData) => {

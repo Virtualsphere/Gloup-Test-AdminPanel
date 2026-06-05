@@ -902,7 +902,9 @@ const PartnerDetails = ({ title }) => {
         });
       };
       img.onerror = reject;
-      img.src = url;
+      // Add a cache buster because the browser might have cached the old response without CORS headers
+      const cacheBusterUrl = url.includes("?") ? `${url}&t=${new Date().getTime()}` : `${url}?t=${new Date().getTime()}`;
+      img.src = cacheBusterUrl;
     });
   };
 
