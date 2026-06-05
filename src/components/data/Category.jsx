@@ -61,16 +61,29 @@ const handleAddData = async (newData) => {
 
    // Utility function to convert image URL to File object
   const convertImageUrlToFile = async (imageUrl, fileName) => {
-    try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      // Create a File object from the blob
-      const file = new File([blob], fileName, { type: blob.type });
-      return file;
-    } catch (error) {
-      console.error('Error converting image to file:', error);
-      return null;
-    }
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], fileName, { type: blob.type }));
+          } else {
+            resolve(null);
+          }
+        });
+      };
+      img.onerror = (error) => {
+        console.error("Error converting image to file:", error);
+        resolve(null);
+      };
+      img.src = imageUrl;
+    });
   };
   const handleUpdateData = async (updatedData) => {
     debugger;

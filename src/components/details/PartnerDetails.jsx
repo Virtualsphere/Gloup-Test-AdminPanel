@@ -883,27 +883,37 @@ const PartnerDetails = ({ title }) => {
     });
   };
 
-  const fetchWithFallback = async (img) => {
-    try {
-      const s3Url = getImageUrl(img);
-      const res = await fetch(s3Url);
-
-      if (!res.ok) throw new Error("S3 failed");
-
-      return await urlToFile(s3Url, img);
-    } catch {
-      const localUrl = getImageUrl(img);
-      return await urlToFile(localUrl, img);
-    }
+  const urlToFile = async (url, filename) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], filename, { type: blob.type }));
+          } else {
+            reject(new Error("Canvas toBlob failed"));
+          }
+        });
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
   };
 
-  const urlToFile = async (url, filename) => {
-    const res = await fetch(url);
-    const blob = await res.blob();
-
-    return new File([blob], filename, {
-      type: blob.type,
-    });
+  const fetchWithFallback = async (img) => {
+    try {
+      const url = getImageUrl(img);
+      return await urlToFile(url, img);
+    } catch (error) {
+      console.error("Failed to convert image:", error);
+      return null;
+    }
   };
 
   const handleSaveEdit = async (updatedData) => {
