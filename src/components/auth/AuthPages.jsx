@@ -24,7 +24,6 @@ const AuthPages = () => {
   } = useForm();
 
   const onSubmit = async (data) => {
-    debugger;
     if (!isSignUp) {
       try {
         const response = await api.post(
