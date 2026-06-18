@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://api.v1.gloup.in}
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:5678}
         - VITE_IMAGE_BASE_URL=${VITE_IMAGE_BASE_URL:-https://api.v1.gloup.in}
     image: gloup-admin-panel:latest
     restart: unless-stopped
