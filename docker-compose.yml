@@ -6,6 +6,7 @@ services:
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://api.v1.gloup.in}
         - VITE_IMAGE_BASE_URL=${VITE_IMAGE_BASE_URL:-https://api.v1.gloup.in}
+        - VITE_GOOGLE_MAPS_KEY=${VITE_GOOGLE_MAPS_KEY:-AIzaSyBACvmG9-ekKRhJYRhSTVa7Et10IArFzUs}
     image: gloup-admin-panel:latest
     restart: unless-stopped
     ports:
