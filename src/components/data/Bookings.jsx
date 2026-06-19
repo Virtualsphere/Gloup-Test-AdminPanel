@@ -16,6 +16,8 @@ const Bookings = ({ title }) => {
 
   const [search, setSearch] = useState("");
 
+  const [paymentStatus, setPaymentStatus] = useState("success");
+
   // 🔹 Pagination
   const [page, setPage] = useState(1);
   const limit = 10;
@@ -91,6 +93,8 @@ const Bookings = ({ title }) => {
             toDate={toDate}
             setFromDate={setFromDate}
             setToDate={setToDate}
+            paymentStatus={paymentStatus}
+            setPaymentStatus={setPaymentStatus}
           />
 
         </div>

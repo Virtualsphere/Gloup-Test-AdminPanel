@@ -29,10 +29,9 @@ const STATUS_COLOR = {
     refunded: "bg-purple-600",
 };
 
-const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStatus, search, setSearch, fromDate, toDate, setFromDate, setToDate }) => {
+const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStatus, search, setSearch, fromDate, toDate, setFromDate, setToDate, paymentStatus, setPaymentStatus }) => {
 
     const navigate = useNavigate();
-
 
     const safeData = Array.isArray(data)
         ? data
@@ -41,17 +40,20 @@ const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStat
             : [];
 
     // 🔍 Client-side search
-    const filteredData = safeData.filter((row) => {
-        if (!search) return true;
-
-        const q = search.toLowerCase();
-
-        return (
-            row.id?.toString().includes(q) ||
-            row.user_name?.toLowerCase().includes(q) ||
-            row.salon_name?.toLowerCase().includes(q) ||
-            STATUS_LABEL[row.status?.toLowerCase()]?.toLowerCase().includes(q)
-        );
+    const filteredData = safeData
+    .filter((row) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        row.id?.toString().includes(q) ||
+        row.user_name?.toLowerCase().includes(q) ||
+        row.salon_name?.toLowerCase().includes(q) ||
+        STATUS_LABEL[row.status?.toLowerCase()]?.toLowerCase().includes(q)
+      );
+    })
+    .filter((row) => {
+      if (!paymentStatus) return true;
+      return row.payment_status === paymentStatus;
     });
 
     // 📄 Pagination
@@ -96,6 +98,36 @@ const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStat
         <div>
             {/* Header */}
             <div className="flex flex-col md:flex-row gap-4 p-4 border-b border-gray-200 items-end">
+                {/* Payment Status Toggle — add inside the header flex div */}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                        setPage(1);
+                        setPaymentStatus(paymentStatus === "success" ? "" : "success");
+                        }}
+                        className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                        paymentStatus === "success"
+                            ? "bg-green-600 text-white border-green-600"
+                            : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                        }`}
+                    >
+                        ✓ Paid
+                    </button>
+                    <button
+                        onClick={() => {
+                        setPage(1);
+                        setPaymentStatus(paymentStatus === "pending" ? "" : "pending");
+                        }}
+                        className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                        paymentStatus === "pending"
+                            ? "bg-red-500 text-white border-red-500"
+                            : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                        }`}
+                    >
+                        ✗ Unpaid
+                    </button>
+                </div>
+
                 {/* Search */}
                 <div className="relative w-full md:w-64">
                     <Search
