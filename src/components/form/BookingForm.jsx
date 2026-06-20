@@ -386,9 +386,9 @@ const downloadPDF = async () => {
 
                     <div className="text-right text-sm font-medium text-gray-900">
                       ₹{item.service_amount}
-                      <span className="mx-1 text-red-500">− ₹{item.service_discount_amount}</span>
+                      <span className="mx-1 text-red-500">− ₹{item.service_subtotal}</span>
                       <span className="mx-1 text-gray-400">=</span>
-                      ₹{item.service_subtotal}
+                      ₹{item.service_discount_amount}
                     </div>
 
                   </div>
