@@ -20,7 +20,7 @@ const Bookings = ({ title }) => {
 
   // 🔹 Pagination
   const [page, setPage] = useState(1);
-  const limit = 10;
+  const limit = 50;
 
   // 🔹 Redux state
   const {
