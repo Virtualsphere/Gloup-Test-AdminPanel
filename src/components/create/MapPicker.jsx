@@ -12,6 +12,8 @@ const containerStyle = {
   height: "400px",
 };
 
+const LIBRARIES = ["places"];
+
 const fallbackCenter = { lat: 13.0724, lng: 80.2460 };
 
 export default function MapPicker({
@@ -22,8 +24,10 @@ export default function MapPicker({
 }) {
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
-    libraries: ["places"],
+    libraries: LIBRARIES,
   });
+
+  console.log("Maps Key:", import.meta.env.VITE_GOOGLE_MAPS_KEY);
 
   const [marker, setMarker] = useState(defaultLocation);
   const [autocomplete, setAutocomplete] = useState(null);

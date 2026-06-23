@@ -20,8 +20,10 @@ COPY . .
 # Build-time environment variables for Vite
 ARG VITE_API_BASE_URL
 ARG VITE_IMAGE_BASE_URL
+ARG VITE_GOOGLE_MAPS_KEY
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_IMAGE_BASE_URL=$VITE_IMAGE_BASE_URL
+ENV VITE_GOOGLE_MAPS_KEY=$VITE_GOOGLE_MAPS_KEY
 
 # Build the project
 RUN if [ -f pnpm-lock.yaml ]; then pnpm run build; \
