@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Header from "./components/layout/Header";
 import Sidebar from "./components/layout/Sidebar";
 import { Toaster } from "react-hot-toast";
+import UseBookingSSE from "./components/data/UseBookingSSE";
 
 // صفحات (example)
 import Dashboard from "./components/dashboard/DashboardPage";
@@ -18,6 +19,12 @@ const Layout = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // ✅ Responsive detection
 useEffect(() => {
@@ -82,6 +89,8 @@ useEffect(() => {
               setIsMobileOpen((prev) => !prev);
             }}
         />
+
+        <UseBookingSSE />
 
         {/* PAGE CONTENT */}
         <main
