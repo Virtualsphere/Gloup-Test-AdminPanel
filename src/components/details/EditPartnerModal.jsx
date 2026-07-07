@@ -32,6 +32,7 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
     servicesProvidedFor: [],
     languages: [],
     isPremium: false,
+    whatsapp_number: "",
   });
 
   const [imageFile, setImageFile] = useState(null);
@@ -59,11 +60,12 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
       servicesProvidedFor: store.services_provided_for || [],
       languages: store.languages || [],
       isPremium: store.is_premium || false,
+      whatsapp_number: store.whatsapp_number || "",
     });
 
     if (store.images?.length) {
       setPreviewUrl(
-        `${import.meta.env.VITE_API_BASE_URL}/images/${store.images[0]}`
+        `${import.meta.env.VITE_API_BASE_URL}/${store.images[0]}`
       );
     }
 
@@ -211,6 +213,17 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
           placeholder="Area"
           value={form.area}
           onChange={(e) => handleChange("area", e.target.value)}
+        />
+
+        <input
+          className="input"
+          placeholder="WhatsApp Number"
+          value={form.whatsapp_number}
+          maxLength={10}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (/^\d*$/.test(val)) handleChange("whatsapp_number", val);
+          }}
         />
 
         <div className="grid grid-cols-2 gap-3">
