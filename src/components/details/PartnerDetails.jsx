@@ -292,6 +292,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
     name: "",
     email: "",
     phone: "",
+    whatsapp_number: "",
     income: "",
     description: "",
     images: [],
@@ -326,6 +327,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
       name: d?.name || "",
       email: d?.email || "",
       phone: d?.phone || "",
+      whatsapp_number: d?.whatsapp_number || "",
       income: d?.income || "",
       description: d?.description || "",
       images: d?.images || [],
@@ -428,41 +430,45 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Inputs */}
-          {["name", "email", "phone", "income", "addressLine1", "area", "city", "district", "state", "zipcode", "landmark", "radius"].map((field) => (
+          {["name", "email", "phone", "whatsapp_number", "income", "addressLine1", "area", "city", "district", "state", "zipcode", "landmark", "radius"].map((field) => (
             <div className="mb-4" key={field}>
               <label className="block text-sm font-medium text-gray-700 capitalize">
-                {field === "addressLine1" ? "Salon Full Address" : `Salon ${field}`}
+                {field === "addressLine1"
+                  ? "Salon Full Address"
+                  : field === "whatsapp_number"
+                  ? "Salon WhatsApp Number"
+                  : `Salon ${field}`}
               </label>
               <input
                 type={
-        field === "phone" || field === "radius" || field === "income"
-          ? "number"
-          : "text"
-      }
-      min={field === "radius" ? "0" : undefined}
-      step={field === "radius" ? "any" : undefined}
-      value={form[field]}
-      onChange={(e) => {
-        let value = e.target.value;
+                  field === "phone" || field === "whatsapp_number" || field === "radius" || field === "income"
+                    ? "number"
+                    : "text"
+                }
+                min={field === "radius" ? "0" : undefined}
+                step={field === "radius" ? "any" : undefined}
+                value={form[field]}
+                onChange={(e) => {
+                  let value = e.target.value;
 
-        // ✅ SPECIAL VALIDATION FOR RADIUS
-        if (field === "radius") {
-          if (value === "" || Number(value) >= 0) {
-            handleChange(field, value);
-          }
-          return;
-        }
+                  // ✅ SPECIAL VALIDATION FOR RADIUS
+                  if (field === "radius") {
+                    if (value === "" || Number(value) >= 0) {
+                      handleChange(field, value);
+                    }
+                    return;
+                  }
 
-        handleChange(field, value);
-      }}
-      onKeyDown={(e) => {
-        // ✅ BLOCK invalid characters for radius
-        if (field === "radius") {
-          if (["e", "E", "+", "-"].includes(e.key)) {
-            e.preventDefault();
-          }
-        }
-      }}
+                  handleChange(field, value);
+                }}
+                onKeyDown={(e) => {
+                  // ✅ BLOCK invalid characters for radius
+                  if (field === "radius") {
+                    if (["e", "E", "+", "-"].includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }
+                }}
                 className="mt-1 block w-full bg-white border border-gray-300 px-3 py-2 rounded-md focus:ring-indigo-500"
               />
             </div>
@@ -1000,6 +1006,7 @@ const PartnerDetails = ({ title }) => {
       formData.append("name", updatedData.name);
       formData.append("email", updatedData.email);
       formData.append("phone", updatedData.phone);
+      formData.append("whatsapp_number", updatedData.whatsapp_number || "");
       formData.append("income", updatedData.income);
       formData.append("description", updatedData.description);
       formData.append("addressLine1", updatedData.addressLine1);
@@ -1538,6 +1545,7 @@ const PartnerDetails = ({ title }) => {
 
                     <p><span className="font-bold">Email:</span> {data?.store_details?.email}</p>
                     <p><span className="font-bold">Phone:</span> {data?.store_details?.phone}</p>
+                    <p><span className="font-bold">WhatsApp:</span> {data?.store_details?.whatsapp_number || "N/A"}</p>
                     <p><span className="font-bold">Zipcode:</span> {data?.store_details?.zipcode}</p>
 
                     <p><span className="font-bold">Income:</span> ₹{data?.store_details?.income}</p>
