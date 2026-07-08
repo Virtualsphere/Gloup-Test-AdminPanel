@@ -61,6 +61,7 @@ const CreatePartner = () => {
     name: "",
     email: "",
     phone: "",
+    whatsapp_number: "",
     category_id: "null",
     deviceId: ["fvSaLo4fTfKg15N_1zHDT4:APA91bFfvqY749XGErflelYec8dzjN07ys9nITHCpEotOOV51J6XHsRhqOZCppjMMAPLixi3oayxf15CGK8l9wfrObI-FxQui1v6zSEwmxUd8RF6sjhhzrk"],
     store_type: "",
@@ -91,7 +92,7 @@ const CreatePartner = () => {
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
 
-    if (name === "phone" && !/^\d*$/.test(value)) return;
+    if ((name === "phone" || name === "whatsapp_number") && !/^\d*$/.test(value)) return;
 
     setForm((prev) => ({
       ...prev,
@@ -190,6 +191,9 @@ const CreatePartner = () => {
 
     if (!/^\d{10}$/.test(form.phone))
       e.phone = "Phone must be 10 digits";
+
+    if (form.whatsapp_number && !/^\d{10}$/.test(form.whatsapp_number))
+      e.whatsapp_number = "WhatsApp number must be 10 digits";
 
     if (!form.password || form.password.length < 6)
       e.password = "Password must be at least 6 characters";
@@ -330,6 +334,7 @@ const CreatePartner = () => {
           <Input label="Partner Type" name="store_type" value={form.store_type} error={errors.store_type} onChange={handleChange} />
           <Input label="Email" name="email" value={form.email} error={errors.email} onChange={handleChange} />
           <Input label="Phone" name="phone" maxLength={10} value={form.phone} error={errors.phone} onChange={handleChange} />
+          <Input label="WhatsApp Number" name="whatsapp_number" maxLength={10} value={form.whatsapp_number} error={errors.whatsapp_number} onChange={handleChange} />
           <Input label="Password" name="password" type={showPassword ? "text" : "password"} value={form.password} error={errors.password} onChange={handleChange} showToggle onToggle={() => setShowPassword((prev) => !prev)} />
           <Input label="Bank Account Holder" name="bank_account_holder" value={form.bank_account_holder} onChange={handleChange} />
         </div>
