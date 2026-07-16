@@ -27,6 +27,7 @@ const Bookings = lazy(() => import("../components/data/Bookings"));
 const BookingForm = lazy(() => import("../components/form/BookingForm"));
 const PartnerSubscription = lazy(() => import("../components/data/PartnerSubscription"));
 const PartnerSubscriptionForm = lazy(() => import("../components/form/PartnerSubscriptionForm"));
+const Marketing = lazy(() => import("../components/create/Marketing"));
 
 const AppRoutes = () => {
   return (
@@ -58,6 +59,7 @@ const AppRoutes = () => {
         <Route path="/category" element={<Category title="Category"/>} />
         <Route path="/notification" element={<Notification title="Notification"/>} />
         <Route path="/banner" element={<Banner title="Banner"/>} />
+        <Route path="/marketing" element={<Marketing title="Marketing"/>} />
         <Route path="/coupon" element={<Coupon title="Coupon"/>} />
         <Route path="/refund" element={<Refund title="Refunds"/>} />
         <Route path="/subscription" element={<Subscription title="Subscription"/>} />
