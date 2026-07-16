@@ -30,6 +30,7 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/coupon", icon: <Ticket size={18} />, text: "Coupon" },
     { path: "/banner", icon: <Image size={18} />, text: "Banner" },
     { path: "/review", icon: <Star size={18} />, text: "Reviews" },
+    { path: "/marketing", icon: <Star size={18} />, text: "Marketing" },
     { path: "/notification", icon: <Bell size={18} />, text: "Notification" },
     { path: "/allusers", icon: <User size={18} />, text: "Users" },
   ];
