@@ -1723,12 +1723,12 @@ const PartnerDetails = ({ title }) => {
 
               {/* EDIT SERVICES */}
               {/* SERVICES */}
-              <div className="p-4">
-                <p className="mb-2 font-semibold">Services</p>
+              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-300">
+                <p className="mb-3 text-lg font-semibold text-gray-800">Services</p>
 
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="px-3 py-2 bg-black hover:bg-neutral-800 text-white flex gap-2 mb-3"
+                  className="px-3 py-2 bg-black hover:bg-neutral-800 text-white flex gap-2 mb-3 rounded-md"
                 >
                   <Plus /> Add Service
                 </button>
@@ -1750,18 +1750,16 @@ const PartnerDetails = ({ title }) => {
                 </div>
 
                 {/* SERVICES TABLE */}
-                <div className="max-h-72 overflow-y-auto rounded-lg">
+                <div className="max-h-[600px] overflow-y-auto rounded-lg border border-gray-200">
                   {servicesData.length > 0 ? (
                     <table className="min-w-full text-sm border-collapse">
                       <thead className="sticky top-0 bg-gray-100 z-10">
                         <tr>
-                          <th className="px-4 py-2 text-left border-b">Service</th>
-                          <th className="px-4 py-2 text-left border-b">Amount</th>
-                          <th className="px-4 py-2 text-left border-b">
-                            Discounted Amount
-                          </th>
-                          <th className="px-4 py-2 text-left border-b">Duration</th>
-                          <th className="px-4 py-2 text-left border-b">Action</th>
+                          <th className="px-4 py-3 text-left border-b">Service</th>
+                          <th className="px-4 py-3 text-left border-b">Amount</th>
+                          <th className="px-4 py-3 text-left border-b">Discounted Amount</th>
+                          <th className="px-4 py-3 text-left border-b">Duration</th>
+                          <th className="px-4 py-3 text-left border-b">Action</th>
                         </tr>
                       </thead>
 
@@ -1777,20 +1775,11 @@ const PartnerDetails = ({ title }) => {
                               setShowUpdateModal(true);
                             }}
                           >
-                            <td className="border-x border-neutral-200 px-4 py-2">
-                              {item.service_name}
-                            </td>
-                            <td className="border-x border-neutral-200 px-4 py-2">
-                              ₹{item.amount}
-                            </td>
-                            <td className="border-x border-neutral-200 px-4 py-2">
-                              ₹{item.discounted_amount}
-                            </td>
-                            <td className="border-x border-neutral-200 px-4 py-2">
-                              {item.duration}
-                            </td>
-                            <td className="border-x border-neutral-200 px-4 py-2">
-                              {/* DELETE BUTTON */}
+                            <td className="border-x border-neutral-200 px-4 py-3">{item.service_name}</td>
+                            <td className="border-x border-neutral-200 px-4 py-3">₹{item.amount}</td>
+                            <td className="border-x border-neutral-200 px-4 py-3">₹{item.discounted_amount}</td>
+                            <td className="border-x border-neutral-200 px-4 py-3">{item.duration}</td>
+                            <td className="border-x border-neutral-200 px-4 py-3">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1806,17 +1795,12 @@ const PartnerDetails = ({ title }) => {
                       </tbody>
                     </table>
                   ) : (
-                    <p className="text-gray-500 text-sm">
-                      No services available in this category.
-                    </p>
+                    <p className="text-gray-500 text-sm p-4">No services available in this category.</p>
                   )}
                 </div>
 
                 {showCreateModal && (
-                  <CreateServiceModal
-                    setShowModal={setShowCreateModal}
-                    storeId={id}
-                  />
+                  <CreateServiceModal setShowModal={setShowCreateModal} storeId={id} />
                 )}
 
                 {showUpdateModal && (
