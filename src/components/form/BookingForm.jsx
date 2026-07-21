@@ -295,7 +295,7 @@ const downloadPDF = async () => {
               {/* CANCEL */}
               {["booked", "confirmed"].includes(bookingView.status) && (
                 <button
-                  onClick={() => openCancelModal()}
+                  onClick={() => setShowCancel(true)}
                   className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                 >
                   Cancel
@@ -303,15 +303,14 @@ const downloadPDF = async () => {
               )}
 
               {/* REFUND */}
-              {bookingView.status === "completed" &&
-                bookingView.payment_status === "success" && (
-                  <button
-                    onClick={() => openRefundModal()}
-                    className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm"
-                  >
-                    Refund
-                  </button>
-                )}
+              {bookingView.status === "completed" && bookingView.payment_status === "success" && (
+                <button
+                  onClick={() => setShowRefund(true)}
+                  className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm"
+                >
+                  Refund
+                </button>
+              )}
               {/* PDF */}
               <button
                 onClick={downloadPDF}
