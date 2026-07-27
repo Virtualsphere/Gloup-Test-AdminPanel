@@ -13,6 +13,7 @@ import MapPicker from "../create/MapPicker";
 import CreateServiceModal from "../create/CreateService";
 import { Plus } from "lucide-react";
 import EditServiceModal from "../create/EditService";
+import BulkUploadServiceModal from "../create/BulkUploadServiceModal";
 import { getImageUrl } from "../../utils/image";
 import { fetchServiceCategories, deleteService } from "../../redux/slices/partnersSlice";
 
@@ -708,6 +709,7 @@ const PartnerDetails = ({ title }) => {
   const [deleteServiceId, setDeleteServiceId] = useState(null);
   const [isDeleteServiceModalOpen, setIsDeleteServiceModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
 
   const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -1726,12 +1728,21 @@ const PartnerDetails = ({ title }) => {
               <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-300">
                 <p className="mb-3 text-lg font-semibold text-gray-800">Services</p>
 
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="px-3 py-2 bg-black hover:bg-neutral-800 text-white flex gap-2 mb-3 rounded-md"
-                >
-                  <Plus /> Add Service
-                </button>
+                <div className="flex gap-3 mb-3">
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-3 py-2 bg-black hover:bg-neutral-800 text-white flex gap-2 rounded-md"
+                  >
+                    <Plus /> Add Service
+                  </button>
+
+                  <button
+                    onClick={() => setShowBulkUploadModal(true)}
+                    className="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 flex gap-2 rounded-md"
+                  >
+                    <Upload className="w-4 h-4" /> Bulk Upload
+                  </button>
+                </div>
 
                 {/* CATEGORY TABS */}
                 <div className="flex gap-2 mb-4 overflow-x-auto">
@@ -1809,6 +1820,13 @@ const PartnerDetails = ({ title }) => {
                     storeId={id}
                     serviceId={serviceId}
                     serviceData={serviceData}
+                  />
+                )}
+
+                {showBulkUploadModal && (
+                  <BulkUploadServiceModal
+                    setShowModal={setShowBulkUploadModal}
+                    storeId={id}
                   />
                 )}
               </div>
