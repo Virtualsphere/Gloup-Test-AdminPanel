@@ -76,6 +76,34 @@ return rejectWithValue(message);
   }
 );
 
+export const bulkCreateServices = createAsyncThunk(
+  "allPartners/bulkCreateServices",
+  async ({ store_id, file }, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append("store_id", store_id);
+      formData.append("excel", file);
+
+      const response = await api.post(
+        "/admin/app/bulkcreateservices",
+        formData,
+        {
+          // ✅ Do NOT set Content-Type manually — same as createPartner/updatePartnerDetail
+          withCredentials: false,
+        }
+      );
+
+      return response.data.data; // { message, created_count, skipped_count, skipped_details }
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Bulk upload failed";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // create service
 export const createService = createAsyncThunk(
   "allPartners/createService",
