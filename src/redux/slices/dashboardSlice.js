@@ -1,6 +1,28 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api";
 
+// get live stats (active users/partners, new signups today)
+export const getLiveStats = createAsyncThunk(
+  "dashboard/getLiveStats",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/admin/app/livestats", {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch live stats";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // get dashboard
 export const getDashboard = createAsyncThunk(
   "dashboard/getDashboard",
@@ -335,6 +357,11 @@ const initialState = {
   loading: false,
   error: null,
   success: false,
+  liveStats: {},
+  liveStatsLoading: false,
+  liveStatsError: null,
+  liveStatsLastUpdated: null,
+  livePolling: true,
   dashboardList: {},
   monthlyReports: {},
   reports: {},
@@ -360,6 +387,11 @@ const dashboardSlice = createSlice({
       state.loading = false;
       state.error = null;
       state.success = false;
+      state.liveStats = {};
+      state.liveStatsLoading = false;
+      state.liveStatsError = null;
+      state.liveStatsLastUpdated = null;
+      state.livePolling = true;
       state.dashboardList = {};
       state.monthlyReports = {};
       state.reports = {};
@@ -379,6 +411,20 @@ const dashboardSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Get live stats
+      .addCase(getLiveStats.pending, (state) => {
+        state.liveStatsLoading = true;
+        state.liveStatsError = null;
+      })
+      .addCase(getLiveStats.fulfilled, (state, action) => {
+        state.liveStatsLoading = false;
+        state.liveStats = action.payload;
+        state.liveStatsLastUpdated = new Date().toISOString();
+      })
+      .addCase(getLiveStats.rejected, (state, action) => {
+        state.liveStatsLoading = false;
+        state.liveStatsError = action.payload || "Failed to fetch live stats";
+      })
       // Get dashboard list
       .addCase(getDashboard.pending, (state) => {
         state.loading = true;

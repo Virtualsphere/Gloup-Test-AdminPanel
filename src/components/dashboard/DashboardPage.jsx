@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getDashboard } from "../../redux/slices/dashboardSlice";
 import DashboardDetail from "./DashboardDetail";
+import LiveStatsSection from "./LiveStatsSection";
 
 const DashboardPage = ({ title }) => {
   const [data, setData] = useState({});
@@ -27,6 +28,8 @@ const DashboardPage = ({ title }) => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-800 mb-6">{title}</h2>
+
+        <LiveStatsSection />
 
         {/* Error Message */}
         {error ? (
