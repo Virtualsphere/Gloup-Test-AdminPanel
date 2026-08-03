@@ -18,6 +18,7 @@ import {
   Store,
   TrendingUp,
   Calendar,
+  CalendarCheck,
   Mail,
   Phone,
   UserCheck,
@@ -467,6 +468,13 @@ const DashboardDetail = ({ data }) => {
             icon={Calendar}
             color="#10B981"
             onpress={() => navigate("/bookings")}
+          />
+          <MetricCard
+            title="Total Bookings This Month"
+            value={data?.total_bookings_this_month || 0}
+            icon={CalendarCheck}
+            color="#6366F1"
+            onpress={() => navigate("/monthly-report")}
           />
           <MetricCard
             title="Cancelled/Refunded Orders"

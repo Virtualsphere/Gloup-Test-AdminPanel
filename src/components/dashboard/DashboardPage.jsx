@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getDashboard } from "../../redux/slices/dashboardSlice";
+import { getDashboard, getCurrentMonthBookingsCount } from "../../redux/slices/dashboardSlice";
 import DashboardDetail from "./DashboardDetail";
 import LiveStatsSection from "./LiveStatsSection";
 
@@ -9,18 +9,29 @@ const DashboardPage = ({ title }) => {
   const dispatch = useDispatch();
 
   const dashboardStats = useSelector((state) => state.dashboard.dashboardList);
+  const currentMonthBookings = useSelector(
+    (state) => state.dashboard.currentMonthBookings
+  );
   const loading = useSelector((state) => state.dashboard.loading);
   const error = useSelector((state) => state.dashboard.error);
 
   useEffect(() => {
     dispatch(getDashboard());
+    dispatch(getCurrentMonthBookingsCount());
   }, [dispatch]);
 
   useEffect(() => {
     if (dashboardStats) {
-      setData(dashboardStats);
+      setData((prev) => ({ ...prev, ...dashboardStats }));
     }
   }, [dashboardStats]);
+
+  useEffect(() => {
+    setData((prev) => ({
+      ...prev,
+      total_bookings_this_month: currentMonthBookings?.total_bookings || 0,
+    }));
+  }, [currentMonthBookings]);
 
 
   
