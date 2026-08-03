@@ -24,6 +24,7 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/verifypartner", icon: <User size={18} />, text: "Verify Partner" },
     { path: "/partnersubscriptionplans", icon: <CreditCard size={18} />, text: "Plans" },
     { path: "/bookings", icon: <CalendarCheck size={18} />, text: "Bookings" },
+    { path: "/bookings-by-order-date", icon: <CalendarCheck size={18} />, text: "Bookings by Order Date" },
     { path: "/subscription", icon: <CreditCard size={18} />, text: "Subscription" },
     { path: "/category", icon: <Layers size={18} />, text: "Category" },
     { path: "/refund", icon: <FaRegMoneyBillAlt size={18} />, text: "Refund" },

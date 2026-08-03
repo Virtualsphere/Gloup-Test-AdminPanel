@@ -24,10 +24,12 @@ const Subscription = lazy(() => import("../components/data/Subscription"));
 const Review = lazy(() => import("../components/data/Review"));
 const VerifyPartner = lazy(() => import("../components/data/VerifyPartner"));
 const Bookings = lazy(() => import("../components/data/Bookings"));
+const BookingsByOrderDate = lazy(() => import("../components/data/BookingsByOrderDate"));
 const BookingForm = lazy(() => import("../components/form/BookingForm"));
 const PartnerSubscription = lazy(() => import("../components/data/PartnerSubscription"));
 const PartnerSubscriptionForm = lazy(() => import("../components/form/PartnerSubscriptionForm"));
 const Marketing = lazy(() => import("../components/create/Marketing"));
+const PartnerPaymentStatusPage = lazy(() => import("../components/details/PartnerPaymentStatusPage"));
 
 const AppRoutes = () => {
   return (
@@ -46,6 +48,7 @@ const AppRoutes = () => {
         <Route path="/userdetails/:id" element={<UserDetails title="User Details"/>} />
         <Route path="/partner" element={<Partner title="Partner"/>} />
         <Route path="/bookings" element={<Bookings title="Bookings"/>} />
+        <Route path="/bookings-by-order-date" element={<BookingsByOrderDate title="Bookings by Order Date"/>} />
         <Route path="/bookings/:id" element={<BookingForm />} />
         <Route path="/partnersubscriptionplans" element={<PartnerSubscription title="Partner Subscription" />} />
         <Route path="/partnersubscription/add" element={<PartnerSubscriptionForm />} />
@@ -64,6 +67,7 @@ const AppRoutes = () => {
         <Route path="/refund" element={<Refund title="Refunds"/>} />
         <Route path="/subscription" element={<Subscription title="Subscription"/>} />
         <Route path="/review" element={<Review title="Review"/>} />
+        <Route path="/partnersubscriptionstatus" element={<PartnerPaymentStatusPage title="Partner Subscription Status"/>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Suspense>
