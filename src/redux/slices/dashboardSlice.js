@@ -67,6 +67,32 @@ export const getMonthlyReports = createAsyncThunk(
   }
 );
 
+// get total bookings count for the current month
+export const getCurrentMonthBookingsCount = createAsyncThunk(
+  "dashboard/getCurrentMonthBookingsCount",
+  async (store_id, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/getCurrentMonthBookingsCount",
+        store_id ? { store_id } : {},
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: false,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch current month bookings count";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // get reports
 export const getReports = createAsyncThunk(
   "dashboard/getReports",
@@ -363,6 +389,7 @@ const initialState = {
   liveStatsLastUpdated: null,
   livePolling: true,
   dashboardList: {},
+  currentMonthBookings: {},
   monthlyReports: {},
   reports: {},
   topSaloon: {},
@@ -393,6 +420,7 @@ const dashboardSlice = createSlice({
       state.liveStatsLastUpdated = null;
       state.livePolling = true;
       state.dashboardList = {};
+      state.currentMonthBookings = {};
       state.monthlyReports = {};
       state.reports = {};
       state.topSaloon = {};
@@ -437,6 +465,20 @@ const dashboardSlice = createSlice({
       .addCase(getDashboard.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to fetch dashboard";
+      })
+      // Get current month bookings count
+      .addCase(getCurrentMonthBookingsCount.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getCurrentMonthBookingsCount.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentMonthBookings = action.payload;
+      })
+      .addCase(getCurrentMonthBookingsCount.rejected, (state, action) => {
+        state.loading = false;
+        state.error =
+          action.payload || "Failed to fetch current month bookings count";
       })
       // Get monthly reports
       .addCase(getMonthlyReports.pending, (state) => {

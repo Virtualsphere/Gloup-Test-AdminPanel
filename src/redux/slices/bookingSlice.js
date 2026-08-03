@@ -70,6 +70,44 @@ export const getbDetailByOrderDate = createAsyncThunk(
 );
 
 /* ============================
+   🔹 MONTHLY REPORT (bookings with user + partner details)
+============================ */
+export const getMonthlyReportDetail = createAsyncThunk(
+  "allBookings/getMonthlyReportDetail",
+  async (
+    { fromDate = "", toDate = "", page = 1, limit = 50, status = "", store_id = "" } = {},
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.post(
+        "/admin/app/getBookingsByDateRange",
+        {
+          fromDate,
+          toDate,
+          page,
+          limit,
+          ...(status ? { status } : {}),
+          ...(store_id ? { store_id } : {}),
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: false,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message ||
+          error.message ||
+          "Failed to fetch monthly report"
+      );
+    }
+  }
+);
+
+/* ============================
    🔹 VIEW BOOKING BY ID
 ============================ */
 export const getBookingById = createAsyncThunk(
@@ -176,6 +214,10 @@ const initialState = {
   totalByOrderDate: 0,
   loadingByOrderDate: false,
   errorByOrderDate: null,
+  monthlyReportRows: [],     // monthly report list (with user & partner details)
+  monthlyReportTotal: 0,
+  monthlyReportLoading: false,
+  monthlyReportError: null,
 };
 
 const bookingSlice = createSlice({
@@ -221,6 +263,21 @@ const bookingSlice = createSlice({
       .addCase(getbDetailByOrderDate.rejected, (state, action) => {
         state.loadingByOrderDate = false;
         state.errorByOrderDate = action.payload;
+      })
+
+      /* ===== MONTHLY REPORT ===== */
+      .addCase(getMonthlyReportDetail.pending, (state) => {
+        state.monthlyReportLoading = true;
+        state.monthlyReportError = null;
+      })
+      .addCase(getMonthlyReportDetail.fulfilled, (state, action) => {
+        state.monthlyReportLoading = false;
+        state.monthlyReportRows = action.payload?.data || [];
+        state.monthlyReportTotal = action.payload?.total || 0;
+      })
+      .addCase(getMonthlyReportDetail.rejected, (state, action) => {
+        state.monthlyReportLoading = false;
+        state.monthlyReportError = action.payload;
       })
 
       /* ===== VIEW ===== */
