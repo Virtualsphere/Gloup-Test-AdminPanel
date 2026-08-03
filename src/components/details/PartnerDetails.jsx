@@ -1579,7 +1579,13 @@ const PartnerDetails = ({ title }) => {
 
               {/* TIMESLOTS */}
               <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-300">
-                <div className="flex justify-end mb-3">
+                <div className="flex justify-end mb-3 gap-2 flex-wrap">
+                  <button
+                    onClick={() => navigate(`/holidays?storeId=${id}`)}
+                    className="px-4 py-2 bg-black text-white rounded-lg shadow hover:bg-neutral-800"
+                  >
+                    Manage Holidays
+                  </button>
                   <button
                     onClick={handleGenerateDefaultSlots}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
