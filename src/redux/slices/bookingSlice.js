@@ -36,6 +36,40 @@ export const getbDetail = createAsyncThunk(
 );
 
 /* ============================
+   🔹 LIST BOOKINGS BY ORDER DATE (appointment/booking_date)
+============================ */
+export const getbDetailByOrderDate = createAsyncThunk(
+  "allBookings/getBookingsDetailByOrderDate",
+  async (
+    { fromDate = "", toDate = "", page = 1, limit = 10, status = "" } = {},
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.post("/admin/app/getBookingsDetailsByOrderDate", {
+        fromDate,
+        toDate,
+        page,
+        limit,
+        status,
+      },
+      {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: false,
+        });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message ||
+          error.message ||
+          "Failed to fetch bookings"
+      );
+    }
+  }
+);
+
+/* ============================
    🔹 VIEW BOOKING BY ID
 ============================ */
 export const getBookingById = createAsyncThunk(
@@ -138,6 +172,10 @@ const initialState = {
   pdfBlob: null,
   pdfLoading: false,
   pdfError: null,
+  bookingsByOrderDate: [],   // list filtered by order/appointment date
+  totalByOrderDate: 0,
+  loadingByOrderDate: false,
+  errorByOrderDate: null,
 };
 
 const bookingSlice = createSlice({
@@ -168,6 +206,21 @@ const bookingSlice = createSlice({
       .addCase(getbDetail.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      /* ===== LIST BY ORDER DATE ===== */
+      .addCase(getbDetailByOrderDate.pending, (state) => {
+        state.loadingByOrderDate = true;
+        state.errorByOrderDate = null;
+      })
+      .addCase(getbDetailByOrderDate.fulfilled, (state, action) => {
+        state.loadingByOrderDate = false;
+        state.bookingsByOrderDate = action.payload.data || [];
+        state.totalByOrderDate = action.payload.data.total || 0;
+      })
+      .addCase(getbDetailByOrderDate.rejected, (state, action) => {
+        state.loadingByOrderDate = false;
+        state.errorByOrderDate = action.payload;
       })
 
       /* ===== VIEW ===== */
