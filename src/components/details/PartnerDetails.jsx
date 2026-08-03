@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { MapPin, CheckCircle, XCircle, Eye, Calendar, User, IndianRupee, Edit, Trash2, Upload } from "lucide-react";
+import { MapPin, CheckCircle, XCircle, Eye, Calendar, User, IndianRupee, Edit, Trash2, Upload, CalendarOff } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { getPartnerDetail, getAllPayoutLogs, updatePartnerDetail, updatePartnerStatus, deletePartner, getStoreServices, generateDefaultSlots, BlockAndUnblockSlot, getBlockedSlots, getLanguageList, getServiceProvidedForOptions } from "../../redux/slices/partnersSlice";
 import { useDispatch, useSelector } from "react-redux";
@@ -16,6 +16,7 @@ import EditServiceModal from "../create/EditService";
 import BulkUploadServiceModal from "../create/BulkUploadServiceModal";
 import { getImageUrl } from "../../utils/image";
 import { fetchServiceCategories, deleteService } from "../../redux/slices/partnersSlice";
+import PartnerHolidaysPanel from "./PartnerHolidaysPanel";
 
 const useDragAndDrop = () => {
   const [isDragging, setIsDragging] = useState(false);
@@ -1165,6 +1166,35 @@ const PartnerDetails = ({ title }) => {
     return getWeekDays(weekStart);
   }, [weekStart]);
 
+  const holidayState = useSelector((s) => s.holidays);
+  const holidayOneOffDates = useMemo(
+    () =>
+      new Set(
+        (holidayState?.holidays || []).map((h) =>
+          String(h.holiday_date || h.date || "").slice(0, 10)
+        )
+      ),
+    [holidayState?.holidays]
+  );
+  const holidayWeeklySet = useMemo(
+    () =>
+      new Set((holidayState?.weekly || []).map((w) => Number(w.weekday))),
+    [holidayState?.weekly]
+  );
+
+  const isHolidayDay = (dayObj) => {
+    if (!dayObj) return false;
+    // Prefer local YMD from Date to avoid UTC shift from toISOString
+    const ymd =
+      dayObj.date instanceof Date
+        ? `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth() + 1).padStart(2, "0")}-${String(dayObj.date.getDate()).padStart(2, "0")}`
+        : dayObj.full;
+    if (holidayOneOffDates.has(ymd)) return true;
+    const jsWeekday =
+      dayObj.date instanceof Date ? dayObj.date.getDay() : null;
+    return jsWeekday != null && holidayWeeklySet.has(jsWeekday);
+  };
+
   const [selectedDate, setSelectedDate] = useState(null);
 
   useEffect(() => {
@@ -1577,15 +1607,22 @@ const PartnerDetails = ({ title }) => {
                 </div>
               </div>
 
+              {/* HOLIDAYS */}
+              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-300">
+                <div className="flex items-center gap-2 mb-4">
+                  <CalendarOff size={20} className="text-gray-700" />
+                  <h2 className="text-lg font-semibold text-gray-800">Holidays</h2>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  Mark full days closed for this salon. Weekly rules close every
+                  matching weekday; one-day holidays cancel that date&apos;s bookings.
+                </p>
+                <PartnerHolidaysPanel storeId={id} />
+              </div>
+
               {/* TIMESLOTS */}
               <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-300">
                 <div className="flex justify-end mb-3 gap-2 flex-wrap">
-                  <button
-                    onClick={() => navigate(`/holidays?storeId=${id}`)}
-                    className="px-4 py-2 bg-black text-white rounded-lg shadow hover:bg-neutral-800"
-                  >
-                    Manage Holidays
-                  </button>
                   <button
                     onClick={handleGenerateDefaultSlots}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
@@ -1629,7 +1666,9 @@ const PartnerDetails = ({ title }) => {
   overflow-x-auto no-scrollbar
   justify-start md:justify-center
 ">
-                  {days.map((d) => (
+                  {days.map((d) => {
+                    const closed = isHolidayDay(d);
+                    return (
                     <button
                       key={d.full}
                       disabled={d.isPast}
@@ -1638,6 +1677,10 @@ const PartnerDetails = ({ title }) => {
       min-w-[70px] flex-shrink-0 px-3 py-2 rounded-xl border transition
       ${d.isPast
                           ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : closed
+                            ? selectedDate?.full === d.full
+                              ? "bg-red-500 text-white border-red-500 shadow-md"
+                              : "bg-red-50 text-red-600 border-red-300"
                           : selectedDate?.full === d.full
                             ? "bg-teal-600 text-white border-teal-600 shadow-md"
                             : d.isToday
@@ -1648,18 +1691,30 @@ const PartnerDetails = ({ title }) => {
                       <span className="text-xs leading-none">{d.label}</span>
                       <span className="text-lg font-semibold leading-none">{d.number}</span>
 
-                      {d.isToday && (
+                      {closed && !d.isPast && (
+                        <span className={`text-[10px] leading-none ${selectedDate?.full === d.full ? "text-white/90" : "text-red-500"}`}>
+                          Holiday
+                        </span>
+                      )}
+                      {!closed && d.isToday && (
                         <span className="text-[10px] text-teal-600 leading-none">
                           Today
                         </span>
                       )}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
                 {/* SELECTED DAY */}
                 <h2 className="text-center text-lg font-semibold mb-4">
                   {selectedDate?.day}
                 </h2>
+                {selectedDate && isHolidayDay(selectedDate) && (
+                  <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700">
+                    This day is marked as a holiday — the salon is closed and
+                    new bookings are blocked.
+                  </div>
+                )}
 
 
                 {/* SLOTS GRID */}
