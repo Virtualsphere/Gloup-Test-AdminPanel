@@ -15,7 +15,7 @@ import { Plus } from "lucide-react";
 import EditServiceModal from "../create/EditService";
 import BulkUploadServiceModal from "../create/BulkUploadServiceModal";
 import { getImageUrl } from "../../utils/image";
-import { fetchServiceCategories, deleteService } from "../../redux/slices/partnersSlice";
+import { fetchServiceCategories, deleteService, updateServiceImportant } from "../../redux/slices/partnersSlice";
 import PartnerHolidaysPanel from "./PartnerHolidaysPanel";
 
 const useDragAndDrop = () => {
@@ -869,6 +869,28 @@ const PartnerDetails = ({ title }) => {
   const handleCancelDeleteService = () => {
     setIsDeleteServiceModalOpen(false);
     setDeleteServiceId(null);
+  };
+
+  const handleToggleServiceImportant = async (service) => {
+    const nextImportant = !service.important;
+
+    // Optimistic update so the row color responds immediately
+    setServicesData(prev =>
+      prev.map(s => (s.id === service.id ? { ...s, important: nextImportant } : s))
+    );
+
+    try {
+      await dispatch(
+        updateServiceImportant({ id: service.id, important: nextImportant })
+      ).unwrap();
+    } catch (error) {
+      console.error("Update service important error:", error);
+      // Revert on failure
+      setServicesData(prev =>
+        prev.map(s => (s.id === service.id ? { ...s, important: service.important } : s))
+      );
+      alert(error || "Failed to update service. Please try again.");
+    }
   };
 
   const urlToFile1 = async (url) => {
@@ -1827,6 +1849,7 @@ const PartnerDetails = ({ title }) => {
                     <table className="min-w-full text-sm border-collapse">
                       <thead className="sticky top-0 bg-gray-100 z-10">
                         <tr>
+                          <th className="px-4 py-3 text-center border-b">Important</th>
                           <th className="px-4 py-3 text-left border-b">Service</th>
                           <th className="px-4 py-3 text-left border-b">Amount</th>
                           <th className="px-4 py-3 text-left border-b">Discounted Amount</th>
@@ -1836,10 +1859,14 @@ const PartnerDetails = ({ title }) => {
                       </thead>
 
                       <tbody>
-                        {servicesData.map((item, index) => (
+                        {servicesData.map((item, index) => {
+                          const isImportant = !!item.important;
+                          return (
                           <tr
                             key={item.id}
-                            className={`hover:bg-neutral-200 cursor-pointer ${index % 2 === 0 ? "bg-neutral-100" : "bg-white"
+                            className={`cursor-pointer ${isImportant
+                                ? "bg-blue-100 hover:bg-blue-200"
+                                : `hover:bg-neutral-200 ${index % 2 === 0 ? "bg-neutral-100" : "bg-white"}`
                               }`}
                             onClick={() => {
                               setServiceId(item.id);
@@ -1847,6 +1874,17 @@ const PartnerDetails = ({ title }) => {
                               setShowUpdateModal(true);
                             }}
                           >
+                            <td
+                              className="border-x border-neutral-200 px-4 py-3 text-center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isImportant}
+                                onChange={() => handleToggleServiceImportant(item)}
+                                className="w-4 h-4 accent-blue-600 cursor-pointer"
+                              />
+                            </td>
                             <td className="border-x border-neutral-200 px-4 py-3">{item.service_name}</td>
                             <td className="border-x border-neutral-200 px-4 py-3">₹{item.amount}</td>
                             <td className="border-x border-neutral-200 px-4 py-3">₹{item.discounted_amount}</td>
@@ -1863,7 +1901,8 @@ const PartnerDetails = ({ title }) => {
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   ) : (

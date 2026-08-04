@@ -151,6 +151,26 @@ export const editService = createAsyncThunk(
   }
 );
 
+export const updateServiceImportant = createAsyncThunk(
+  "allPartners/updateServiceImportant",
+  async ({ id, important }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/updateserviceimportant",
+        { id, important },
+        { withCredentials: false }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to update service importance";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const deleteService = createAsyncThunk(
   "allPartners/deleteService",
   async(serviceId, {rejectWithValue}) => {
