@@ -303,7 +303,7 @@ const downloadPDF = async () => {
               )}
 
               {/* REFUND */}
-              {bookingView.status === "completed" && bookingView.payment_status === "success" && (
+              {bookingView.payment_status === "success" && (
                 <button
                   onClick={() => setShowRefund(true)}
                   className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm"
