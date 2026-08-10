@@ -3,28 +3,37 @@ import { useDispatch, useSelector } from "react-redux";
 import { Activity, Store, UserPlus, Users, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { getLiveStats } from "../../redux/slices/dashboardSlice";
 
-const POLL_INTERVAL_MS = 10_000;
+/** Fallback poll when SSE is disconnected; keep light when realtime is up. */
+const POLL_FALLBACK_MS = 30_000;
+const POLL_NO_SSE_MS = 10_000;
 
 const LiveStatsSection = () => {
   const dispatch = useDispatch();
   const intervalRef = useRef(null);
-  const { liveStats, liveStatsLoading, liveStatsError, liveStatsLastUpdated, livePolling } =
-    useSelector((state) => state.dashboard);
+  const {
+    liveStats,
+    liveStatsLoading,
+    liveStatsError,
+    liveStatsLastUpdated,
+    livePolling,
+    liveStatsRealtime,
+  } = useSelector((state) => state.dashboard);
 
   useEffect(() => {
     dispatch(getLiveStats());
   }, [dispatch]);
 
   useEffect(() => {
-    if (!livePolling) {
-      clearInterval(intervalRef.current);
-      return;
-    }
+    clearInterval(intervalRef.current);
+    if (!livePolling) return undefined;
+
+    const ms = liveStatsRealtime ? POLL_FALLBACK_MS : POLL_NO_SSE_MS;
     intervalRef.current = setInterval(() => {
       dispatch(getLiveStats());
-    }, POLL_INTERVAL_MS);
+    }, ms);
+
     return () => clearInterval(intervalRef.current);
-  }, [dispatch, livePolling]);
+  }, [dispatch, livePolling, liveStatsRealtime]);
 
   const cards = [
     {
@@ -55,6 +64,12 @@ const LiveStatsSection = () => {
     },
   ];
 
+  const liveLabel = !livePolling
+    ? "Paused"
+    : liveStatsRealtime
+      ? "Realtime"
+      : "Polling";
+
   return (
     <div className="mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -64,18 +79,23 @@ const LiveStatsSection = () => {
             {liveStatsLastUpdated
               ? `Updated ${new Date(liveStatsLastUpdated).toLocaleTimeString()}`
               : "Fetching real-time stats..."}
+            {liveStats?.presence_source
+              ? ` · source: ${liveStats.presence_source}`
+              : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
-              livePolling
+              livePolling && liveStatsRealtime
                 ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-gray-50 text-gray-500 border-gray-200"
+                : livePolling
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-gray-50 text-gray-500 border-gray-200"
             }`}
           >
             {livePolling ? <Wifi size={14} /> : <WifiOff size={14} />}
-            {livePolling ? "Live" : "Paused"}
+            {liveLabel}
           </span>
           <button
             type="button"

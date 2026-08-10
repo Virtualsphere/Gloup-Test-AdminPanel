@@ -388,6 +388,7 @@ const initialState = {
   liveStatsError: null,
   liveStatsLastUpdated: null,
   livePolling: true,
+  liveStatsRealtime: false,
   dashboardList: {},
   currentMonthBookings: {},
   monthlyReports: {},
@@ -419,6 +420,7 @@ const dashboardSlice = createSlice({
       state.liveStatsError = null;
       state.liveStatsLastUpdated = null;
       state.livePolling = true;
+      state.liveStatsRealtime = false;
       state.dashboardList = {};
       state.currentMonthBookings = {};
       state.monthlyReports = {};
@@ -435,6 +437,22 @@ const dashboardSlice = createSlice({
       state.customers = {};
       state.revenueGrowth = {};
       state.storesByDate = {};
+    },
+    applyLiveStatsFromSSE(state, action) {
+      const payload = action.payload || {};
+      state.liveStats = {
+        ...state.liveStats,
+        active_users_now: payload.active_users_now,
+        active_partners_now: payload.active_partners_now,
+      };
+      state.liveStatsLastUpdated = new Date(
+        payload.ts || Date.now()
+      ).toISOString();
+      state.liveStatsRealtime = true;
+      state.liveStatsError = null;
+    },
+    setLiveStatsRealtime(state, action) {
+      state.liveStatsRealtime = Boolean(action.payload);
     },
   },
   extraReducers: (builder) => {
@@ -665,5 +683,6 @@ const dashboardSlice = createSlice({
   },
 });
 
-export const { resetDashboardState } = dashboardSlice.actions;
+export const { resetDashboardState, applyLiveStatsFromSSE, setLiveStatsRealtime } =
+  dashboardSlice.actions;
 export default dashboardSlice.reducer;
