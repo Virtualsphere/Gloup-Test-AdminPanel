@@ -27,7 +27,7 @@ const InvoicePartners = ({ title }) => {
         <div>
           <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
           <p className="text-sm text-gray-500">
-            Booking summary by salon for {date || "today"}
+            Appointments by salon for {date || "today"} (visit day)
           </p>
         </div>
 
@@ -71,14 +71,18 @@ const InvoicePartners = ({ title }) => {
         </div>
       ) : partners.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center text-gray-500">
-          No bookings have come in today yet.
+          No appointments scheduled for {date || "today"}.
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {partners.map((partner) => (
             <button
               key={partner.partner_id}
-              onClick={() => navigate(`/invoice/${partner.partner_id}`)}
+              onClick={() =>
+                navigate(
+                  `/invoice/${partner.partner_id}${date ? `?date=${date}` : ""}`
+                )
+              }
               className="text-left bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-blue-300 hover:shadow-md transition group"
             >
               <div className="flex items-start justify-between mb-3">

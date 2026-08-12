@@ -1,14 +1,16 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api";
 
-// Partners with at least one booking created today, plus a running total.
+// Partners with at least one appointment booking_date = today (IST), plus totals.
 export const fetchInvoicePartners = createAsyncThunk(
   "invoice/fetchInvoicePartners",
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
+      const body =
+        params && params.date ? { date: params.date } : {};
       const response = await api.post(
         "/admin/app/getinvoicepartnerstoday",
-        {},
+        body,
         { withCredentials: false }
       );
       return response.data.data;
@@ -22,14 +24,17 @@ export const fetchInvoicePartners = createAsyncThunk(
   }
 );
 
-// Line-item booking breakdown for one partner, today.
+// Line-item booking breakdown for one partner on the invoice day (booking_date).
 export const fetchInvoiceDetails = createAsyncThunk(
   "invoice/fetchInvoiceDetails",
-  async ({ partnerId }, { rejectWithValue }) => {
+  async ({ partnerId, date }, { rejectWithValue }) => {
     try {
       const response = await api.post(
         "/admin/app/getinvoicedetails",
-        { partner_id: partnerId },
+        {
+          partner_id: partnerId,
+          ...(date ? { date } : {}),
+        },
         { withCredentials: false }
       );
       return response.data.data;
@@ -45,11 +50,11 @@ export const fetchInvoiceDetails = createAsyncThunk(
 
 export const downloadInvoicePDF = createAsyncThunk(
   "invoice/downloadInvoicePDF",
-  async ({ partnerId }, { rejectWithValue }) => {
+  async ({ partnerId, date }, { rejectWithValue }) => {
     try {
       const res = await api.post(
         `/admin/app/downloadinvoicepdf/${partnerId}`,
-        {},
+        date ? { date } : {},
         { responseType: "blob" }
       );
       return res.data;

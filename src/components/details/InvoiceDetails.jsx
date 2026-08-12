@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Download } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
@@ -11,6 +11,8 @@ import {
 
 const InvoiceDetails = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const invoiceDate = searchParams.get("date") || undefined;
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -19,16 +21,21 @@ const InvoiceDetails = () => {
   );
 
   useEffect(() => {
-    dispatch(fetchInvoiceDetails({ partnerId: id }));
+    dispatch(fetchInvoiceDetails({ partnerId: id, date: invoiceDate }));
     return () => {
       dispatch(clearInvoiceDetails());
     };
-  }, [dispatch, id]);
+  }, [dispatch, id, invoiceDate]);
 
   const handleDownloadPDF = async () => {
     const toastId = toast.loading("Generating invoice PDF...");
     try {
-      const blob = await dispatch(downloadInvoicePDF({ partnerId: id })).unwrap();
+      const blob = await dispatch(
+        downloadInvoicePDF({
+          partnerId: id,
+          date: details?.date || invoiceDate,
+        })
+      ).unwrap();
 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
