@@ -34,7 +34,8 @@ const NotificationForm = ({
       notification_type: defaultValues.notification_type || "",  
       sent_to: defaultValues.sent_to || "",  
       title: defaultValues.title || "",  
-      description: defaultValues.description || "",  
+      description: defaultValues.description || "",
+      image: defaultValues.image || "",
     },
   });
 
@@ -199,6 +200,19 @@ const NotificationForm = ({
             {errors.description.message}
             </p>
         )}
+      </div>
+
+      {/* Image URL (optional) */}
+      <div className="flex flex-col">
+        <label className="text-sm font-medium text-gray-700 mb-1">
+          Image URL <span className="text-gray-400 text-xs">(optional)</span>
+        </label>
+        <input
+          type="url"
+          {...register("image")}
+          placeholder="https://example.com/image.jpg"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
       </div>
         
       

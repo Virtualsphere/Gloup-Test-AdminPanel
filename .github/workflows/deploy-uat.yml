@@ -1,0 +1,42 @@
+name: Deploy Admin Panel (UAT)
+
+on:
+  push:
+    branches:
+      - uat
+
+jobs:
+  deploy:
+    name: Deploy to UAT
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy admin panel to UAT VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.UAT_SERVER_IP }}
+          username: ${{ secrets.UAT_SSH_USER }}
+          key: ${{ secrets.UAT_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /var/www/gloup/uat/admin/Gloup-Test-AdminPanel
+
+            echo "Pulling latest UAT code..."
+            git fetch origin
+            git checkout uat
+            git pull origin uat
+
+            echo "Writing UAT build env..."
+            printf '%s\n' \
+              "VITE_API_BASE_URL=${{ secrets.ADMIN_UAT_API_BASE_URL }}" \
+              "VITE_IMAGE_BASE_URL=${{ secrets.ADMIN_UAT_IMAGE_BASE_URL }}" \
+              "VITE_GOOGLE_MAPS_KEY=${{ secrets.ADMIN_UAT_GOOGLE_MAPS_KEY }}" \
+              "PORT=${{ secrets.ADMIN_UAT_PORT }}" \
+              > .env
+
+            echo "Building and starting admin panel..."
+            docker compose --env-file .env up -d --build
+
+            echo "Admin UAT deployment completed"
+            docker compose ps
