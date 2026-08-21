@@ -22,6 +22,7 @@ import {
   updateMultiplePartner,
 } from "../../redux/slices/partnersSlice";
 import { useDispatch } from "react-redux";
+import { useListUiState } from "../../hooks/useListUiState";
 import Select from "react-select";
 import moment from "moment";
 import { Plus } from "lucide-react";
@@ -46,7 +47,27 @@ const PartnerTable = ({ data, title }) => {
   { value: "rejected", label: "Rejected" },
 ];
 
-const [viewType, setViewType] = useState("card");
+const [listState, setListField] = useListUiState("partner", {
+  viewType: "card",
+  searchTerm: "",
+  sortField: "name",
+  sortDirection: "asc",
+  filters: {
+    status: "active",
+    city: "",
+    categoryName: "",
+    startDate: "",
+    endDate: "",
+  },
+  currentPage: 1,
+});
+const { viewType, searchTerm, sortField, sortDirection, filters, currentPage } = listState;
+const setViewType = (v) => setListField("viewType", v);
+const setSearchTerm = (v) => setListField("searchTerm", v);
+const setSortField = (v) => setListField("sortField", v);
+const setSortDirection = (v) => setListField("sortDirection", v);
+const setFilters = (v) => setListField("filters", v);
+const setCurrentPage = (v) => setListField("currentPage", v);
 
   // Filter out inactive from dropdown options for row updates, but keep it for display and global filter
   const getDropdownOptions = () => {
@@ -87,7 +108,6 @@ const [viewType, setViewType] = useState("card");
   };
 
   // Original state
-  const [searchTerm, setSearchTerm] = useState("");
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
     name: true,
@@ -102,18 +122,8 @@ const [viewType, setViewType] = useState("card");
     status: true,
   });
   const [showColumnToggle, setShowColumnToggle] = useState(false);
-  const [sortField, setSortField] = useState("name");
-  const [sortDirection, setSortDirection] = useState("asc");
 
-  // New state for filters, pagination
-  const [filters, setFilters] = useState({
-    status: "active",
-    city: "",
-    categoryName: "",
-    startDate: "",
-    endDate: "",
-  });
-  const [currentPage, setCurrentPage] = useState(1);
+  // New state for pagination page size
   const [itemsPerPage] = useState(15); // Show 50 items per page
   const [selectedRows, setSelectedRows] = useState([]);
   const tableRef = useRef(null);

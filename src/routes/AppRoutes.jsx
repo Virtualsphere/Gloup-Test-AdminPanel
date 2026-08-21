@@ -25,7 +25,8 @@ const Review = lazy(() => import("../components/data/Review"));
 const VerifyPartner = lazy(() => import("../components/data/VerifyPartner"));
 const Bookings = lazy(() => import("../components/data/Bookings"));
 const BookingsByOrderDate = lazy(() => import("../components/data/BookingsByOrderDate"));
-const MonthlyReport = lazy(() => import("../components/data/MonthlyReport"));
+const MonthlyReportPartners = lazy(() => import("../components/data/MonthlyReportPartners"));
+const MonthlyReportDetails = lazy(() => import("../components/details/MonthlyReportDetails"));
 const Holidays = lazy(() => import("../components/data/Holidays"));
 const BookingForm = lazy(() => import("../components/form/BookingForm"));
 const PartnerSubscription = lazy(() => import("../components/data/PartnerSubscription"));
@@ -53,7 +54,8 @@ const AppRoutes = () => {
         <Route path="/partner" element={<Partner title="Partner"/>} />
         <Route path="/bookings" element={<Bookings title="Bookings"/>} />
         <Route path="/bookings-by-order-date" element={<BookingsByOrderDate title="Bookings by Order Date"/>} />
-        <Route path="/monthly-report" element={<MonthlyReport title="Monthly Report"/>} />
+        <Route path="/monthly-report" element={<MonthlyReportPartners title="Monthly Report"/>} />
+        <Route path="/monthly-report/:id" element={<MonthlyReportDetails />} />
         <Route path="/holidays" element={<Holidays title="Holidays"/>} />
         <Route path="/bookings/:id" element={<BookingForm />} />
         <Route path="/partnersubscriptionplans" element={<PartnerSubscription title="Partner Subscription" />} />
