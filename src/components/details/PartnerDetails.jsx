@@ -287,6 +287,7 @@ const SalonImagesSection = ({ form, handleChange, id }) => {
 };
 
 export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving }) => {
+  const { id } = useParams();
   const [location, setLocation] = useState(null);
   const dispatch = useDispatch();
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -415,8 +416,6 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
   const API = import.meta.env.VITE_API_BASE_URL;
 
   const IMAGEAPI = import.meta.env.VITE_IMAGE_BASE_URL;
-
-  const { id } = useParams();
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center items-center p-6">
