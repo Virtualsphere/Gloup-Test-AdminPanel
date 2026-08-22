@@ -40,7 +40,7 @@ const VerifyPartnerTable = ({ data, title }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleSelectAll = () => {
     const currentIds = currentItems.map((item) => item.id);
