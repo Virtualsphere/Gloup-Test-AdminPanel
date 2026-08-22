@@ -28,6 +28,37 @@ export const getAllDeleteReviewRequest = createAsyncThunk(
   }
 );
 
+export const getAllSalonReviews = createAsyncThunk(
+  "allReview/getAllSalonReviews",
+  async ({ status = "all", store_id } = {}, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/getallreviews",
+        { status, store_id },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: false,
+        }
+      );
+      const payload = response.data?.data ?? {};
+      return {
+        reviews: Array.isArray(payload.reviews) ? payload.reviews : [],
+        salonSummaries: Array.isArray(payload.salonSummaries)
+          ? payload.salonSummaries
+          : [],
+      };
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch salon reviews";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const updateReviewRequest = createAsyncThunk(
   "allReview/updatereviewrequest",
   async ({ id, review_id, status }, { rejectWithValue }) => {
@@ -56,9 +87,13 @@ export const updateReviewRequest = createAsyncThunk(
 const initialState = {
   fetchLoading: false,
   updateLoading: false,
+  salonReviewsLoading: false,
   error: null,
+  salonReviewsError: null,
   success: false,
   allDeleteReviewRequest: [],
+  salonReviews: [],
+  salonSummaries: [],
 };
 
 const allReviewSlice = createSlice({
@@ -68,12 +103,17 @@ const allReviewSlice = createSlice({
     resetAllReviewState(state) {
       state.fetchLoading = false;
       state.updateLoading = false;
+      state.salonReviewsLoading = false;
       state.error = null;
+      state.salonReviewsError = null;
       state.success = false;
       state.allDeleteReviewRequest = [];
+      state.salonReviews = [];
+      state.salonSummaries = [];
     },
     clearReviewError(state) {
       state.error = null;
+      state.salonReviewsError = null;
     },
   },
   extraReducers: (builder) => {
@@ -103,6 +143,20 @@ const allReviewSlice = createSlice({
       .addCase(updateReviewRequest.rejected, (state, action) => {
         state.updateLoading = false;
         state.error = action.payload || "Failed to update review request";
+      })
+      .addCase(getAllSalonReviews.pending, (state) => {
+        state.salonReviewsLoading = true;
+        state.salonReviewsError = null;
+      })
+      .addCase(getAllSalonReviews.fulfilled, (state, action) => {
+        state.salonReviewsLoading = false;
+        state.salonReviews = action.payload.reviews;
+        state.salonSummaries = action.payload.salonSummaries;
+      })
+      .addCase(getAllSalonReviews.rejected, (state, action) => {
+        state.salonReviewsLoading = false;
+        state.salonReviewsError =
+          action.payload || "Failed to fetch salon reviews";
       });
   },
 });
