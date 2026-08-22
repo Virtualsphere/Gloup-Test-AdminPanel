@@ -25,6 +25,8 @@ import marketingReducer from "./slices/marketingSlice";
 import partnerPaymentReducer from "./slices/partnerPaymentSlice"
 import holidayReducer from "./slices/holidaySlice";
 import invoiceReducer from "./slices/invoiceSlice";
+import monthlyInvoiceReducer from "./slices/monthlyInvoiceSlice";
+import listUiStateReducer from "./slices/listUiStateSlice";
 
 const persistConfig = {
   key: "root", // key for localStorage
@@ -53,6 +55,8 @@ const rootReducer = combineReducers({
   partnerPayments: partnerPaymentReducer,
   holidays: holidayReducer,
   invoice: invoiceReducer,
+  monthlyInvoice: monthlyInvoiceReducer,
+  listUiState: listUiStateReducer,
 });
 
 // Wrap the rootReducer with persistReducer

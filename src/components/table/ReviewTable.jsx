@@ -16,12 +16,36 @@ import {
 } from "lucide-react";
 
 import { getAllDeleteReviewRequest, updateReviewRequest } from "../../redux/slices/reviewSlice";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import Select from "react-select";
+import { toast } from "react-hot-toast";
 
-const ReviewTable = ({ data, title }) => {
+const REVIEW_SEARCH_FIELDS = [
+  "id",
+  "review_id",
+  "user_firstname",
+  "user_lastname",
+  "store_name",
+  "store_email",
+  "rating",
+  "review_description",
+  "reason",
+  "status",
+];
+
+const matchesReviewSearch = (item, searchTerm) => {
+  if (!searchTerm) return true;
+  const haystack = REVIEW_SEARCH_FIELDS.map((key) => item?.[key])
+    .filter((value) => value != null && value !== "")
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(searchTerm.toLowerCase());
+};
+
+const ReviewTable = ({ data, title, onRefresh }) => {
   
   const dispatch = useDispatch();
+  const updateLoading = useSelector((state) => state.allReviews.updateLoading);
   const statusOptions = [
   { value: "pending", label: "Pending" },
   { value: "approved", label: "Approved" },
@@ -43,14 +67,14 @@ const ReviewTable = ({ data, title }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
-    firstname: true,
-    lastname: true,
+    user_firstname: true,
+    user_lastname: true,
     store_name: true,
     store_email: true,
     rating: true,
-    review: true,
+    review_description: true,
     reason: true,
-    status: true, 
+    status: true,
   });
   const [showColumnToggle, setShowColumnToggle] = useState(false);
   const [sortField, setSortField] = useState("store_name");
@@ -69,11 +93,7 @@ const ReviewTable = ({ data, title }) => {
 
   // Filter data based on search term AND filters
   const filteredData = data.filter((item) => {
-    const matchesSearch = Object.keys(visibleColumns).some(
-      (key) =>
-        visibleColumns[key] &&
-        item[key]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const matchesSearch = matchesReviewSearch(item, searchTerm);
 
     const matchesDepartmentFilter =
       !filters.department || item.department === filters.department;
@@ -270,12 +290,31 @@ const ReviewTable = ({ data, title }) => {
   }, [filters, searchTerm]);
  
 
-  const handleStatusChange = (id, review_id, newStatus) => {
-  dispatch(updateReviewRequest({ id: id,review_id: review_id, status: newStatus }))
-    .then(() => {
-      dispatch(getAllDeleteReviewRequest());
-    });
-};
+  const handleStatusChange = async (id, review_id, newStatus) => {
+    if (newStatus !== "approved" && newStatus !== "rejected") return;
+
+    const toastId = toast.loading("Updating review request...");
+    try {
+      await dispatch(
+        updateReviewRequest({ id, review_id, status: newStatus })
+      ).unwrap();
+
+      toast.success(
+        newStatus === "approved"
+          ? "Review removed successfully"
+          : "Review delete request rejected",
+        { id: toastId }
+      );
+
+      await dispatch(getAllDeleteReviewRequest()).unwrap();
+      onRefresh?.();
+    } catch (error) {
+      toast.error(
+        typeof error === "string" ? error : "Failed to update review request",
+        { id: toastId }
+      );
+    }
+  };
 
   return (
     <div>
@@ -359,9 +398,9 @@ const ReviewTable = ({ data, title }) => {
                   SNo
                 </th>
               )}
-              {(visibleColumns.firstname || visibleColumns.lastname) && (
+              {(visibleColumns.user_firstname || visibleColumns.user_lastname) && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
+                  Customer
                 </th>
               )}
               {visibleColumns.store_name && (
@@ -379,7 +418,7 @@ const ReviewTable = ({ data, title }) => {
                   Rating
                 </th>
               )}
-              {visibleColumns.review && (
+              {visibleColumns.review_description && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Review
                 </th>
@@ -408,11 +447,11 @@ const ReviewTable = ({ data, title }) => {
                   {visibleColumns.id && (
                     <td className="px-6 py-4 capitalize">{index + 1}</td>
                   )}
-                  {(visibleColumns.firstname || visibleColumns.lastname) && (
+                  {(visibleColumns.user_firstname || visibleColumns.user_lastname) && (
                     <td className="px-6 py-4 whitespace-nowrap capitalize">
                       {`${item?.user_firstname || ""} ${
                         item?.user_lastname || ""
-                      }`.trim()}
+                      }`.trim() || "—"}
                     </td>
                   )}
                   {visibleColumns.store_name && (
@@ -452,9 +491,9 @@ const ReviewTable = ({ data, title }) => {
                     </div>
                     </td>
                   )}
-                  {visibleColumns.review && (
-                    <td className="px-6 py-4 whitespace-nowrap  capitalize">
-                      {item?.review_description}
+                  {visibleColumns.review_description && (
+                    <td className="px-6 py-4 whitespace-nowrap capitalize max-w-xs truncate">
+                      {item?.review_description || "—"}
                     </td>
                   )}
                   {visibleColumns.reason && (
@@ -464,13 +503,20 @@ const ReviewTable = ({ data, title }) => {
                   )}
 
                   {visibleColumns.status && (
-                    
                     <td className="px-2 py-2 whitespace-nowrap">
+                      {item?.status === "pending" ? (
                       <div className="relative inline-block">
                         <Select
-                          options={getDropdownOptions()} // Filtered options without inactive
-                          value={getCurrentValue(item?.status)} // Current value (can include inactive)
-                          onChange={(selectedOption) => handleStatusChange(item?.id, item?.review_id, selectedOption.value)}
+                          options={getDropdownOptions()}
+                          value={getCurrentValue(item?.status)}
+                          onChange={(selectedOption) =>
+                            handleStatusChange(
+                              item?.id,
+                              item?.review_id,
+                              selectedOption.value
+                            )
+                          }
+                          isDisabled={updateLoading}
                           isSearchable={false}
                           className="text-sm"
                           classNamePrefix="minimal-border-select"
@@ -574,8 +620,12 @@ const ReviewTable = ({ data, title }) => {
                           }}
                         />
                       </div>
+                      ) : (
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize bg-gray-100 text-gray-700">
+                          {item?.status}
+                        </span>
+                      )}
                     </td>
-
                   )}
                  
                 </tr>
@@ -586,7 +636,7 @@ const ReviewTable = ({ data, title }) => {
                   colSpan="6"
                   className="px-6 py-4 text-center text-sm text-gray-500"
                 >
-                  No {title.toLowerCase()} found
+                  No pending review delete requests found
                 </td>
               </tr>
             )}

@@ -26,15 +26,32 @@ export const getAllNotificationList = createAsyncThunk(
   }
 );
 
-// add notification
+// add notification (JSON or multipart when image file is attached)
 export const addNotification = createAsyncThunk(
   "allNotification/addNotification",
   async (notificationData, { rejectWithValue }) => {
     try {
-      const response = await api.post("/admin/app/addnotification", notificationData, {
-        headers: {
-          "Content-Type": "application/json", // optional in GET, but included here per request
-        },
+      const { imageFile, id, ...fields } = notificationData || {};
+      let payload = fields;
+      let headers = {
+        "Content-Type": "application/json",
+      };
+
+      if (imageFile instanceof File) {
+        const formData = new FormData();
+        Object.entries(fields).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            formData.append(key, value);
+          }
+        });
+        formData.append("image", imageFile);
+        payload = formData;
+        // Let the browser set multipart boundary
+        headers = {};
+      }
+
+      const response = await api.post("/admin/app/addnotification", payload, {
+        headers,
         withCredentials: false,
       });
       return response.data.data;
