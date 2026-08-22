@@ -1,9 +1,23 @@
+# UAT deploy — separate base URL from production via GitHub secrets (not branch code).
+#
+# Required secrets:
+#   UAT_SERVER_IP, UAT_SSH_USER, UAT_SSH_KEY
+#   ADMIN_UAT_API_BASE_URL      — e.g. http://169.58.105.116:5678
+#   ADMIN_UAT_IMAGE_BASE_URL    — e.g. http://169.58.105.116:5678
+#   ADMIN_UAT_GOOGLE_MAPS_KEY
+#   ADMIN_UAT_PORT              — e.g. 3001
+
 name: Deploy Admin Panel (UAT)
 
 on:
   push:
     branches:
       - uat
+  workflow_dispatch:
+
+concurrency:
+  group: admin-uat-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -36,16 +50,41 @@ jobs:
             set -euo pipefail
             cd /var/www/gloup/uat/admin/Gloup-Test-AdminPanel
 
-            echo "Writing UAT build env..."
-            printf '%s\n' \
-              "VITE_API_BASE_URL=${{ secrets.ADMIN_UAT_API_BASE_URL }}" \
-              "VITE_IMAGE_BASE_URL=${{ secrets.ADMIN_UAT_IMAGE_BASE_URL }}" \
-              "VITE_GOOGLE_MAPS_KEY=${{ secrets.ADMIN_UAT_GOOGLE_MAPS_KEY }}" \
-              "PORT=${{ secrets.ADMIN_UAT_PORT }}" \
-              > .env
+            UAT_PORT="${{ secrets.ADMIN_UAT_PORT }}"
+            if [ -z "$UAT_PORT" ]; then UAT_PORT=3001; fi
+
+            echo "Writing UAT Vite build env (injected at deploy — not stored in git)..."
+            cat > .env <<ENVEOF
+            VITE_API_BASE_URL=${{ secrets.ADMIN_UAT_API_BASE_URL }}
+            VITE_IMAGE_BASE_URL=${{ secrets.ADMIN_UAT_IMAGE_BASE_URL }}
+            VITE_GOOGLE_MAPS_KEY=${{ secrets.ADMIN_UAT_GOOGLE_MAPS_KEY }}
+            PORT=${UAT_PORT}
+            ENVEOF
+
+            if ! grep -qE '^VITE_API_BASE_URL=https?://' .env; then
+              echo "ERROR: ADMIN_UAT_API_BASE_URL secret is missing or invalid"
+              exit 1
+            fi
+
+            echo "API base (UAT): $(grep VITE_API_BASE_URL .env | cut -d= -f2-)"
 
             echo "Building and starting admin panel..."
             docker compose --env-file .env up -d --build
+
+            echo "Waiting for admin panel health..."
+            healthy=0
+            for i in $(seq 1 30); do
+              if curl -sf "http://127.0.0.1:${UAT_PORT}/" >/dev/null; then
+                healthy=1
+                break
+              fi
+              sleep 2
+            done
+            if [ "$healthy" -ne 1 ]; then
+              echo "ERROR: UAT admin panel failed health check on :${UAT_PORT}"
+              docker compose logs --tail=100 admin-panel || true
+              exit 1
+            fi
 
             echo "Admin UAT deployment completed"
             docker compose ps

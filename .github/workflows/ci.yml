@@ -1,0 +1,39 @@
+# Validates lint + production build before merging to master.
+
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - uat
+
+jobs:
+  build:
+    name: Lint and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build (smoke test)
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: https://api.v1.gloup.in
+          VITE_IMAGE_BASE_URL: https://api.v1.gloup.in
+          VITE_GOOGLE_MAPS_KEY: ci-smoke-test-key

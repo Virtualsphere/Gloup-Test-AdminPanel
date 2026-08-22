@@ -1,9 +1,26 @@
+# Production deploy — GCP VM "gloup" (asia-south1-b)
+# Manual access: gcloud compute ssh avipa@gloup --zone=asia-south1-b
+# Deploy path:  /var/www/gloup/admin/Gloup-Test-AdminPanel
+# Public URL:   https://admin.gloup.in  → nginx → localhost:3001
+#
+# Required GitHub secrets (repo: Gloup-Test-AdminPanel):
+#   SERVER_IP                  — same external IP as backend prod deploy
+#   GCP_SSH_KEY                — private key for user avipa (same as backend)
+#   ADMIN_PROD_API_BASE_URL      — https://api.v1.gloup.in
+#   ADMIN_PROD_IMAGE_BASE_URL    — https://api.v1.gloup.in
+#   ADMIN_PROD_GOOGLE_MAPS_KEY   — Google Maps JS API key
+
 name: Deploy Admin Panel (Prod)
 
 on:
   push:
     branches:
       - master
+  workflow_dispatch:
+
+concurrency:
+  group: admin-prod-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -11,32 +28,65 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy admin panel to production VM
+      - name: Deploy admin panel to GCP production VM
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.PROD_SERVER_IP }}
-          username: ${{ secrets.PROD_SSH_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
+          host: ${{ secrets.SERVER_IP }}
+          username: avipa
+          key: ${{ secrets.GCP_SSH_KEY }}
           script_stop: true
           script: |
             set -euo pipefail
-            cd "${{ secrets.ADMIN_PROD_DEPLOY_PATH }}"
 
-            echo "Pulling latest production code..."
+            DEPLOY_DIR="/var/www/gloup/admin/Gloup-Test-AdminPanel"
+            cd "$DEPLOY_DIR"
+
+            echo "=== Admin panel production deploy ==="
+            echo "Host: $(hostname)"
+            echo "Path: $DEPLOY_DIR"
+
+            echo "Pulling latest master..."
             git fetch origin
             git checkout master
             git pull origin master
 
-            echo "Writing production build env..."
+            echo "Writing production Vite build env (injected at deploy — not stored in git)..."
             printf '%s\n' \
               "VITE_API_BASE_URL=${{ secrets.ADMIN_PROD_API_BASE_URL }}" \
               "VITE_IMAGE_BASE_URL=${{ secrets.ADMIN_PROD_IMAGE_BASE_URL }}" \
               "VITE_GOOGLE_MAPS_KEY=${{ secrets.ADMIN_PROD_GOOGLE_MAPS_KEY }}" \
-              "PORT=${{ secrets.ADMIN_PROD_PORT }}" \
+              "PORT=3001" \
               > .env
 
-            echo "Building and starting admin panel..."
+            if ! grep -qE '^VITE_API_BASE_URL=https?://' .env; then
+              echo "ERROR: ADMIN_PROD_API_BASE_URL secret is missing or invalid"
+              exit 1
+            fi
+
+            echo "API base (prod): $(grep VITE_API_BASE_URL .env | cut -d= -f2-)"
+
+            echo "Building and restarting admin panel container..."
             docker compose --env-file .env up -d --build
 
-            echo "Admin production deployment completed"
+            echo "Waiting for admin panel health (port 3001)..."
+            healthy=0
+            for i in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:3001/ >/dev/null; then
+                healthy=1
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$healthy" -ne 1 ]; then
+              echo "ERROR: admin panel failed health check on :3001"
+              docker compose ps || true
+              docker compose logs --tail=100 admin-panel || true
+              exit 1
+            fi
+
+            echo "Pruning unused Docker images..."
+            docker image prune -f
+
+            echo "Deployment completed successfully"
             docker compose ps
