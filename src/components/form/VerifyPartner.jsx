@@ -13,7 +13,6 @@ const VerifyPartner = ({ onSuccess }) => {
 
   // 🔹 Fetch partners list
   const fetchPartners = async () => {
-    debugger;
     try {
       setLoading(true);
       const res = await dispatch(getVerifiedPartnersList()).unwrap();

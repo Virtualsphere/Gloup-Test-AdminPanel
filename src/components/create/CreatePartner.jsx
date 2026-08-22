@@ -120,7 +120,6 @@ const CreatePartner = () => {
 
   const MAX_IMAGES = 6;
   const handleImageChange = (e) => {
-    debugger;
     const files = Array.from(e.target.files);
 
     const allowedTypes = ["image/jpeg", "image/png"];

@@ -32,7 +32,6 @@ export const getVerifiedPartnersList = createAsyncThunk(
   "allPartners/getVerifiedPartnersList",
   async (_, { rejectWithValue }) => { 
     try {
-      debugger;
       const response = await api.post(
         "/admin/app/getverifypartner",
         {},
@@ -65,10 +64,9 @@ export const createPartner = createAsyncThunk(
       return response.data.data;
     } catch (error) {
       const message =
-  error.response?.data?.error?.message ||
-  error.message ||
-  "Partner already exists with matching data" ||
-  "Failed to create partner";
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to create partner";
 
 return rejectWithValue(message);
 
