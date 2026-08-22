@@ -28,6 +28,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate production deploy secrets
+        run: |
+          missing=0
+          if [ -z "${{ secrets.SERVER_IP }}" ]; then
+            echo "::error::Missing secret SERVER_IP — set to prod VM IP (same as Gloup-Test-Backend, e.g. 34.93.155.171)"
+            missing=1
+          fi
+          if [ -z "${{ secrets.GCP_SSH_KEY }}" ]; then
+            echo "::error::Missing secret GCP_SSH_KEY — copy the private SSH key from Gloup-Test-Backend repo secrets"
+            missing=1
+          fi
+          if [ -z "${{ secrets.ADMIN_PROD_API_BASE_URL }}" ]; then
+            echo "::error::Missing secret ADMIN_PROD_API_BASE_URL — set to https://api.v1.gloup.in"
+            missing=1
+          fi
+          if [ -z "${{ secrets.ADMIN_PROD_IMAGE_BASE_URL }}" ]; then
+            echo "::error::Missing secret ADMIN_PROD_IMAGE_BASE_URL — set to https://api.v1.gloup.in"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo ""
+            echo "Add secrets at: Settings → Secrets and variables → Actions"
+            echo "Repo: https://github.com/Virtualsphere/Gloup-Test-AdminPanel/settings/secrets/actions"
+            exit 1
+          fi
+
       - name: Deploy admin panel to GCP production VM
         uses: appleboy/ssh-action@v1.2.0
         with:
