@@ -1269,7 +1269,7 @@ const PartnerDetails = ({ title }) => {
       }));
 
     } catch (err) {
-      alert("Failed to update slot");
+      alert(err || "Failed to update slot");
     }
   };
 
@@ -1278,11 +1278,11 @@ const PartnerDetails = ({ title }) => {
     try {
 
       await Promise.all(
-        selectedSlots.map(id =>
+        selectedSlots.map(slotId =>
           dispatch(
             BlockAndUnblockSlot({
               storeId: id,
-              slotId: id,
+              slotId,
               status: "block",
               date: selectedDate.full
             })
@@ -1301,8 +1301,8 @@ const PartnerDetails = ({ title }) => {
 
       setSelectedSlots([]);
 
-    } catch {
-      alert("Failed to block slots");
+    } catch (err) {
+      alert(err || "Failed to block slots");
     }
   };
 
@@ -1311,11 +1311,11 @@ const PartnerDetails = ({ title }) => {
     try {
 
       await Promise.all(
-        selectedSlots.map(id =>
+        selectedSlots.map(slotId =>
           dispatch(
             BlockAndUnblockSlot({
               storeId: id,
-              slotId: id,
+              slotId,
               status: "unblock",
               date: selectedDate.full
             })
@@ -1334,8 +1334,8 @@ const PartnerDetails = ({ title }) => {
 
       setSelectedSlots([]);
 
-    } catch {
-      alert("Failed to unblock slots");
+    } catch (err) {
+      alert(err || "Failed to unblock slots");
     }
   };
 
