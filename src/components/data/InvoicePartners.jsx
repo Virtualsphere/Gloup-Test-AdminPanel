@@ -1,12 +1,16 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, Phone, Mail, ChevronRight } from "lucide-react";
 import { fetchInvoicePartners } from "../../redux/slices/invoiceSlice";
 
 const InvoicePartners = ({ title }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const selectedDate = searchParams.get("date") || "";
+  const selectedStatus = searchParams.get("status") || "";
 
   const {
     partners,
@@ -18,8 +22,22 @@ const InvoicePartners = ({ title }) => {
   } = useSelector((state) => state.invoice);
 
   useEffect(() => {
-    dispatch(fetchInvoicePartners());
-  }, [dispatch]);
+    dispatch(
+      fetchInvoicePartners({
+        date: selectedDate || undefined,
+        status: selectedStatus || undefined,
+      })
+    );
+  }, [dispatch, selectedDate, selectedStatus]);
+
+  const updateParam = (key, value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value);
+      else next.delete(key);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -40,6 +58,45 @@ const InvoicePartners = ({ title }) => {
             <div className="text-2xl font-bold text-gray-800">{totalPartners}</div>
             <div className="text-xs text-gray-500">Partners</div>
           </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="w-full sm:w-48">
+          <label className="block text-xs text-gray-500 mb-1">Date</label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => updateParam("date", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() =>
+              updateParam("status", selectedStatus === "completed" ? "" : "completed")
+            }
+            className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+              selectedStatus === "completed"
+                ? "bg-green-600 text-white border-green-600"
+                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            ✓ Completed
+          </button>
+          <button
+            onClick={() =>
+              updateParam("status", selectedStatus === "pending" ? "" : "pending")
+            }
+            className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+              selectedStatus === "pending"
+                ? "bg-gray-700 text-white border-gray-700"
+                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            ✗ Incomplete
+          </button>
         </div>
       </div>
 
@@ -71,7 +128,9 @@ const InvoicePartners = ({ title }) => {
         </div>
       ) : partners.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center text-gray-500">
-          No appointments scheduled for {date || "today"}.
+          {selectedStatus
+            ? "No partners match the selected filters."
+            : `No appointments scheduled for ${date || "today"}.`}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -107,8 +166,19 @@ const InvoicePartners = ({ title }) => {
                 )}
               </div>
 
-              <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                {partner.booking_count} {partner.booking_count === 1 ? "Booking" : "Bookings"}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                  {partner.booking_count} {partner.booking_count === 1 ? "Booking" : "Bookings"}
+                </div>
+                {partner.payout_status === "completed" ? (
+                  <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                    Paid
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                    Pending
+                  </div>
+                )}
               </div>
             </button>
           ))}
