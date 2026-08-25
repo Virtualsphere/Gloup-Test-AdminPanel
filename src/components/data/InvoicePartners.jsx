@@ -4,12 +4,20 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, Phone, Mail, ChevronRight } from "lucide-react";
 import { fetchInvoicePartners } from "../../redux/slices/invoiceSlice";
 
+const getTodayDateString = () => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const InvoicePartners = ({ title }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const selectedDate = searchParams.get("date") || "";
+  const selectedDate = searchParams.get("date") || getTodayDateString();
   const selectedStatus = searchParams.get("status") || "";
 
   const {

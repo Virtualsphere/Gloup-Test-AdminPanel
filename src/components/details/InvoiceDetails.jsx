@@ -118,7 +118,7 @@ const InvoiceDetails = () => {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          onClick={() => navigate("/invoice")}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-1 text-gray-600 hover:text-black cursor-pointer"
         >
           <ArrowLeft size={16} />
