@@ -109,7 +109,6 @@ const InvoiceDetails = () => {
     date,
     items = [],
     total_amount,
-    total_discount,
     total_bookings,
     payout_status,
     payout_paid_at,
@@ -163,15 +162,13 @@ const InvoiceDetails = () => {
                 <th className="px-4 py-3 text-left">#</th>
                 <th className="px-4 py-3 text-left">Service</th>
                 <th className="px-4 py-3 text-left">Booking Time</th>
-                <th className="px-4 py-3 text-right">Rate</th>
-                <th className="px-4 py-3 text-right">Discount</th>
                 <th className="px-4 py-3 text-right">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
                     No bookings for today.
                   </td>
                 </tr>
@@ -195,18 +192,6 @@ const InvoiceDetails = () => {
                           })
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-500">
-                      ₹{Number(item.base_amount ?? item.amount).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {item.discount_applied > 0 ? (
-                        <span className="text-green-700">
-                          − ₹{Number(item.discount_applied).toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
                     <td className="px-4 py-3 text-right font-medium">
                       ₹{Number(item.amount).toFixed(2)}
                     </td>
@@ -215,13 +200,6 @@ const InvoiceDetails = () => {
               )}
             </tbody>
           </table>
-
-          {total_discount > 0 && (
-            <div className="bg-green-50 text-green-700 px-4 py-2 flex justify-between text-sm font-medium border-t">
-              <span>Total Discount Given</span>
-              <span>− ₹{Number(total_discount).toFixed(2)}</span>
-            </div>
-          )}
 
           <div className="bg-gray-900 text-white px-4 py-3 flex justify-between font-semibold">
             <span>Total</span>
