@@ -94,11 +94,11 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
 
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-      <div className="bg-white w-[460px] p-8 rounded-2xl shadow-2xl space-y-6 animate-fadeIn">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4 overflow-y-auto">
+      <div className="bg-white w-[460px] max-h-[90vh] overflow-y-auto p-8 rounded-2xl shadow-2xl space-y-6 animate-fadeIn">
 
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center sticky top-0 -mx-8 -mt-8 px-8 pt-8 pb-3 bg-white z-10">
           <h2 className="text-xl font-semibold tracking-wide">
             Create Service
           </h2>
