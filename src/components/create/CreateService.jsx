@@ -17,6 +17,13 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
   const [serviceStatus, setServiceStatus] = useState("active");
   const [serviceCategory, setServiceCategory] = useState("");
   const [serviceFor, setServiceFor] = useState("unisex");
+  const [tierAmounts, setTierAmounts] = useState([]);
+
+  const setTierCount = (count) => {
+    setTierAmounts((prev) =>
+      Array.from({ length: count }, (_, i) => prev[i] ?? "")
+    );
+  };
 
 
   async function handleSubmitService(e) {
@@ -34,6 +41,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
         priority,
         duration,
         status: serviceStatus,
+        tier_discounts: tierAmounts.map((v) => Number(v) || 0),
       };
 
       console.log("CREATE SERVICE PAYLOAD:", payload);
@@ -52,6 +60,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
       setServiceStatus("active");
       setServiceCategory("");
       setServiceFor("unisex");
+      setTierAmounts([]);
 
       setShowModal(false);
 
@@ -182,7 +191,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-600">
-                Discounted
+                Default Discount
               </label>
               <input
                 type="number"
@@ -191,6 +200,55 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
                 className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
               />
             </div>
+          </div>
+
+          {/* Booking Discount Tiers */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-600">
+              Booking Discount Tiers (optional)
+            </label>
+            <p className="text-xs text-gray-400">
+              Give a different discount based on how many times a customer has booked before.
+              Anyone beyond these tiers (or not logged in) gets the Default Discount above.
+            </p>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setTierCount(tierAmounts.length === n ? 0 : n)}
+                  className={`w-9 h-9 rounded-lg border text-sm font-medium transition ${
+                    tierAmounts.length === n
+                      ? "bg-black text-white border-black"
+                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+
+            {tierAmounts.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {tierAmounts.map((val, i) => (
+                  <div key={i} className="space-y-1">
+                    <label className="text-xs text-gray-500">
+                      Discount for Booking {i + 1}
+                    </label>
+                    <input
+                      type="number"
+                      value={val}
+                      onChange={(e) => {
+                        const next = [...tierAmounts];
+                        next[i] = e.target.value;
+                        setTierAmounts(next);
+                      }}
+                      className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-3 py-2 rounded-lg transition"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Duration */}
