@@ -23,6 +23,13 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
   const [serviceCategory, setServiceCategory] = useState("");
   const [serviceFor, setServiceFor] = useState("unisex");
   const [time, setTime] = useState({ hh: "", mm: "", ss: "" });
+  const [tierAmounts, setTierAmounts] = useState([]);
+
+  const setTierCount = (count) => {
+    setTierAmounts((prev) =>
+      Array.from({ length: count }, (_, i) => prev[i] ?? "")
+    );
+  };
 
   // Load categories
   useEffect(() => {
@@ -39,6 +46,11 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       setServiceCategory(serviceData.service_category || "");
       setServiceFor(serviceData.service_for || "unisex");
       setPriority(serviceData.priority || 0);
+      setTierAmounts(
+        Array.isArray(serviceData.tier_discounts)
+          ? serviceData.tier_discounts.map((v) => String(v ?? ""))
+          : []
+      );
 
       const [hh = "00", mm = "00", ss = "00"] =
         (serviceData.duration || "00:00:00").split(":");
@@ -75,6 +87,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       status: serviceStatus,
       serviceFor: serviceFor,
       priority,
+      tier_discounts: tierAmounts.map((v) => Number(v) || 0),
     };
 
     try {
@@ -94,11 +107,11 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-      <div className="bg-white w-[500px] p-8 rounded-2xl shadow-2xl space-y-6">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4 overflow-y-auto">
+      <div className="bg-white w-[500px] max-h-[90vh] overflow-y-auto p-8 rounded-2xl shadow-2xl space-y-6">
 
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center sticky top-0 -mx-8 -mt-8 px-8 pt-8 pb-3 bg-white z-10">
           <h2 className="text-xl font-semibold">
             Edit Service #{serviceId}
           </h2>
@@ -193,7 +206,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-600">
-                Discounted Amount
+                Default Discount
               </label>
               <input
                 type="number"
@@ -203,6 +216,49 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
               />
             </div>
 
+          </div>
+
+          {/* Booking Discount Tiers */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-600">
+              Booking Discount Tiers (optional)
+            </label>
+            <p className="text-xs text-gray-400">
+              Give a different discount based on how many times a customer has booked before.
+              Anyone beyond these tiers (or not logged in) gets the Default Discount above.
+            </p>
+            <div className="w-32">
+              <label className="text-xs text-gray-500">Number of Tiers</label>
+              <input
+                type="number"
+                min="0"
+                value={tierAmounts.length}
+                onChange={(e) => setTierCount(Math.max(0, Number(e.target.value) || 0))}
+                className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-3 py-2 rounded-lg transition"
+              />
+            </div>
+
+            {tierAmounts.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {tierAmounts.map((val, i) => (
+                  <div key={i} className="space-y-1">
+                    <label className="text-xs text-gray-500">
+                      Discount for Booking {i + 1}
+                    </label>
+                    <input
+                      type="number"
+                      value={val}
+                      onChange={(e) => {
+                        const next = [...tierAmounts];
+                        next[i] = e.target.value;
+                        setTierAmounts(next);
+                      }}
+                      className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-3 py-2 rounded-lg transition"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Duration */}

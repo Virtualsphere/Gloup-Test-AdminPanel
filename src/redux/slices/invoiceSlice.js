@@ -6,8 +6,9 @@ export const fetchInvoicePartners = createAsyncThunk(
   "invoice/fetchInvoicePartners",
   async (params = {}, { rejectWithValue }) => {
     try {
-      const body =
-        params && params.date ? { date: params.date } : {};
+      const body = {};
+      if (params?.date) body.date = params.date;
+      if (params?.status) body.status = params.status;
       const response = await api.post(
         "/admin/app/getinvoicepartnerstoday",
         body,
@@ -68,6 +69,52 @@ export const downloadInvoicePDF = createAsyncThunk(
   }
 );
 
+export const markInvoicePayout = createAsyncThunk(
+  "invoice/markInvoicePayout",
+  async ({ partnerId, date }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/markinvoicepayout",
+        {
+          partner_id: partnerId,
+          ...(date ? { date } : {}),
+        },
+        { withCredentials: false }
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message ||
+          error.message ||
+          "Failed to mark invoice as paid"
+      );
+    }
+  }
+);
+
+export const undoInvoicePayout = createAsyncThunk(
+  "invoice/undoInvoicePayout",
+  async ({ partnerId, date }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/undoinvoicepayout",
+        {
+          partner_id: partnerId,
+          ...(date ? { date } : {}),
+        },
+        { withCredentials: false }
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message ||
+          error.message ||
+          "Failed to undo invoice payout"
+      );
+    }
+  }
+);
+
 const invoiceSlice = createSlice({
   name: "invoice",
   initialState: {
@@ -83,6 +130,8 @@ const invoiceSlice = createSlice({
     detailsError: null,
 
     pdfLoading: false,
+
+    payoutLoading: false,
   },
   reducers: {
     clearInvoiceDetails: (state) => {
@@ -129,6 +178,28 @@ const invoiceSlice = createSlice({
       })
       .addCase(downloadInvoicePDF.rejected, (state) => {
         state.pdfLoading = false;
+      })
+
+      .addCase(markInvoicePayout.pending, (state) => {
+        state.payoutLoading = true;
+      })
+      .addCase(markInvoicePayout.fulfilled, (state, action) => {
+        state.payoutLoading = false;
+        state.details = action.payload;
+      })
+      .addCase(markInvoicePayout.rejected, (state) => {
+        state.payoutLoading = false;
+      })
+
+      .addCase(undoInvoicePayout.pending, (state) => {
+        state.payoutLoading = true;
+      })
+      .addCase(undoInvoicePayout.fulfilled, (state, action) => {
+        state.payoutLoading = false;
+        state.details = action.payload;
+      })
+      .addCase(undoInvoicePayout.rejected, (state) => {
+        state.payoutLoading = false;
       });
   },
 });
