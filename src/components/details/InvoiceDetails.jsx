@@ -112,7 +112,30 @@ const InvoiceDetails = () => {
     total_bookings,
     payout_status,
     payout_paid_at,
+    payout_amount,
+    payout_subscription_deducted,
+    subscription_total_due,
+    subscription_deduction_today,
+    subscription_remaining_debt,
+    subscription_plan_amount,
+    subscription_gst_amount,
+    net_payout_preview,
   } = details;
+
+  const isPaid = payout_status === "completed";
+  // Deducted from THIS invoice — historical fact once paid (frozen at
+  // payout time), a capped preview beforehand (can't deduct more than
+  // this invoice actually totals).
+  const subscriptionDeduction = isPaid
+    ? Number(payout_subscription_deducted || 0)
+    : Number(subscription_deduction_today || 0);
+  const netPayout = isPaid ? Number(payout_amount || 0) : Number(net_payout_preview ?? total_amount);
+  // What's still owed after this invoice's deduction — once paid, the
+  // live subscription total already reflects that; beforehand it's a
+  // preview of what would remain if this payout were committed now.
+  const remainingDebt = isPaid
+    ? Number(subscription_total_due || 0)
+    : Number(subscription_remaining_debt || 0);
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -205,6 +228,37 @@ const InvoiceDetails = () => {
             <span>Total</span>
             <span>₹{Number(total_amount || 0).toFixed(2)}</span>
           </div>
+
+          {subscriptionDeduction > 0 && (
+            <div className="bg-amber-50 text-amber-800 px-4 py-3 border-t border-amber-100 space-y-1">
+              {subscription_plan_amount != null && (
+                <div className="flex justify-between text-xs text-amber-700/80">
+                  <span>
+                    Subscription Plan (₹{Number(subscription_plan_amount).toFixed(2)}) + 18% GST
+                    (₹{Number(subscription_gst_amount).toFixed(2)})
+                  </span>
+                  <span>
+                    = ₹{(Number(subscription_plan_amount) + Number(subscription_gst_amount)).toFixed(2)}
+                    /cycle
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span>Deducted From This Invoice{!isPaid ? " (preview)" : ""}</span>
+                <span>− ₹{subscriptionDeduction.toFixed(2)}</span>
+              </div>
+              {remainingDebt > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Remaining Debt{!isPaid ? " (after this payout)" : ""}</span>
+                  <span>₹{remainingDebt.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-semibold">
+                <span>{isPaid ? "Payout (After Deduction)" : "Net Payout After Deduction"}</span>
+                <span>₹{netPayout.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-3 mt-5">
