@@ -26,6 +26,7 @@ import partnerPaymentReducer from "./slices/partnerPaymentSlice"
 import holidayReducer from "./slices/holidaySlice";
 import invoiceReducer from "./slices/invoiceSlice";
 import monthlyInvoiceReducer from "./slices/monthlyInvoiceSlice";
+import partnerManualSubscriptionReducer from "./slices/partnerManualSubscriptionSlice";
 import listUiStateReducer from "./slices/listUiStateSlice";
 
 const persistConfig = {
@@ -56,6 +57,7 @@ const rootReducer = combineReducers({
   holidays: holidayReducer,
   invoice: invoiceReducer,
   monthlyInvoice: monthlyInvoiceReducer,
+  partnerManualSubscription: partnerManualSubscriptionReducer,
   listUiState: listUiStateReducer,
 });
 

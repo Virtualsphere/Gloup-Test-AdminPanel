@@ -10,6 +10,7 @@ import {
   Layers,
   Ticket,
   FileText,
+  Receipt,
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -28,6 +29,7 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/bookings-by-order-date", icon: <CalendarCheck size={18} />, text: "Bookings by Order Date" },
     { path: "/monthly-report", icon: <FileText size={18} />, text: "Monthly Report" },
     { path: "/invoice", icon: <FileText size={18} />, text: "Invoice" },
+    { path: "/partner-subscriptions", icon: <Receipt size={18} />, text: "Partner Subscriptions" },
     { path: "/subscription", icon: <CreditCard size={18} />, text: "Subscription" },
     { path: "/category", icon: <Layers size={18} />, text: "Category" },
     { path: "/refund", icon: <FaRegMoneyBillAlt size={18} />, text: "Refund" },

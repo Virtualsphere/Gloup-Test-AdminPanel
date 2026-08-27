@@ -35,6 +35,7 @@ const Marketing = lazy(() => import("../components/create/Marketing"));
 const PartnerPaymentStatusPage = lazy(() => import("../components/details/PartnerPaymentStatusPage"));
 const InvoicePartners = lazy(() => import("../components/data/InvoicePartners"));
 const InvoiceDetails = lazy(() => import("../components/details/InvoiceDetails"));
+const PartnerManualSubscriptions = lazy(() => import("../components/data/PartnerManualSubscriptions"));
 
 const AppRoutes = () => {
   return (
@@ -78,6 +79,7 @@ const AppRoutes = () => {
         <Route path="/partnersubscriptionstatus" element={<PartnerPaymentStatusPage title="Partner Subscription Status"/>} />
         <Route path="/invoice" element={<InvoicePartners title="Invoices"/>} />
         <Route path="/invoice/:id" element={<InvoiceDetails />} />
+        <Route path="/partner-subscriptions" element={<PartnerManualSubscriptions title="Partner Subscriptions"/>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Suspense>
