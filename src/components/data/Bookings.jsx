@@ -1,26 +1,54 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import BookingTable from "../table/BookingTable";
 import { getbDetail } from "../../redux/slices/bookingSlice";
 
+const getTodayDateString = () => new Date().toISOString().split("T")[0];
+
 const Bookings = ({ title }) => {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // 🔹 Dates (default today)
-  const today = new Date().toISOString().split("T")[0];
-  const [fromDate, setFromDate] = useState(today);
-  const [toDate, setToDate] = useState(today);
+  const today = getTodayDateString();
 
-  // 🔹 Filters
-  const [status, setStatus] = useState("");
+  // 🔹 Dates (default today), filters, and pagination all live in the URL
+  // so they survive navigating into a booking's detail page and back.
+  const fromDate = searchParams.get("fromDate") || today;
+  const toDate = searchParams.get("toDate") || today;
+  const status = searchParams.get("status") || "";
+  const search = searchParams.get("search") || "";
+  const paymentStatus = searchParams.has("paymentStatus")
+    ? searchParams.get("paymentStatus")
+    : "success";
+  const page = Number(searchParams.get("page")) || 1;
 
-  const [search, setSearch] = useState("");
-
-  const [paymentStatus, setPaymentStatus] = useState("success");
-
-  // 🔹 Pagination
-  const [page, setPage] = useState(1);
   const limit = 50;
+
+  const updateParam = (key, value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const setFromDate = (value) => updateParam("fromDate", value);
+  const setToDate = (value) => updateParam("toDate", value);
+  const setStatus = (value) => updateParam("status", value);
+  const setSearch = (value) => updateParam("search", value);
+  const setPage = (value) => updateParam("page", value === 1 ? "" : String(value));
+  // paymentStatus's default ("success") differs from its cleared value (""),
+  // so unlike the others it must always stay present in the URL — deleting
+  // it on clear would make it fall back to "success" instead of "off".
+  const setPaymentStatus = (value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("paymentStatus", value ?? "");
+      return next;
+    });
+  };
 
   // 🔹 Redux state
   const {
@@ -43,9 +71,6 @@ const Bookings = ({ title }) => {
       })
     );
   }, [dispatch, fromDate, toDate, page, status]);
-
-  console.log("Bookings Component Data: ", bookingsDetail);
-  console.log("Redux state:", { bookingsDetail, total });
 
   return (
     <div className="space-y-6">
