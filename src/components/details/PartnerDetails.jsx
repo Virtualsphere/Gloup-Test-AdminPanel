@@ -1859,15 +1859,37 @@ const PartnerDetails = ({ title }) => {
                       </thead>
 
                       <tbody>
-                        {servicesData.map((item, index) => {
+                        {[...servicesData]
+                          .sort((a, b) => {
+                            const ap = Number(a.priority) || 0;
+                            const bp = Number(b.priority) || 0;
+                            if (ap > 0 && bp > 0) return ap - bp;
+                            if (ap > 0) return -1;
+                            if (bp > 0) return 1;
+                            return 0;
+                          })
+                          .map((item, index) => {
                           const isImportant = !!item.important;
+                          const isPriority = Number(item.priority) > 0;
+
+                          let rowClassName = "cursor-pointer ";
+                          let rowStyle;
+                          if (isPriority && isImportant) {
+                            rowStyle = { background: "linear-gradient(to right, #dbeafe 50%, #bbf7d0 50%)" };
+                            rowClassName += "hover:brightness-95";
+                          } else if (isImportant) {
+                            rowClassName += "bg-blue-100 hover:bg-blue-200";
+                          } else if (isPriority) {
+                            rowClassName += "bg-green-100 hover:bg-green-200";
+                          } else {
+                            rowClassName += `hover:bg-neutral-200 ${index % 2 === 0 ? "bg-neutral-100" : "bg-white"}`;
+                          }
+
                           return (
                           <tr
                             key={item.id}
-                            className={`cursor-pointer ${isImportant
-                                ? "bg-blue-100 hover:bg-blue-200"
-                                : `hover:bg-neutral-200 ${index % 2 === 0 ? "bg-neutral-100" : "bg-white"}`
-                              }`}
+                            className={rowClassName}
+                            style={rowStyle}
                             onClick={() => {
                               setServiceId(item.id);
                               setServiceData(item);
