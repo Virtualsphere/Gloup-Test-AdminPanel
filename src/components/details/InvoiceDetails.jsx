@@ -185,13 +185,14 @@ const InvoiceDetails = () => {
                 <th className="px-4 py-3 text-left">#</th>
                 <th className="px-4 py-3 text-left">Service</th>
                 <th className="px-4 py-3 text-left">Booking Time</th>
+                <th className="px-4 py-3 text-right">Acquisition Cost</th>
                 <th className="px-4 py-3 text-right">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                     No bookings for today.
                   </td>
                 </tr>
@@ -213,6 +214,11 @@ const InvoiceDetails = () => {
                             hour: "2-digit",
                             minute: "2-digit",
                           })
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-600">
+                      {!item.important && item.discount_applied > 0
+                        ? `₹${Number(item.discount_applied).toFixed(2)}`
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-right font-medium">
