@@ -17,6 +17,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
   const [serviceName, setServiceName] = useState("");
   const [amount, setAmount] = useState("");
   const [discountedAmount, setDiscountedAmount] = useState("");
+  const [fakePrice, setFakePrice] = useState("");
   const [priority, setPriority] = useState(0);
   const [duration, setDuration] = useState("00:00:00");
   const [serviceStatus, setServiceStatus] = useState("active");
@@ -42,6 +43,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       setServiceName(serviceData.service_name || "");
       setAmount(serviceData.amount || "");
       setDiscountedAmount(serviceData.discounted_amount || "");
+      setFakePrice(serviceData.fake_price ?? "");
       setServiceStatus(serviceData.status || "active");
       setServiceCategory(serviceData.service_category || "");
       setServiceFor(serviceData.service_for || "unisex");
@@ -83,6 +85,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
       service_for: serviceFor,
       amount,
       discounted_amount: discountedAmount,
+      fake_price: fakePrice || null,
       duration,
       status: serviceStatus,
       serviceFor: serviceFor,
@@ -216,6 +219,22 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
               />
             </div>
 
+          </div>
+
+          {/* Fake Price */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-600">
+              Fake Price (optional)
+            </label>
+            <p className="text-xs text-gray-400">
+              Display-only marketing price shown to customers (e.g. an inflated "was" price). Does not affect billing.
+            </p>
+            <input
+              type="number"
+              value={fakePrice}
+              onChange={(e) => setFakePrice(e.target.value)}
+              className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg"
+            />
           </div>
 
           {/* Booking Discount Tiers */}

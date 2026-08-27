@@ -12,6 +12,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
   const [amount, setAmount] = useState("");
   const [priority, setPriority] = useState(0);
   const [discountedAmount, setDiscountedAmount] = useState("");
+  const [fakePrice, setFakePrice] = useState("");
   const [duration, setDuration] = useState("00:00:00");
   const [time, setTime] = useState({ hh: "", mm: "", ss: "" });
   const [serviceStatus, setServiceStatus] = useState("active");
@@ -38,6 +39,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
         service_for: serviceFor,
         amount,
         discounted_amount: discountedAmount,
+        fake_price: fakePrice || null,
         priority,
         duration,
         status: serviceStatus,
@@ -54,6 +56,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
       setServiceName("");
       setAmount("");
       setDiscountedAmount("");
+      setFakePrice("");
       setPriority(0);
       setDuration("00:00:00");
       setTime({ hh: "", mm: "", ss: "" });
@@ -200,6 +203,22 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
                 className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
               />
             </div>
+          </div>
+
+          {/* Fake Price */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-600">
+              Fake Price (optional)
+            </label>
+            <p className="text-xs text-gray-400">
+              Display-only marketing price shown to customers (e.g. an inflated "was" price). Does not affect billing.
+            </p>
+            <input
+              type="number"
+              value={fakePrice}
+              onChange={(e) => setFakePrice(e.target.value)}
+              className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
+            />
           </div>
 
           {/* Booking Discount Tiers */}
