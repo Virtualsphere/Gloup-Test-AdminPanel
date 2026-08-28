@@ -1853,6 +1853,7 @@ const PartnerDetails = ({ title }) => {
                           <th className="px-4 py-3 text-left border-b">Payin</th>
                           <th className="px-4 py-3 text-left border-b">CAC</th>
                           <th className="px-4 py-3 text-left border-b">Payout</th>
+                          <th className="px-4 py-3 text-left border-b">Fake Price</th>
                           <th className="px-4 py-3 text-left border-b">Duration</th>
                           <th className="px-4 py-3 text-left border-b">Action</th>
                         </tr>
@@ -1910,9 +1911,14 @@ const PartnerDetails = ({ title }) => {
                             <td className="border-x border-neutral-200 px-4 py-3">{item.service_name}</td>
                             <td className="border-x border-neutral-200 px-4 py-3">₹{item.discounted_amount}</td>
                             <td className="border-x border-neutral-200 px-4 py-3">
-                              ₹{(Number(item.amount || 0) - Number(item.discounted_amount || 0)).toFixed(2)}
+                              {isImportant
+                                ? "—"
+                                : `₹${(Number(item.amount || 0) - Number(item.discounted_amount || 0)).toFixed(2)}`}
                             </td>
                             <td className="border-x border-neutral-200 px-4 py-3">₹{item.amount}</td>
+                            <td className="border-x border-neutral-200 px-4 py-3">
+                              {item.fake_price ? `₹${item.fake_price}` : "—"}
+                            </td>
                             <td className="border-x border-neutral-200 px-4 py-3">{item.duration}</td>
                             <td className="border-x border-neutral-200 px-4 py-3">
                               <button

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { FileSpreadsheet, Image as ImageIcon, X, Send, CheckCircle2, AlertTriangle } from "lucide-react";
+import { FileSpreadsheet, Image as ImageIcon, Video as VideoIcon, X, Send, CheckCircle2, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   sendMarketingWhatsapp,
   resetMarketingState,
 } from "../../redux/slices/marketingSlice";
+import MarketingVideo from "./MarketingVideo";
 
 const GENDER_OPTIONS = [
   { value: "all", label: "Everyone" },
@@ -13,7 +14,7 @@ const GENDER_OPTIONS = [
   { value: "female", label: "Female only" },
 ];
 
-const Marketing = () => {
+const MarketingImage = () => {
   const dispatch = useDispatch();
   const { loading, result } = useSelector((state) => state.marketing);
 
@@ -91,7 +92,7 @@ const Marketing = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-10 px-4 space-y-6">
+    <div className="max-w-3xl mx-auto pt-6 pb-10 px-4 space-y-6">
 
       {/* Header */}
       <div>
@@ -341,5 +342,42 @@ const SummaryStat = ({ label, value }) => (
     <div className="text-xs text-gray-500 mt-1">{label}</div>
   </div>
 );
+
+const Marketing = () => {
+  const [tab, setTab] = useState("image");
+
+  return (
+    <div>
+      <div className="max-w-3xl mx-auto pt-10 px-4">
+        <div className="inline-flex text-sm rounded-lg border border-gray-300 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setTab("image")}
+            className={`flex items-center gap-1.5 px-4 py-2 transition ${tab === "image"
+              ? "bg-black text-white"
+              : "bg-white text-gray-500 hover:bg-gray-50"
+              }`}
+          >
+            <ImageIcon size={15} />
+            Image
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("video")}
+            className={`flex items-center gap-1.5 px-4 py-2 transition ${tab === "video"
+              ? "bg-black text-white"
+              : "bg-white text-gray-500 hover:bg-gray-50"
+              }`}
+          >
+            <VideoIcon size={15} />
+            Video
+          </button>
+        </div>
+      </div>
+
+      {tab === "image" ? <MarketingImage /> : <MarketingVideo />}
+    </div>
+  );
+};
 
 export default Marketing;
