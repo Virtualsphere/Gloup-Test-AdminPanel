@@ -14,11 +14,23 @@ import {
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { getVerifiedPartnersList } from "../../redux/slices/partnersSlice";
 
 
 const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const pendingPartnerCount = useSelector(
+    (state) => state.allPartners.verifiedPartners?.length || 0
+  );
+
+  useEffect(() => {
+    dispatch(getVerifiedPartnersList());
+  }, [dispatch]);
 
   const menuItems = [
     { path: "/", icon: <BarChart size={18} />, text: "Dashboard" },
@@ -119,8 +131,19 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
 
               {/* Text */}
               {!collapsed && (
-                <span className="ml-3 text-sm font-medium">
+                <span className="ml-3 text-sm font-medium flex-1 text-left">
                   {item.text}
+                </span>
+              )}
+
+              {/* Pending count badge */}
+              {item.path === "/verifypartner" && pendingPartnerCount > 0 && (
+                <span
+                  className={`flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold ${
+                    collapsed ? "absolute -top-1 -right-1" : "ml-2"
+                  }`}
+                >
+                  {pendingPartnerCount > 99 ? "99+" : pendingPartnerCount}
                 </span>
               )}
             </button>

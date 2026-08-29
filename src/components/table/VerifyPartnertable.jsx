@@ -4,7 +4,7 @@ import {
   EyeOff, ChevronDown, ArrowUp, ArrowDown
 } from "lucide-react";
 import moment from "moment";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { updateMultiplePartner, getVerifiedPartnersList } from "../../redux/slices/partnersSlice";
 import { Toaster, toast } from "react-hot-toast";
@@ -12,6 +12,7 @@ import { Toaster, toast } from "react-hot-toast";
 const VerifyPartnerTable = ({ data, title }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tableRef = useRef(null);
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
@@ -38,7 +39,19 @@ const VerifyPartnerTable = ({ data, title }) => {
   const [sortDirection, setSortDirection] = useState("asc");
   const [showColumnToggle, setShowColumnToggle] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  // Page number lives in the URL so it survives navigating to a partner's
+  // details page and back (instead of resetting to page 1 on remount).
+  const currentPage = Number(searchParams.get("page")) || 1;
+  const setCurrentPage = (updater) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      const newPage =
+        typeof updater === "function" ? updater(currentPage) : updater;
+      if (newPage <= 1) next.delete("page");
+      else next.set("page", String(newPage));
+      return next;
+    });
+  };
   const itemsPerPage = 10;
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
