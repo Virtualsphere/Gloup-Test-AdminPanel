@@ -608,7 +608,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
                 Salon Location
               </h3>
 
-              <div className="rounded-xl overflow-hidden border border-gray-300 h-72">
+              <div className="rounded-xl overflow-hidden border border-gray-300 h-[550px]">
                 <MapPicker
                   defaultLocation={
                     form.latitude && form.longitude
@@ -617,6 +617,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
                   }
                   onSelectLocation={handleLocationSelect}
                   editable
+                  height="550px"
                 />
               </div>
 
@@ -1622,8 +1623,8 @@ const PartnerDetails = ({ title }) => {
                     </p>
                   </div>
 
-                  <div className="rounded-lg overflow-hidden border h-64">
-                    <MapPicker defaultLocation={location} editable={false} />
+                  <div className="rounded-lg overflow-hidden border h-[450px]">
+                    <MapPicker defaultLocation={location} editable={false} height="450px" />
                   </div>
                 </div>
               </div>
