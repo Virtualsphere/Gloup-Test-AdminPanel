@@ -15,7 +15,7 @@ const Notification = ({ title }) => {
   const dispatch = useDispatch();
 
   const [data, setData] = useState([]);
-  const [activeTab, setActiveTab] = useState("table");
+  const [activeTab, setActiveTab] = useState("form");
 
   const [formData, setFormData] = useState({
     id: null,
