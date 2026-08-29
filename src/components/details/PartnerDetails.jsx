@@ -15,7 +15,7 @@ import { Plus } from "lucide-react";
 import EditServiceModal from "../create/EditService";
 import BulkUploadServiceModal from "../create/BulkUploadServiceModal";
 import { getImageUrl } from "../../utils/image";
-import { fetchServiceCategories, deleteService, updateServiceImportant } from "../../redux/slices/partnersSlice";
+import { fetchServiceCategories, deleteService, updateServiceImportant, updateServiceAmount } from "../../redux/slices/partnersSlice";
 import PartnerHolidaysPanel from "./PartnerHolidaysPanel";
 
 const useDragAndDrop = () => {
@@ -608,7 +608,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
                 Salon Location
               </h3>
 
-              <div className="rounded-xl overflow-hidden border border-gray-300 h-72">
+              <div className="rounded-xl overflow-hidden border border-gray-300 h-[550px]">
                 <MapPicker
                   defaultLocation={
                     form.latitude && form.longitude
@@ -617,6 +617,7 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
                   }
                   onSelectLocation={handleLocationSelect}
                   editable
+                  height="550px"
                 />
               </div>
 
@@ -889,6 +890,53 @@ const PartnerDetails = ({ title }) => {
         prev.map(s => (s.id === service.id ? { ...s, important: service.important } : s))
       );
       alert(error || "Failed to update service. Please try again.");
+    }
+  };
+
+  const [editingAmountId, setEditingAmountId] = useState(null);
+  const [amountDraft, setAmountDraft] = useState("");
+
+  const startEditingAmount = (service) => {
+    setEditingAmountId(service.id);
+    setAmountDraft(String(service.amount ?? ""));
+  };
+
+  const cancelEditingAmount = () => {
+    setEditingAmountId(null);
+    setAmountDraft("");
+  };
+
+  const handleSaveAmount = async (service) => {
+    const newAmount = Number(amountDraft);
+
+    if (amountDraft === "" || isNaN(newAmount)) {
+      cancelEditingAmount();
+      return;
+    }
+    if (newAmount === Number(service.amount)) {
+      cancelEditingAmount();
+      return;
+    }
+
+    const previousAmount = service.amount;
+
+    // Optimistic update so the list responds immediately
+    setServicesData(prev =>
+      prev.map(s => (s.id === service.id ? { ...s, amount: newAmount } : s))
+    );
+    cancelEditingAmount();
+
+    try {
+      await dispatch(
+        updateServiceAmount({ id: service.id, amount: newAmount })
+      ).unwrap();
+    } catch (error) {
+      console.error("Update service amount error:", error);
+      // Revert on failure
+      setServicesData(prev =>
+        prev.map(s => (s.id === service.id ? { ...s, amount: previousAmount } : s))
+      );
+      alert(error || "Failed to update service amount. Please try again.");
     }
   };
 
@@ -1622,8 +1670,8 @@ const PartnerDetails = ({ title }) => {
                     </p>
                   </div>
 
-                  <div className="rounded-lg overflow-hidden border h-64">
-                    <MapPicker defaultLocation={location} editable={false} />
+                  <div className="rounded-lg overflow-hidden border h-[450px]">
+                    <MapPicker defaultLocation={location} editable={false} height="450px" />
                   </div>
                 </div>
               </div>
@@ -1915,7 +1963,31 @@ const PartnerDetails = ({ title }) => {
                                 ? "—"
                                 : `₹${(Number(item.amount || 0) - Number(item.discounted_amount || 0)).toFixed(2)}`}
                             </td>
-                            <td className="border-x border-neutral-200 px-4 py-3">₹{item.amount}</td>
+                            <td
+                              className="border-x border-neutral-200 px-4 py-3"
+                              onClick={(e) => e.stopPropagation()}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                startEditingAmount(item);
+                              }}
+                            >
+                              {editingAmountId === item.id ? (
+                                <input
+                                  type="number"
+                                  autoFocus
+                                  value={amountDraft}
+                                  onChange={(e) => setAmountDraft(e.target.value)}
+                                  onBlur={() => handleSaveAmount(item)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") e.target.blur();
+                                    if (e.key === "Escape") cancelEditingAmount();
+                                  }}
+                                  className="w-24 border border-blue-400 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              ) : (
+                                <span title="Double-click to edit">₹{item.amount}</span>
+                              )}
+                            </td>
                             <td className="border-x border-neutral-200 px-4 py-3">
                               {item.fake_price ? `₹${item.fake_price}` : "—"}
                             </td>

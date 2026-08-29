@@ -7,11 +7,6 @@ import {
 } from "@react-google-maps/api";
 import { useState, useCallback, useEffect } from "react";
 
-const containerStyle = {
-  width: "100%",
-  height: "400px",
-};
-
 const LIBRARIES = ["places"];
 
 const fallbackCenter = { lat: 13.0724, lng: 80.2460 };
@@ -21,7 +16,12 @@ export default function MapPicker({
   radiusKm = 0,
   onSelectLocation,
   editable = true,
+  height = "400px",
 }) {
+  const containerStyle = {
+    width: "100%",
+    height,
+  };
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
     libraries: LIBRARIES,
