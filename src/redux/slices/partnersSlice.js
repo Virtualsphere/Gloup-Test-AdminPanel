@@ -169,6 +169,26 @@ export const updateServiceImportant = createAsyncThunk(
   }
 );
 
+export const updateServiceAmount = createAsyncThunk(
+  "allPartners/updateServiceAmount",
+  async ({ id, amount }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/updateserviceamount",
+        { id, amount },
+        { withCredentials: false }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to update service amount";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const deleteService = createAsyncThunk(
   "allPartners/deleteService",
   async(serviceId, {rejectWithValue}) => {
