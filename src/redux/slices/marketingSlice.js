@@ -49,6 +49,30 @@ export const sendVideoMarketingWhatsapp = createAsyncThunk(
   }
 );
 
+// Send marketing SMS broadcast (fixed, DLT-approved templates)
+export const sendMarketingSMS = createAsyncThunk(
+  "marketing/sendMarketingSMS",
+  async (formData, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/sendmarketingsms",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          withCredentials: false,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to send marketing SMS";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 const initialState = {
   loading: false,
   error: null,
@@ -59,6 +83,11 @@ const initialState = {
   videoError: null,
   videoSuccess: false,
   videoResult: null,
+
+  smsLoading: false,
+  smsError: null,
+  smsSuccess: false,
+  smsResult: null,
 };
 
 const marketingSlice = createSlice({
@@ -76,6 +105,12 @@ const marketingSlice = createSlice({
       state.videoError = null;
       state.videoSuccess = false;
       state.videoResult = null;
+    },
+    resetSMSMarketingState(state) {
+      state.smsLoading = false;
+      state.smsError = null;
+      state.smsSuccess = false;
+      state.smsResult = null;
     },
   },
   extraReducers: (builder) => {
@@ -110,9 +145,25 @@ const marketingSlice = createSlice({
         state.videoLoading = false;
         state.videoError = action.payload || "Failed to send video marketing broadcast";
         state.videoSuccess = false;
+      })
+
+      .addCase(sendMarketingSMS.pending, (state) => {
+        state.smsLoading = true;
+        state.smsError = null;
+        state.smsSuccess = false;
+      })
+      .addCase(sendMarketingSMS.fulfilled, (state, action) => {
+        state.smsLoading = false;
+        state.smsResult = action.payload;
+        state.smsSuccess = true;
+      })
+      .addCase(sendMarketingSMS.rejected, (state, action) => {
+        state.smsLoading = false;
+        state.smsError = action.payload || "Failed to send marketing SMS";
+        state.smsSuccess = false;
       });
   },
 });
 
-export const { resetMarketingState, resetVideoMarketingState } = marketingSlice.actions;
+export const { resetMarketingState, resetVideoMarketingState, resetSMSMarketingState } = marketingSlice.actions;
 export default marketingSlice.reducer;

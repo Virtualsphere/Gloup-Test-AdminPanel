@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { FileSpreadsheet, Image as ImageIcon, Video as VideoIcon, X, Send, CheckCircle2, AlertTriangle } from "lucide-react";
+import { FileSpreadsheet, Image as ImageIcon, Video as VideoIcon, MessageSquare, X, Send, CheckCircle2, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   sendMarketingWhatsapp,
   resetMarketingState,
 } from "../../redux/slices/marketingSlice";
 import MarketingVideo from "./MarketingVideo";
+import MarketingSMS from "./MarketingSMS";
 
 const GENDER_OPTIONS = [
   { value: "all", label: "Everyone" },
@@ -372,10 +373,27 @@ const Marketing = () => {
             <VideoIcon size={15} />
             Video
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("sms")}
+            className={`flex items-center gap-1.5 px-4 py-2 transition ${tab === "sms"
+              ? "bg-black text-white"
+              : "bg-white text-gray-500 hover:bg-gray-50"
+              }`}
+          >
+            <MessageSquare size={15} />
+            SMS
+          </button>
         </div>
       </div>
 
-      {tab === "image" ? <MarketingImage /> : <MarketingVideo />}
+      {tab === "image" ? (
+        <MarketingImage />
+      ) : tab === "video" ? (
+        <MarketingVideo />
+      ) : (
+        <MarketingSMS />
+      )}
     </div>
   );
 };
