@@ -6,7 +6,8 @@ import { toast } from "react-hot-toast";
 import {
   getAllNotificationList,
   addNotification,
-  getNotificationById
+  getNotificationById,
+  getLoyaltyStatusCounts,
 } from "../../redux/slices/notificationSlice";
 import { getAllPartnersList } from "../../redux/slices/partnersSlice";
 
@@ -23,6 +24,7 @@ const Notification = ({ title }) => {
     sent_to: "",
     title: "",
     description: "",
+    loyalty_status: "",
   });
 
   const {
@@ -30,7 +32,8 @@ const Notification = ({ title }) => {
     loading,
     error,
     selectedNotification,
-    notificationReport
+    notificationReport,
+    loyaltyCounts,
   } = useSelector((state) => state.allNotification);
 
   const partnerOptions = useSelector(
@@ -50,6 +53,7 @@ const Notification = ({ title }) => {
   useEffect(() => {
     dispatch(getAllNotificationList());
     dispatch(getAllPartnersList());
+    dispatch(getLoyaltyStatusCounts());
   }, [dispatch]);
 
   useEffect(() => {
@@ -67,6 +71,7 @@ const Notification = ({ title }) => {
         sent_to: selectedNotification.sent_to || "",
         title: selectedNotification.title || "",
         description: selectedNotification.description || "",
+        loyalty_status: selectedNotification.loyalty_status || "",
       });
     }
   }, [selectedNotification]);
@@ -76,11 +81,18 @@ const Notification = ({ title }) => {
     const resultAction = await dispatch(addNotification(finaldata));
 
     if (addNotification.fulfilled.match(resultAction)) {
-      toast.success("Notification added!");
+      const payload = resultAction.payload;
+      const recipientHint =
+        payload?.recipients?.users != null
+          ? ` (${payload.recipients.users} user${
+              payload.recipients.users === 1 ? "" : "s"
+            })`
+          : "";
+      toast.success(`Notification sent${recipientHint}!`);
       dispatch(getAllNotificationList());
       setActiveTab("table");
     } else {
-      toast.error("Failed to add notification.");
+      toast.error(resultAction.payload || "Failed to add notification.");
     }
   };
 
@@ -107,6 +119,7 @@ const Notification = ({ title }) => {
       sent_to: "",
       title: "",
       description: "",
+      loyalty_status: "",
     });
 
     dispatch({ type: "allNotification/clearSelectedNotification" });
@@ -161,9 +174,11 @@ const Notification = ({ title }) => {
               {/* FORM CARD */}
               <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow duration-300">
                 <NotificationForm
+                  key={formData.id || "new"}
                   defaultValues={formData}
                   partnerOptions={formattedPartnerOptions}
-                  onSubmit={formData.id ? handleAddData : handleAddData}
+                  loyaltyCounts={loyaltyCounts}
+                  onSubmit={handleAddData}
                   onCancel={() => {
                     clearForm();
                     setActiveTab("table");

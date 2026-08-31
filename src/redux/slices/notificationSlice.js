@@ -1,4 +1,3 @@
-
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api";
 
@@ -26,12 +25,45 @@ export const getAllNotificationList = createAsyncThunk(
   }
 );
 
+export const getLoyaltyStatusCounts = createAsyncThunk(
+  "allNotification/getLoyaltyStatusCounts",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/getloyaltystatuscounts",
+        {},
+        {
+          headers: { "Content-Type": "application/json" },
+          withCredentials: false,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch loyalty counts";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // add notification (JSON or multipart when image file is attached)
 export const addNotification = createAsyncThunk(
   "allNotification/addNotification",
   async (notificationData, { rejectWithValue }) => {
     try {
-      const { imageFile, id, ...fields } = notificationData || {};
+      const { imageFile, id, ...rest } = notificationData || {};
+      const fields = { ...rest };
+
+      // Normalize loyalty_status to comma-separated string for FormData + JSON
+      if (Array.isArray(fields.loyalty_status)) {
+        fields.loyalty_status = fields.loyalty_status.filter(Boolean).join(",");
+      }
+      if (!fields.loyalty_status) {
+        delete fields.loyalty_status;
+      }
+
       let payload = fields;
       let headers = {
         "Content-Type": "application/json",
@@ -94,6 +126,8 @@ const initialState = {
   success: false,
   allNotificationList: [],
   notificationById: null,
+  loyaltyCounts: null,
+  loyaltyCountsLoading: false,
 };
 
 const allNotificationSlice = createSlice({
@@ -106,6 +140,7 @@ const allNotificationSlice = createSlice({
       state.success = false;
       state.allNotificationList = [];
       state.notificationById = null;
+      state.loyaltyCounts = null;
     },
     clearSelectedNotification: (state) => {
       state.selectedNotification = null;
@@ -127,6 +162,17 @@ const allNotificationSlice = createSlice({
       .addCase(getAllNotificationList.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to fetch allNotification";
+      })
+
+      .addCase(getLoyaltyStatusCounts.pending, (state) => {
+        state.loyaltyCountsLoading = true;
+      })
+      .addCase(getLoyaltyStatusCounts.fulfilled, (state, action) => {
+        state.loyaltyCountsLoading = false;
+        state.loyaltyCounts = action.payload;
+      })
+      .addCase(getLoyaltyStatusCounts.rejected, (state) => {
+        state.loyaltyCountsLoading = false;
       })
 
       // add notification

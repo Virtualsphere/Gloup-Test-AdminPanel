@@ -256,6 +256,12 @@ const formatDOB = (dob) =>
           <span className="font-medium capitalize">{user.gender || "--"}</span>
         </div>
         <div>
+          <span className="text-gray-500">Loyalty:</span>{" "}
+          <span className="font-medium capitalize">
+            {(user.loyalty_status || "--").replace(/_/g, " ")}
+          </span>
+        </div>
+        <div>
           <span className="text-gray-500">DOB 🎂:</span>{" "}
           <span className="font-medium">{formatDOB(user.date_of_birth)}</span>
         </div>
