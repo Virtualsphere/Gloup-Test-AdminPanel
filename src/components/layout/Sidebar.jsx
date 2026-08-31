@@ -11,6 +11,7 @@ import {
   Ticket,
   FileText,
   Receipt,
+  PieChart,
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -51,6 +52,7 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/marketing", icon: <Star size={18} />, text: "Marketing" },
     { path: "/notification", icon: <Bell size={18} />, text: "Notification" },
     { path: "/allusers", icon: <User size={18} />, text: "Users" },
+    { path: "/gender-probability", icon: <PieChart size={18} />, text: "Gender Probability" },
   ];
 
   return (

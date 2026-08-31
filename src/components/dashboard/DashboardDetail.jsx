@@ -23,6 +23,7 @@ import {
   Phone,
   UserCheck,
   TrendingDown,
+  UserPlus,
 } from "lucide-react";
 import { FaRegMoneyBillAlt, FaMale, FaFemale } from "react-icons/fa";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -418,6 +419,13 @@ const DashboardDetail = ({ data }) => {
             value={data?.total_users || 0}
             icon={Users}
             color="#F43F5E"
+            onpress={() => navigate("/allusers")}
+          />
+          <MetricCard
+            title="First-Time Bookers"
+            value={data?.first_booking_users || 0}
+            icon={UserPlus}
+            color="#8B5CF6"
             onpress={() => navigate("/allusers")}
           />
           <MetricCard
