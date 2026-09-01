@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import moment from "moment";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import { Toaster, toast } from "react-hot-toast";
 import { showToast } from "../../utils/toast";
 import UsersTable from "../table/UsersTable";
@@ -9,6 +10,8 @@ import { getAllUsersList } from "../../redux/slices/allUsersSlice";
 const AllUsers = ({ title }) => {
   const [data, setData] = useState([]);
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const minBookings = searchParams.get("min_bookings");
   // Form data state
   const [formData, setFormData] = useState({
     id: null,
@@ -29,8 +32,8 @@ const AllUsers = ({ title }) => {
 
   
   useEffect(() => {
-    dispatch(getAllUsersList());
-  }, [dispatch]);
+    dispatch(getAllUsersList({ min_bookings: minBookings }));
+  }, [dispatch, minBookings]);
 
   useEffect(() => {
     if (allUsersValue) {
