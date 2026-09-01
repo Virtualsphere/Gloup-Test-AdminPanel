@@ -6,9 +6,13 @@ import api from "../../utils/api";
 // get AllUsers
 export const getAllUsersList = createAsyncThunk(
   "allUsers/getAllUsersList",
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await api.post("/admin/app/getallusers", {},{
+      const body = {};
+      if (params?.min_bookings != null && params.min_bookings !== "") {
+        body.min_bookings = params.min_bookings;
+      }
+      const response = await api.post("/admin/app/getallusers", body,{
         headers: {
           "Content-Type": "application/json", // optional in GET, but included here per request
         },

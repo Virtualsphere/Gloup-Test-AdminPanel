@@ -31,6 +31,7 @@ import { Autoplay } from "swiper/modules";
 import { Link } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/autoplay";
+import CustomerFunnel from "./CustomerFunnel";
 import { useNavigate } from "react-router-dom";
 
 
@@ -399,6 +400,11 @@ const DashboardDetail = ({ data }) => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div>
+        {/* Customer Funnel */}
+        <div className="mb-6">
+          <CustomerFunnel data={data?.customer_funnel} />
+        </div>
+
         {/* Key Metrics */}
        <div className="
   grid grid-cols-1 

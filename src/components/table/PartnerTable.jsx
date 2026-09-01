@@ -124,7 +124,7 @@ const setCurrentPage = (v) => setListField("currentPage", v);
   const [showColumnToggle, setShowColumnToggle] = useState(false);
 
   // New state for pagination page size
-  const [itemsPerPage] = useState(15); // Show 50 items per page
+  const [itemsPerPage] = useState(30); // Show 30 items per page
   const [selectedRows, setSelectedRows] = useState([]);
   const tableRef = useRef(null);
 
@@ -738,7 +738,7 @@ const setCurrentPage = (v) => setListField("currentPage", v);
 
       {viewType === "card" && (
         <div className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {currentItems.map((item) => {
     console.log("item:", item); // ✅ log works
 
@@ -803,7 +803,7 @@ const setCurrentPage = (v) => setListField("currentPage", v);
       
 
         {/* CONTENT */}
-        <div className="p-4 flex flex-col justify-between h-[220px]">
+        <div className="p-4 flex flex-col gap-2">
           <div className="flex justify-between items-center mb-2">
             <h2 className="font-semibold text-gray-800 capitalize truncate">
               {item?.name || "No Name"}
@@ -822,7 +822,7 @@ const setCurrentPage = (v) => setListField("currentPage", v);
             </span>
           </div>
 
-        <div className="p-4 space-y-2">
+        <div className="space-y-1">
             <p className="text-sm text-gray-600">
               <b>Owner:</b> {item?.ownerDetails?.name || "-"}
             </p>
@@ -834,7 +834,7 @@ const setCurrentPage = (v) => setListField("currentPage", v);
             </p>
           </div>
 
-        <div className="flex justify-between items-center px-4 pb-4">
+        <div className="flex justify-between items-center">
         <span className="text-base font-semibold text-gray-800">
           ₹{new Intl.NumberFormat("en-IN").format(item?.totalRevenue || 0)}
         </span>
