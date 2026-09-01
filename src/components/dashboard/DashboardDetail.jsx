@@ -24,6 +24,8 @@ import {
   UserCheck,
   TrendingDown,
   UserPlus,
+  Repeat,
+  Percent,
 } from "lucide-react";
 import { FaRegMoneyBillAlt, FaMale, FaFemale } from "react-icons/fa";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -32,6 +34,9 @@ import { Link } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/autoplay";
 import CustomerFunnel from "./CustomerFunnel";
+import CustomerSegments from "./CustomerSegments";
+import RepeatBookingsChart from "./RepeatBookingsChart";
+import SparklineStatCard from "./SparklineStatCard";
 import { useNavigate } from "react-router-dom";
 
 
@@ -397,15 +402,73 @@ const DashboardDetail = ({ data }) => {
     }
   };
 
+  const repeatRateSeries = (data?.repeat_booking_rate_by_month || []).map((d) => ({
+    month: d.month,
+    value: d.repeat_rate,
+  }));
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div>
-        {/* Customer Funnel */}
-        <div className="mb-6">
-          <CustomerFunnel data={data?.customer_funnel} />
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard Overview 👋</h1>
+            <p className="text-xs sm:text-sm text-gray-500">Track your business performance and customer insights</p>
+          </div>
+          <span className="hidden sm:inline-flex items-center text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
+            This Month
+          </span>
         </div>
 
-        {/* Key Metrics */}
+        {/* Sparkline stat cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+          <SparklineStatCard
+            title="Users"
+            icon={Users}
+            color="#8B5CF6"
+            series={data?.dashboard_trends?.users_by_month}
+          />
+          <SparklineStatCard
+            title="First-Time"
+            icon={UserPlus}
+            color="#3B82F6"
+            series={data?.dashboard_trends?.first_time_by_month}
+          />
+          <SparklineStatCard
+            title="Repeat"
+            icon={Repeat}
+            color="#10B981"
+            series={data?.dashboard_trends?.repeat_by_month}
+          />
+          <SparklineStatCard
+            title="Repeat %"
+            icon={Percent}
+            color="#F59E0B"
+            suffix="%"
+            series={repeatRateSeries}
+          />
+          <SparklineStatCard
+            title="Bookings"
+            icon={CalendarCheck}
+            color="#EF4444"
+            series={data?.dashboard_trends?.bookings_by_month}
+          />
+        </div>
+
+        {/* Funnel + Segments */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6 items-stretch">
+          <CustomerFunnel data={data?.customer_funnel} />
+          <CustomerSegments data={data?.customer_segments} />
+        </div>
+
+        {/* Repeat Bookings by Month */}
+        <div className="mb-6">
+          <RepeatBookingsChart data={data?.repeat_booking_rate_by_month} />
+        </div>
+
+        {/* More Metrics */}
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">More Metrics</h2>
        <div className="
   grid grid-cols-1 
   sm:grid-cols-2 
@@ -498,10 +561,10 @@ const DashboardDetail = ({ data }) => {
           />
           <MetricCard
             title="Top Performing Salon"
-            value={data?.top_salon?.name}
+            value={data?.top_salon?.name || "—"}
             icon={Store}
             color="#3B82F6"
-            subtitle={`₹${(data?.top_salon?.revenue || 0).toLocaleString()}`}
+            subtitle={`${(data?.top_salon?.total_appointments || 0).toLocaleString()} bookings`}
           />
         </div>
       </div>
