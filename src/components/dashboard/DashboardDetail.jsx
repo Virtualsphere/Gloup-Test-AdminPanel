@@ -424,7 +424,7 @@ const DashboardDetail = ({ data }) => {
         {/* Sparkline stat cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           <SparklineStatCard
-            title="Users"
+            title="Active Users"
             icon={Users}
             color="#8B5CF6"
             series={data?.dashboard_trends?.users_by_month}
