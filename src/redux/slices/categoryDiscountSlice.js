@@ -1,12 +1,12 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api";
 
-export const getCategoryDiscounts = createAsyncThunk(
-  "categoryDiscount/getCategoryDiscounts",
+export const getCategoryDiscountOverview = createAsyncThunk(
+  "categoryDiscount/getCategoryDiscountOverview",
   async (_, { rejectWithValue }) => {
     try {
       const response = await api.post(
-        "/admin/app/getcategorydiscounts",
+        "/admin/app/getcategorydiscountoverview",
         {},
         { withCredentials: false }
       );
@@ -15,18 +15,38 @@ export const getCategoryDiscounts = createAsyncThunk(
       const message =
         error.response?.data?.error?.message ||
         error.message ||
-        "Failed to fetch category discounts";
+        "Failed to fetch category discount overview";
       return rejectWithValue(message);
     }
   }
 );
 
-export const setCategoryDiscount = createAsyncThunk(
-  "categoryDiscount/setCategoryDiscount",
+export const getCategoryDiscountHistory = createAsyncThunk(
+  "categoryDiscount/getCategoryDiscountHistory",
+  async ({ category_id }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/getcategorydiscounthistory",
+        { category_id },
+        { withCredentials: false }
+      );
+      return { category_id, history: response.data.data };
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch category discount history";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const addCategoryDiscount = createAsyncThunk(
+  "categoryDiscount/addCategoryDiscount",
   async ({ category_id, discount_percent, starts_at, ends_at }, { rejectWithValue }) => {
     try {
       const response = await api.post(
-        "/admin/app/setcategorydiscount",
+        "/admin/app/addcategorydiscount",
         { category_id, discount_percent, starts_at, ends_at },
         { withCredentials: false }
       );
@@ -35,18 +55,18 @@ export const setCategoryDiscount = createAsyncThunk(
       const message =
         error.response?.data?.error?.message ||
         error.message ||
-        "Failed to set category discount";
+        "Failed to add category discount";
       return rejectWithValue(message);
     }
   }
 );
 
-export const clearCategoryDiscount = createAsyncThunk(
-  "categoryDiscount/clearCategoryDiscount",
+export const endCategoryDiscountNow = createAsyncThunk(
+  "categoryDiscount/endCategoryDiscountNow",
   async ({ category_id }, { rejectWithValue }) => {
     try {
       const response = await api.post(
-        "/admin/app/clearcategorydiscount",
+        "/admin/app/endcategorydiscountnow",
         { category_id },
         { withCredentials: false }
       );
@@ -55,7 +75,27 @@ export const clearCategoryDiscount = createAsyncThunk(
       const message =
         error.response?.data?.error?.message ||
         error.message ||
-        "Failed to clear category discount";
+        "Failed to end category discount";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const cancelScheduledCategoryDiscount = createAsyncThunk(
+  "categoryDiscount/cancelScheduledCategoryDiscount",
+  async ({ id }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/cancelscheduledcategorydiscount",
+        { id },
+        { withCredentials: false }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to cancel scheduled category discount";
       return rejectWithValue(message);
     }
   }
@@ -67,21 +107,35 @@ const categoryDiscountSlice = createSlice({
     categories: [],
     loading: false,
     error: null,
+    // category_id -> array of history rows (with computed `state`)
+    historyByCategory: {},
+    historyLoading: false,
   },
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(getCategoryDiscounts.pending, (state) => {
+      .addCase(getCategoryDiscountOverview.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getCategoryDiscounts.fulfilled, (state, action) => {
+      .addCase(getCategoryDiscountOverview.fulfilled, (state, action) => {
         state.loading = false;
         state.categories = action.payload || [];
       })
-      .addCase(getCategoryDiscounts.rejected, (state, action) => {
+      .addCase(getCategoryDiscountOverview.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || "Failed to fetch category discounts";
+        state.error = action.payload || "Failed to fetch category discount overview";
+      })
+
+      .addCase(getCategoryDiscountHistory.pending, (state) => {
+        state.historyLoading = true;
+      })
+      .addCase(getCategoryDiscountHistory.fulfilled, (state, action) => {
+        state.historyLoading = false;
+        state.historyByCategory[action.payload.category_id] = action.payload.history || [];
+      })
+      .addCase(getCategoryDiscountHistory.rejected, (state) => {
+        state.historyLoading = false;
       });
   },
 });
