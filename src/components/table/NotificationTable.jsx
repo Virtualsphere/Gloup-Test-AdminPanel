@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import moment from "moment";
+import { formatLoyaltyList } from "../../utils/loyalty";
 
 
 
@@ -24,6 +25,7 @@ const NotificationTable = ({ data, title, onEdit, onDelete }) => {
     id: true,
     notification_type: true,
     sent_to: true,
+    loyalty_status: true,
     date: true,
          
   });
@@ -336,6 +338,11 @@ const NotificationTable = ({ data, title, onEdit, onDelete }) => {
                   Sent To
                 </th>
               )}
+              {visibleColumns.loyalty_status && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Loyalty
+                </th>
+              )}
           
               {visibleColumns.date && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -395,6 +402,11 @@ const NotificationTable = ({ data, title, onEdit, onDelete }) => {
 
                   {visibleColumns.sent_to && (
                     <td className="px-6 py-4 capitalize">{item?.sent_to}</td>
+                  )}
+                  {visibleColumns.loyalty_status && (
+                    <td className="px-6 py-4">
+                      {formatLoyaltyList(item?.loyalty_status)}
+                    </td>
                   )}
                   {visibleColumns.date && (
                     <td className="px-6 py-4 capitalize ">

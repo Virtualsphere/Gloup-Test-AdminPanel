@@ -1,6 +1,16 @@
 import { useForm } from "react-hook-form";
 import { Save, X, ImagePlus, Trash2 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
+import { LOYALTY_TIERS } from "../../utils/loyalty";
+
+const parseLoyaltyDefault = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  return String(raw)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
 
 const NotificationForm = ({
   onSubmit,
@@ -8,10 +18,14 @@ const NotificationForm = ({
   defaultValues = {},
   partnerOptions = [],
   report = null,
+  loyaltyCounts = null,
 }) => {
   const fileInputRef = useRef(null);
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(defaultValues.image || "");
+  const [loyaltySelected, setLoyaltySelected] = useState(
+    parseLoyaltyDefault(defaultValues.loyalty_status)
+  );
 
   const {
     register,
@@ -32,15 +46,23 @@ const NotificationForm = ({
   });
 
   const watchType = watch("notification_type");
+  const watchSentTo = watch("sent_to");
   const watchImageUrl = watch("image");
 
   useEffect(() => {
     if (watchType === "subscription") {
       setValue("sent_to", "user");
+      setLoyaltySelected([]);
     } else {
       resetField("sent_to");
     }
   }, [watchType, setValue, resetField]);
+
+  useEffect(() => {
+    if (loyaltySelected.length > 0 && watchSentTo !== "user") {
+      setValue("sent_to", "user");
+    }
+  }, [loyaltySelected, watchSentTo, setValue]);
 
   useEffect(() => {
     return () => {
@@ -59,6 +81,24 @@ const NotificationForm = ({
           { value: "store", label: "Partner" },
         ];
 
+  const showLoyaltyFilter =
+    watchType === "general" &&
+    (watchSentTo === "user" || loyaltySelected.length > 0);
+
+  const toggleLoyalty = (tier) => {
+    setLoyaltySelected((prev) =>
+      prev.includes(tier) ? prev.filter((t) => t !== tier) : [...prev, tier]
+    );
+  };
+
+  const selectedAudienceCount = (() => {
+    if (!loyaltyCounts?.tiers || loyaltySelected.length === 0) return null;
+    return loyaltySelected.reduce(
+      (sum, tier) => sum + (Number(loyaltyCounts.tiers[tier]) || 0),
+      0
+    );
+  })();
+
   const handleFilePick = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -69,7 +109,6 @@ const NotificationForm = ({
       return;
     }
 
-    // ~5MB client-side guard (server also validates)
     if (file.size > 5 * 1024 * 1024) {
       alert("Image must be under 5MB");
       event.target.value = "";
@@ -83,7 +122,6 @@ const NotificationForm = ({
     const objectUrl = URL.createObjectURL(file);
     setImageFile(file);
     setPreviewUrl(objectUrl);
-    // Clear URL field when a device file is chosen
     setValue("image", "");
   };
 
@@ -103,6 +141,10 @@ const NotificationForm = ({
       ...data,
       id: defaultValues.id || null,
       imageFile: imageFile || null,
+      loyalty_status:
+        showLoyaltyFilter && loyaltySelected.length > 0
+          ? loyaltySelected
+          : undefined,
     };
 
     onSubmit(finalData);
@@ -111,6 +153,7 @@ const NotificationForm = ({
     }
     setImageFile(null);
     setPreviewUrl("");
+    setLoyaltySelected([]);
     reset();
   };
 
@@ -125,7 +168,6 @@ const NotificationForm = ({
       onSubmit={handleSubmit(onFormSubmit)}
       className="grid grid-cols-1 md:grid-cols-2 gap-6"
     >
-      {/* Notification Type */}
       <div className="flex flex-col">
         <label className="text-sm font-medium text-gray-700 mb-1">
           Notification Type
@@ -151,7 +193,6 @@ const NotificationForm = ({
         )}
       </div>
 
-      {/* Store ID */}
       {watchType === "subscription" && (
         <div className="flex flex-col">
           <label className="text-sm font-medium text-gray-700 mb-1">
@@ -180,16 +221,16 @@ const NotificationForm = ({
         </div>
       )}
 
-      {/* Sent To */}
       <div className="flex flex-col">
         <label className="text-sm font-medium text-gray-700 mb-1">Sent To</label>
         <select
           {...register("sent_to", { required: "Sent To is required" })}
+          disabled={loyaltySelected.length > 0}
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
             errors.sent_to
               ? "border-red-500 focus:ring-red-500"
               : "border-gray-300 focus:ring-blue-500"
-          }`}
+          } disabled:bg-gray-100`}
         >
           <option value="">Select Sent To</option>
           {sentToOptions.map((option, index) => (
@@ -198,12 +239,71 @@ const NotificationForm = ({
             </option>
           ))}
         </select>
+        {loyaltySelected.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">
+            Loyalty filter targets customers only (Sent To = User).
+          </p>
+        )}
         {errors.sent_to && (
           <p className="text-sm text-red-500 mt-1">{errors.sent_to.message}</p>
         )}
       </div>
 
-      {/* Title */}
+      {showLoyaltyFilter && (
+        <div className="flex flex-col md:col-span-2">
+          <label className="text-sm font-medium text-gray-700 mb-1">
+            Loyalty audience{" "}
+            <span className="text-gray-400 text-xs font-normal">
+              (optional — leave empty to notify all users)
+            </span>
+          </label>
+          <p className="text-xs text-gray-500 mb-3">
+            Based on paid booking count: new → first booking → repeat → loyal →
+            VIP.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+            {LOYALTY_TIERS.map((tier) => {
+              const checked = loyaltySelected.includes(tier.value);
+              const count = loyaltyCounts?.tiers?.[tier.value];
+              return (
+                <label
+                  key={tier.value}
+                  className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                    checked
+                      ? "border-gray-900 bg-gray-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleLoyalty(tier.value)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm font-medium text-gray-800">
+                      {tier.label}
+                    </span>
+                  </span>
+                  <span className="text-xs text-gray-500 pl-6">
+                    {tier.description}
+                    {typeof count === "number" ? ` · ${count} users` : ""}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {selectedAudienceCount != null && (
+            <p className="text-sm text-gray-600 mt-2">
+              Selected audience:{" "}
+              <span className="font-semibold">{selectedAudienceCount}</span>{" "}
+              active user
+              {selectedAudienceCount === 1 ? "" : "s"}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col">
         <label className="text-sm font-medium text-gray-700 mb-1">Title</label>
         <input
@@ -224,7 +324,6 @@ const NotificationForm = ({
         )}
       </div>
 
-      {/* Description */}
       <div className="flex flex-col md:col-span-2">
         <label className="text-sm font-medium text-gray-700 mb-1">
           Description
@@ -249,7 +348,6 @@ const NotificationForm = ({
         )}
       </div>
 
-      {/* Image from device + optional URL */}
       <div className="flex flex-col md:col-span-2 gap-3">
         <label className="text-sm font-medium text-gray-700">
           Notification Image{" "}
@@ -323,7 +421,6 @@ const NotificationForm = ({
         ) : null}
       </div>
 
-      {/* Buttons */}
       <div className="md:col-span-2 flex justify-end gap-3 pt-2">
         <button
           type="button"

@@ -49,6 +49,7 @@ const UsersTable = ({ data, title }) => {
     lastname: true,
     phone: true,
     profilepic: true,
+    loyalty_status: true,
     status: true, // new file column
   });
   const [showColumnToggle, setShowColumnToggle] = useState(false);
@@ -379,6 +380,11 @@ const UsersTable = ({ data, title }) => {
                   Email
                 </th>
               )}
+              {visibleColumns.loyalty_status && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Loyalty
+                </th>
+              )}
 
               {visibleColumns.status && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -435,6 +441,11 @@ const UsersTable = ({ data, title }) => {
                   {visibleColumns.email && (
                     <td className="px-6 py-4 whitespace-nowrap ">
                       {item.email}
+                    </td>
+                  )}
+                  {visibleColumns.loyalty_status && (
+                    <td className="px-6 py-4 whitespace-nowrap capitalize">
+                      {(item.loyalty_status || "—").replace(/_/g, " ")}
                     </td>
                   )}
 

@@ -29,6 +29,7 @@ import monthlyInvoiceReducer from "./slices/monthlyInvoiceSlice";
 import partnerManualSubscriptionReducer from "./slices/partnerManualSubscriptionSlice";
 import listUiStateReducer from "./slices/listUiStateSlice";
 import genderProbabilityReducer from "./slices/genderProbabilitySlice";
+import categoryDiscountReducer from "./slices/categoryDiscountSlice";
 
 const persistConfig = {
   key: "root", // key for localStorage
@@ -61,6 +62,7 @@ const rootReducer = combineReducers({
   partnerManualSubscription: partnerManualSubscriptionReducer,
   listUiState: listUiStateReducer,
   genderProbability: genderProbabilityReducer,
+  categoryDiscount: categoryDiscountReducer,
 });
 
 // Wrap the rootReducer with persistReducer
