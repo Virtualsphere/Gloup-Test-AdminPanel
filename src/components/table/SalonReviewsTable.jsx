@@ -63,6 +63,16 @@ const SalonReviewsTable = ({ reviews = [], summaries = [] }) => {
   const [storeFilter, setStoreFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [expandedReviewIds, setExpandedReviewIds] = useState(() => new Set());
+
+  const toggleReviewExpanded = (id) => {
+    setExpandedReviewIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const filteredData = reviews.filter((item) => {
     const matchesStatus =
@@ -210,10 +220,20 @@ const SalonReviewsTable = ({ reviews = [], summaries = [] }) => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StarRating rating={item.rating} />
                   </td>
-                  <td className="px-6 py-4 max-w-xs">
-                    <p className="text-sm text-gray-700 truncate">
-                      {item.review_description || "—"}
-                    </p>
+                  <td className="px-6 py-4 max-w-md">
+                    {item.review_description ? (
+                      <p
+                        onClick={() => toggleReviewExpanded(item.review_id)}
+                        className={`text-sm text-gray-700 whitespace-normal break-words cursor-pointer hover:text-gray-900 ${
+                          expandedReviewIds.has(item.review_id) ? "" : "line-clamp-2"
+                        }`}
+                        title={expandedReviewIds.has(item.review_id) ? "Click to collapse" : "Click to expand"}
+                      >
+                        {item.review_description}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-700">—</p>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
