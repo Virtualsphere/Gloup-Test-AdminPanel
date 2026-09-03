@@ -88,6 +88,16 @@ const ReviewTable = ({ data, title, onRefresh }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10); // Show 5 items per page
   const tableRef = useRef(null);
+  const [expandedReviewIds, setExpandedReviewIds] = useState(() => new Set());
+
+  const toggleReviewExpanded = (id) => {
+    setExpandedReviewIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Get unique departments and statuses for filter dropdowns
 
@@ -493,7 +503,19 @@ const ReviewTable = ({ data, title, onRefresh }) => {
                   )}
                   {visibleColumns.review_description && (
                     <td className="px-6 py-4 capitalize max-w-md whitespace-normal break-words">
-                      {item?.review_description || "—"}
+                      {item?.review_description ? (
+                        <p
+                          onClick={() => toggleReviewExpanded(item.id)}
+                          className={`cursor-pointer hover:text-gray-900 ${
+                            expandedReviewIds.has(item.id) ? "" : "line-clamp-2"
+                          }`}
+                          title={expandedReviewIds.has(item.id) ? "Click to collapse" : "Click to expand"}
+                        >
+                          {item.review_description}
+                        </p>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   )}
                   {visibleColumns.reason && (
