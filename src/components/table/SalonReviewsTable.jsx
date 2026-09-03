@@ -210,8 +210,8 @@ const SalonReviewsTable = ({ reviews = [], summaries = [] }) => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StarRating rating={item.rating} />
                   </td>
-                  <td className="px-6 py-4 max-w-xs">
-                    <p className="text-sm text-gray-700 truncate">
+                  <td className="px-6 py-4 max-w-md">
+                    <p className="text-sm text-gray-700 whitespace-normal break-words">
                       {item.review_description || "—"}
                     </p>
                   </td>

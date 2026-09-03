@@ -492,7 +492,7 @@ const ReviewTable = ({ data, title, onRefresh }) => {
                     </td>
                   )}
                   {visibleColumns.review_description && (
-                    <td className="px-6 py-4 whitespace-nowrap capitalize max-w-xs truncate">
+                    <td className="px-6 py-4 capitalize max-w-md whitespace-normal break-words">
                       {item?.review_description || "—"}
                     </td>
                   )}
