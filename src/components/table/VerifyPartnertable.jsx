@@ -35,8 +35,8 @@ const VerifyPartnerTable = ({ data, title }) => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [remarks, setRemarks] = useState("");
 
-  const [sortField, setSortField] = useState("name");
-  const [sortDirection, setSortDirection] = useState("asc");
+  const [sortField, setSortField] = useState("createdAt");
+  const [sortDirection, setSortDirection] = useState("desc");
   const [showColumnToggle, setShowColumnToggle] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
   // Page number lives in the URL so it survives navigating to a partner's

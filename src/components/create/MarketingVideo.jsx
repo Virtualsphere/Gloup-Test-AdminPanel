@@ -20,12 +20,18 @@ const MarketingVideo = () => {
     if (file) setExcelFile(file);
   };
 
+  const MAX_VIDEO_SIZE = 16 * 1024 * 1024;
+
   const handleVideoChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setVideoFile(file);
-      setVideoPreview(URL.createObjectURL(file));
+    if (!file) return;
+    if (file.size > MAX_VIDEO_SIZE) {
+      toast.error("Video must be under 16MB — that's WhatsApp's own limit for video messages");
+      e.target.value = "";
+      return;
     }
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
   };
 
   const resetForm = () => {
