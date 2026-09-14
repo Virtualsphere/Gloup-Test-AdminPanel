@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
+import toast from "react-hot-toast";
+import { updateDashboardDataStartDate, getDashboard } from "../../redux/slices/dashboardSlice";
 import {
   BarChart,
   Bar,
@@ -53,6 +56,34 @@ const COLORS = [
 const DashboardDetail = ({ data }) => {
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // Revenue/sales-count cutoff date (client's "go live" date) — editable here
+  const [editingCutoff, setEditingCutoff] = useState(false);
+  const [cutoffInput, setCutoffInput] = useState("");
+  const [savingCutoff, setSavingCutoff] = useState(false);
+
+  const dataStartDate = data?.dashboard_data_start_date || null;
+
+  const openCutoffEditor = () => {
+    setCutoffInput(dataStartDate || "");
+    setEditingCutoff(true);
+  };
+
+  const saveCutoff = async () => {
+    setSavingCutoff(true);
+    try {
+      await dispatch(updateDashboardDataStartDate(cutoffInput || null)).unwrap();
+      toast.success(cutoffInput ? `Dashboard now counts data from ${cutoffInput}` : "Dashboard cutoff cleared — showing all-time data");
+      setEditingCutoff(false);
+      dispatch(getDashboard());
+    } catch (error) {
+      toast.error(error?.message || error || "Failed to update cutoff date");
+    } finally {
+      setSavingCutoff(false);
+    }
+  };
+
   // Chart State
   const [viewType, setViewType] = useState("monthly");
   const [selectedMetric, setSelectedMetric] = useState("revenue");
@@ -416,9 +447,40 @@ const DashboardDetail = ({ data }) => {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard Overview 👋</h1>
             <p className="text-xs sm:text-sm text-gray-500">Track your business performance and customer insights</p>
           </div>
-          <span className="hidden sm:inline-flex items-center text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
-            This Month
-          </span>
+          {editingCutoff ? (
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+              <input
+                type="date"
+                value={cutoffInput}
+                onChange={(e) => setCutoffInput(e.target.value)}
+                className="text-xs text-gray-700 border-none focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={saveCutoff}
+                disabled={savingCutoff}
+                className="text-xs font-medium text-white bg-black rounded-md px-2 py-1 disabled:opacity-50"
+              >
+                {savingCutoff ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingCutoff(false)}
+                className="text-xs font-medium text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openCutoffEditor}
+              title="Click to change the cutoff date"
+              className="hidden sm:inline-flex items-center text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50"
+            >
+              {dataStartDate ? `Data since ${dataStartDate}` : "All-time data"}
+            </button>
+          )}
         </div>
 
         {/* Sparkline stat cards */}
