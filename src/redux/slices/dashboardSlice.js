@@ -45,6 +45,32 @@ export const getDashboard = createAsyncThunk(
   }
 );
 
+// update the dashboard's revenue/sales cutoff date (dashboard.data_start_date)
+export const updateDashboardDataStartDate = createAsyncThunk(
+  "dashboard/updateDashboardDataStartDate",
+  async (dashboard_data_start_date, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        "/admin/app/updatedashboarddatastartdate",
+        { dashboard_data_start_date },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: false,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to update dashboard data start date";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // get monthly reports
 export const getMonthlyReports = createAsyncThunk(
   "dashboard/getMonthlyReports",
@@ -679,6 +705,13 @@ const dashboardSlice = createSlice({
       .addCase(getStoresByDate.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to fetch stores by date";
+      })
+      // Update dashboard data start date
+      .addCase(updateDashboardDataStartDate.fulfilled, (state, action) => {
+        state.dashboardList = {
+          ...state.dashboardList,
+          dashboard_data_start_date: action.payload?.dashboard_data_start_date ?? null,
+        };
       });
   },
 });
