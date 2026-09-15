@@ -38,6 +38,7 @@ const InvoiceDetails = lazy(() => import("../components/details/InvoiceDetails")
 const PartnerManualSubscriptions = lazy(() => import("../components/data/PartnerManualSubscriptions"));
 const GenderProbability = lazy(() => import("../components/data/GenderProbability"));
 const CategoryDiscount = lazy(() => import("../components/data/CategoryDiscount"));
+const AnalyticsIntelligence = lazy(() => import("../components/analytics/AnalyticsIntelligence"));
 
 const AppRoutes = () => {
   return (
@@ -50,6 +51,7 @@ const AppRoutes = () => {
     >
       <Routes>
         <Route path="/" element={<DashboardPage title="DashboardPage" />} />
+        <Route path="/analytics-intelligence" element={<AnalyticsIntelligence title="Analytics Intelligence" />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin title="Admin" />} />
         <Route path="/allusers" element={<AllUsers title="Users"/>} />
