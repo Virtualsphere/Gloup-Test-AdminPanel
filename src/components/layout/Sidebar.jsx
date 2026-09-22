@@ -13,6 +13,7 @@ import {
   Receipt,
   PieChart,
   Percent,
+  Sparkles,
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -36,6 +37,7 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
 
   const menuItems = [
     { path: "/", icon: <BarChart size={18} />, text: "Dashboard" },
+    { path: "/analytics-intelligence", icon: <Sparkles size={18} />, text: "Analytics Intelligence" },
     { path: "/partner", icon: <Handshake size={18} />, text: "Partners" },
     { path: "/verifypartner", icon: <User size={18} />, text: "Verify Partner" },
     { path: "/partnersubscriptionplans", icon: <CreditCard size={18} />, text: "Plans" },
