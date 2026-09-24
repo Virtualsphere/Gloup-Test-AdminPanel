@@ -14,6 +14,8 @@ import {
   PieChart,
   Percent,
   Sparkles,
+  LayoutDashboard,
+  Gauge,
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -57,6 +59,16 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/allusers", icon: <User size={18} />, text: "Users" },
     { path: "/gender-probability", icon: <PieChart size={18} />, text: "Gender Probability" },
     { path: "/category-discount", icon: <Percent size={18} />, text: "Category Discount" },
+
+    // New / in-progress pages live below this divider.
+    { section: "New Pages" },
+    { path: "/analytics-intelligence-v2", icon: <LayoutDashboard size={18} />, text: "Analytics Intelligence V2" },
+    { path: "/dashboard-v2", icon: <Gauge size={18} />, text: "Dashboard V2" },
+    { path: "/bookings-by-order-date-v2", icon: <CalendarCheck size={18} />, text: "Bookings by Order Date V2" },
+    { path: "/invoice-payouts-v2", icon: <Receipt size={18} />, text: "Invoices & Payouts V2" },
+    { path: "/monthly-report-v2", icon: <FileText size={18} />, text: "Monthly Report V2" },
+    { path: "/partner-subscriptions-v2", icon: <Receipt size={18} />, text: "Partner Subscriptions V2" },
+    { path: "/reviews-ratings-v2", icon: <Star size={18} />, text: "Reviews & Ratings V2" },
   ];
 
   return (
@@ -90,11 +102,29 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
       {/* MENU */}
       <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto custom-scroll">
         {menuItems.map((item) => {
+          // Section heading — a plain label, or just a divider when collapsed.
+          if (item.section) {
+            return collapsed ? (
+              <div
+                key={item.section}
+                className="mx-2 my-3 border-t border-white/10"
+              />
+            ) : (
+              <p
+                key={item.section}
+                className="px-2 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500"
+              >
+                {item.section}
+              </p>
+            );
+          }
+
           const isActive = location.pathname === item.path;
 
           return (
             <button
               key={item.path}
+              title={collapsed ? item.text : undefined}
               onClick={() => {
                 navigate(item.path);
 

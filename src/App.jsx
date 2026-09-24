@@ -17,7 +17,13 @@ const Layout = () => {
   const location = useLocation();
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("sidebarCollapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -25,6 +31,15 @@ const Layout = () => {
       Notification.requestPermission();
     }
   }, []);
+
+  // ✅ Remember the collapsed choice across reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem("sidebarCollapsed", isCollapsed ? "1" : "0");
+    } catch {
+      /* private mode / blocked storage - not worth failing over */
+    }
+  }, [isCollapsed]);
 
   // ✅ Responsive detection
 useEffect(() => {
@@ -85,9 +100,14 @@ useEffect(() => {
 
         {/* HEADER */}
         <Header
+          collapsed={isCollapsed}
           toggleSidebar={() => {
+            if (isMobile) {
               setIsMobileOpen((prev) => !prev);
-            }}
+            } else {
+              setIsCollapsed((prev) => !prev);
+            }
+          }}
         />
 
         <UseBookingSSE />
@@ -95,7 +115,7 @@ useEffect(() => {
         {/* PAGE CONTENT */}
         <main
           className={`pt-[70px] p-4 transition-all duration-300
-          ${!isMobile ? (isCollapsed ? "lg:ml-16" : "lg:ml-64") : ""}`}
+          ${!isMobile ? (isCollapsed ? "lg:ml-20" : "lg:ml-64") : ""}`}
         >
           <AppRoutes/>
         </main>

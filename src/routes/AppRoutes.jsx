@@ -39,6 +39,13 @@ const PartnerManualSubscriptions = lazy(() => import("../components/data/Partner
 const GenderProbability = lazy(() => import("../components/data/GenderProbability"));
 const CategoryDiscount = lazy(() => import("../components/data/CategoryDiscount"));
 const AnalyticsIntelligence = lazy(() => import("../components/analytics/AnalyticsIntelligence"));
+const AnalyticsIntelligenceV2 = lazy(() => import("../components/analytics/AnalyticsIntelligenceV2"));
+const DashboardV2 = lazy(() => import("../components/dashboard/DashboardV2"));
+const BookingsByOrderDateV2 = lazy(() => import("../components/data/BookingsByOrderDateV2"));
+const InvoicePayoutsV2 = lazy(() => import("../components/data/InvoicePayoutsV2"));
+const MonthlyReportV2 = lazy(() => import("../components/data/MonthlyReportV2"));
+const PartnerSubscriptionsV2 = lazy(() => import("../components/data/PartnerSubscriptionsV2"));
+const ReviewsRatingsV2 = lazy(() => import("../components/data/ReviewsRatingsV2"));
 
 const AppRoutes = () => {
   return (
@@ -52,6 +59,13 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<DashboardPage title="DashboardPage" />} />
         <Route path="/analytics-intelligence" element={<AnalyticsIntelligence title="Analytics Intelligence" />} />
+        <Route path="/analytics-intelligence-v2" element={<AnalyticsIntelligenceV2 title="Analytics Intelligence V2" />} />
+        <Route path="/dashboard-v2" element={<DashboardV2 title="Dashboard" />} />
+        <Route path="/bookings-by-order-date-v2" element={<BookingsByOrderDateV2 title="Bookings by Order Date" />} />
+        <Route path="/invoice-payouts-v2" element={<InvoicePayoutsV2 title="Invoices & Payouts" />} />
+        <Route path="/monthly-report-v2" element={<MonthlyReportV2 title="Monthly Report" />} />
+        <Route path="/partner-subscriptions-v2" element={<PartnerSubscriptionsV2 title="Partner Subscriptions" />} />
+        <Route path="/reviews-ratings-v2" element={<ReviewsRatingsV2 title="Reviews & Ratings" />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin title="Admin" />} />
         <Route path="/allusers" element={<AllUsers title="Users"/>} />

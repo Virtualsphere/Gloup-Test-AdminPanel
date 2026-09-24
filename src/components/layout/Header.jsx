@@ -86,14 +86,20 @@ const Header = ({ collapsed,toggleSidebar }) => {
       `}
     >
       <div className="h-13 px-4 flex items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center min-w-0 flex-1">
           <button
             onClick={toggleSidebar}
             className="p-2 rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200"
-            aria-label="Toggle sidebar"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <Menu size={20} />
-          </button> 
+          </button>
+
+          {/* Pages can render their own title / header affordances in here
+              instead of drawing a second header bar of their own. Stays empty
+              (and invisible) for every page that doesn't use it. */}
+          <div id="app-header-slot" className="flex min-w-0 flex-1 items-center" />
         </div>
 
         <div className="flex items-center space-x-4">
