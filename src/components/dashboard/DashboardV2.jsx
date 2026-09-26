@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -29,17 +29,13 @@ import {
   Store,
   Users,
 } from "lucide-react";
+import ScaledCanvas from "../v2/ScaledCanvas";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved executive dashboard mockup.
-//
-// Same technique as AnalyticsIntelligenceV2: the layout is built once on a
-// fixed DESIGN_WIDTH canvas and then uniformly scaled to the available width,
-// so the arrangement is identical at every screen size - nothing reflows,
-// nothing clips, the page never scrolls sideways.
-//
-// Raising the px sizes in T below does NOT make text bigger on screen: it
-// forces a wider canvas, which then scales down further and reads smaller.
+// 1:1 reproduction of the approved executive dashboard mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -71,17 +67,6 @@ const T = {
 
 const PAD = "p-4";
 const GAP = "gap-3";
-
-const AXIS = { fontSize: 11, fill: "#94A3B8" };
-const TOOLTIP = {
-  contentStyle: {
-    borderRadius: 12,
-    border: "1px solid #E3E7EF",
-    fontSize: 12,
-    boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
-  },
-  labelStyle: { fontWeight: 700, color: "#0F172A", marginBottom: 2 },
-};
 
 // ---------------------------------------------------------------------------
 // Static demo data - UI only for now, wire up to the backend later.
@@ -388,47 +373,10 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const [revenuePeriod, setRevenuePeriod] = useState("This Month");
   const [marketingPeriod, setMarketingPeriod] = useState("This Month");
 
-  // Scale the fixed design canvas down to whatever width we actually have.
-  const outerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [boxHeight, setBoxHeight] = useState(undefined);
-
-  useLayoutEffect(() => {
-    const outer = outerRef.current;
-    const canvas = canvasRef.current;
-    if (!outer || !canvas) return;
-
-    const measure = () => {
-      const next = Math.min(1, outer.clientWidth / DESIGN_WIDTH);
-      // Guard against feedback loops when the height change moves a scrollbar.
-      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-      setBoxHeight((prev) => {
-        const h = Math.round(canvas.offsetHeight * next);
-        return prev === h ? prev : h;
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(outer);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
   return (
-    <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
-      <div
-        ref={canvasRef}
-        className={`flex flex-col pb-4 ${GAP}`}
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
+    <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
-        {/* Page header + filter bar                                          */}
+        {/* Page header + filter bar                                        */}
         {/* ---------------------------------------------------------------- */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
@@ -1007,8 +955,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
             </div>
           </Card>
         </div>
-      </div>
-    </div>
+    </ScaledCanvas>
   );
 };
 

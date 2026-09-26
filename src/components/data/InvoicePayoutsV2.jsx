@@ -1,10 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import {
   AlertOctagon,
   AlertTriangle,
   ArrowRight,
-  Bell,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -23,18 +21,15 @@ import {
   Search,
   Wallet,
 } from "lucide-react";
+import { PageHeaderPortal } from "../layout/PageHeaderSlot";
+import ScaledCanvas from "../v2/ScaledCanvas";
+import { CARD } from "../v2/tokens";
+import { Card, Chip as BaseChip, HeaderBell, SalonLogo } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Invoices & Payouts" mockup.
-//
-// Same technique as DashboardV2 / AnalyticsIntelligenceV2 / BookingsByOrderDateV2:
-// the layout is built once on a fixed DESIGN_WIDTH canvas and then uniformly
-// scaled to whatever width is available, so the arrangement is identical at
-// every screen size - nothing reflows, nothing clips, the page never scrolls
-// sideways.
-//
-// Raising the px sizes in T below does NOT make text bigger on screen: it
-// forces a wider canvas, which then scales down further and reads smaller.
+// 1:1 reproduction of the approved "Invoices & Payouts" mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 //
 // UI only for now - every number below is static demo data matching the
 // mockup. Wire it to invoiceSlice (getinvoicepartnerstoday / markinvoicepayout)
@@ -79,7 +74,6 @@ const T = {
   kpi: "text-[26px]", // KPI count values
 };
 
-const CARD = "rounded-2xl border border-[#E6E8F0] bg-white";
 const GAP = "gap-3";
 
 // ---------------------------------------------------------------------------
@@ -365,11 +359,6 @@ const STATUSES = ["All Status", "Scheduled", "Processing", "Paid", "Overdue"];
 // Building blocks
 // ---------------------------------------------------------------------------
 
-// min-w-0 is what lets these shrink inside the grid instead of forcing overflow.
-const Card = ({ children, className = "" }) => (
-  <div className={`flex min-w-0 flex-col ${CARD} ${className}`}>{children}</div>
-);
-
 // Uppercase card heading used by every panel on this page.
 const SectionTitle = ({ children, className = "" }) => (
   <h2
@@ -385,39 +374,11 @@ const Delta = ({ value, up }) => (
   </span>
 );
 
-const Chip = ({ children, className }) => (
-  <span
-    className={`inline-block shrink-0 whitespace-nowrap rounded-md px-1.5 py-[3px] font-semibold ${T.tiny} ${className}`}
-  >
-    {children}
-  </span>
-);
+const Chip = (props) => <BaseChip size={`px-1.5 py-[3px] ${T.tiny}`} {...props} />;
 
 const FieldLabel = ({ children }) => (
   <span className={`mb-1 block font-medium text-slate-500 ${T.xs}`}>{children}</span>
 );
-
-// The mockup shows each salon's own logo; initials on a dark plate stand in for
-// them until the API returns partner logos.
-const SalonLogo = ({ name }) => {
-  const initials = name
-    .replace(/[^A-Za-z ]/g, "")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
-
-  return (
-    <span
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-md font-bold ${T.tiny}`}
-      style={{ background: "linear-gradient(135deg,#2B2118,#4C3C28)", color: "#E3B85C" }}
-    >
-      {initials}
-    </span>
-  );
-};
 
 // Footer call-to-action shared by the list cards.
 const ViewAllButton = ({ children }) => (
@@ -430,23 +391,9 @@ const ViewAllButton = ({ children }) => (
   </button>
 );
 
-// The page title, subtitle and the two header affordances render into the app's
-// own top bar (the #app-header-slot that Header.jsx exposes) rather than being
-// drawn a second time inside the canvas: that bar already owns the hamburger
-// and the account menu, so repeating them here only cost a row of height.
-//
-// This deliberately sits OUTSIDE the scaled canvas - the app bar is chrome and
-// should keep its own type size no matter how far the canvas is scaled down.
-const PageHeaderSlot = ({ title }) => {
-  const [slot, setSlot] = useState(null);
-
-  useEffect(() => {
-    setSlot(document.getElementById("app-header-slot"));
-  }, []);
-
-  if (!slot) return null;
-
-  return createPortal(
+// Title, subtitle and header affordances live in the app bar, not the canvas.
+const PageHeader = ({ title }) => (
+  <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0">
         <h1 className="truncate text-[17px] font-extrabold leading-tight tracking-tight text-slate-900">
@@ -466,20 +413,11 @@ const PageHeaderSlot = ({ title }) => {
           <span className="hidden lg:inline">How it works?</span>
         </button>
 
-        <button type="button" className="relative shrink-0 text-slate-500">
-          <Bell size={18} />
-          <span
-            className="absolute -right-1.5 -top-1.5 grid h-[15px] min-w-[15px] place-items-center rounded-full px-1 text-[9px] font-bold text-white"
-            style={{ background: RED }}
-          >
-            12
-          </span>
-        </button>
+        <HeaderBell count={12} color={RED} className="text-slate-500" />
       </div>
-    </div>,
-    slot
-  );
-};
+    </div>
+  </PageHeaderPortal>
+);
 
 // Weekly / Monthly right-rail panel - same shape, different dataset.
 const PayoutRailCard = ({ title, count, rows, more }) => (
@@ -570,50 +508,14 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
 
   const tab = TABS.find((item) => item.key === activeTab) || TABS[0];
 
-  // Scale the fixed design canvas down to whatever width we actually have.
-  const outerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [boxHeight, setBoxHeight] = useState(undefined);
-
-  useLayoutEffect(() => {
-    const outer = outerRef.current;
-    const canvas = canvasRef.current;
-    if (!outer || !canvas) return;
-
-    const measure = () => {
-      const next = Math.min(1, outer.clientWidth / DESIGN_WIDTH);
-      // Guard against feedback loops when the height change moves a scrollbar.
-      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-      setBoxHeight((prev) => {
-        const h = Math.round(canvas.offsetHeight * next);
-        return prev === h ? prev : h;
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(outer);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
   return (
-    <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
-      <PageHeaderSlot title={title} />
+    <>
+      <PageHeader title={title} />
 
-      <div
-        ref={canvasRef}
-        className={`flex flex-col pb-4 ${GAP}`}
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
+      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Export / create - the title row lives in the app bar, see          */}
-        {/* PageHeaderSlot above                                               */}
+        {/* PageHeader above                                                   */}
         {/* ---------------------------------------------------------------- */}
         <div className="flex items-center justify-end gap-2.5">
           <button
@@ -880,7 +782,7 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
 
                       <td className="py-2.5 pr-2 align-middle">
                         <span className="flex items-center gap-2">
-                          <SalonLogo name={row.name} />
+                          <SalonLogo name={row.name} size={32} className={`rounded-md ${T.tiny}`} />
                           <span className="flex min-w-0 items-center gap-1.5">
                             <span className={`truncate font-semibold text-slate-800 ${T.xs}`}>
                               {row.name}
@@ -1105,8 +1007,8 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
             </Card>
           </div>
         </div>
-      </div>
-    </div>
+      </ScaledCanvas>
+    </>
   );
 };
 

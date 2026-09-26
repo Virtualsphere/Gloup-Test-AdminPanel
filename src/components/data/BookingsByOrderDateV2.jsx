@@ -1,8 +1,7 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import {
   BarChart3,
-  Bell,
   Building2,
   CalendarDays,
   CalendarPlus,
@@ -15,7 +14,6 @@ import {
   Eye,
   IndianRupee,
   Lightbulb,
-  Menu,
   MoreVertical,
   Package,
   RefreshCw,
@@ -26,17 +24,15 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
+import { PageHeaderPortal } from "../layout/PageHeaderSlot";
+import ScaledCanvas from "../v2/ScaledCanvas";
+import { CARD } from "../v2/tokens";
+import { Card, Chip as BaseChip, HeaderBell, HeaderSearch } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Bookings by Order Date" mockup.
-//
-// Same technique as DashboardV2 / AnalyticsIntelligenceV2: the layout is built
-// once on a fixed DESIGN_WIDTH canvas and then uniformly scaled to whatever
-// width is available, so the arrangement is identical at every screen size -
-// nothing reflows, nothing clips, the page never scrolls sideways.
-//
-// Raising the px sizes in T below does NOT make text bigger on screen: it
-// forces a wider canvas, which then scales down further and reads smaller.
+// 1:1 reproduction of the approved "Bookings by Order Date" mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 //
 // UI only for now - every number below is static demo data matching the
 // mockup. Wire it to bookingSlice (getbDetailByOrderDate) once the design is
@@ -69,7 +65,6 @@ const T = {
   h1: "text-[20px]", // page title
 };
 
-const CARD = "rounded-2xl border border-[#E6E8F0] bg-white";
 const GAP = "gap-3";
 
 // ---------------------------------------------------------------------------
@@ -359,11 +354,6 @@ const PAYMENT_STYLES = {
 // Building blocks
 // ---------------------------------------------------------------------------
 
-// min-w-0 is what lets these shrink inside the grid instead of forcing overflow.
-const Card = ({ children, className = "" }) => (
-  <div className={`flex min-w-0 flex-col ${CARD} ${className}`}>{children}</div>
-);
-
 const CardTitle = ({ children, right }) => (
   <div className="mb-2.5 flex items-center justify-between gap-2">
     <h2 className={`font-bold text-slate-900 ${T.base}`}>{children}</h2>
@@ -381,13 +371,7 @@ const Delta = ({ value, up }) => (
   </span>
 );
 
-const Chip = ({ children, className }) => (
-  <span
-    className={`inline-block whitespace-nowrap rounded-md px-1.5 py-[3px] font-semibold ${T.xs} ${className}`}
-  >
-    {children}
-  </span>
-);
+const Chip = (props) => <BaseChip size={`px-1.5 py-[3px] ${T.xs}`} {...props} />;
 
 const Checkbox = ({ checked, onChange }) => (
   <button
@@ -497,11 +481,54 @@ const DonutCard = ({ title, total, slices }) => (
   </Card>
 );
 
+// Title, breadcrumb and header affordances live in the app bar, not the canvas.
+const PageHeader = ({ title, search, setSearch }) => (
+  <PageHeaderPortal>
+    <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
+      <div className="min-w-0">
+        <h1 className="truncate text-[17px] font-extrabold leading-tight tracking-tight text-slate-900">
+          {title}
+        </h1>
+        <p className="hidden items-center gap-1 truncate text-[11px] leading-tight text-slate-400 md:flex">
+          Home
+          <ChevronRight size={10} className="shrink-0" />
+          Bookings
+          <ChevronRight size={10} className="shrink-0" />
+          <span className="font-semibold" style={{ color: BRAND }}>
+            By Order Date
+          </span>
+        </p>
+      </div>
+
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        <button
+          type="button"
+          className="hidden items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-600 xl:flex"
+        >
+          <CalendarDays size={14} className="shrink-0 text-slate-400" />
+          May 24, 2024 - Jun 23, 2024
+          <ChevronDown size={13} className="shrink-0 text-slate-400" />
+        </button>
+
+        <HeaderSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search booking ID, user, salon..."
+          width={180}
+          shortcut
+        />
+
+        <HeaderBell count={12} color={RED} className="text-slate-500" />
+      </div>
+    </div>
+  </PageHeaderPortal>
+);
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
+const BookingsByOrderDateV2 =({ title = "Bookings by Order Date" }) => {
   // The payment tabs, filters and pagination are presentational for now - the
   // mockup shows "Paid" selected while still listing unpaid/refunded rows, so
   // nothing here narrows the demo dataset.
@@ -522,121 +549,11 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
   const toggleAll = () =>
     setSelected(allSelected ? [] : bookings.map((booking) => booking.id));
 
-  // Scale the fixed design canvas down to whatever width we actually have.
-  const outerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [boxHeight, setBoxHeight] = useState(undefined);
-
-  useLayoutEffect(() => {
-    const outer = outerRef.current;
-    const canvas = canvasRef.current;
-    if (!outer || !canvas) return;
-
-    const measure = () => {
-      const next = Math.min(1, outer.clientWidth / DESIGN_WIDTH);
-      // Guard against feedback loops when the height change moves a scrollbar.
-      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-      setBoxHeight((prev) => {
-        const h = Math.round(canvas.offsetHeight * next);
-        return prev === h ? prev : h;
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(outer);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
   return (
-    <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
-      <div
-        ref={canvasRef}
-        className={`flex flex-col pb-4 ${GAP}`}
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
-        {/* ---------------------------------------------------------------- */}
-        {/* Page header - title, breadcrumb, global controls                  */}
-        {/* ---------------------------------------------------------------- */}
-        <div className={`flex items-center justify-between gap-4 px-4 py-2.5 ${CARD}`}>
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Menu size={18} className="shrink-0 text-slate-600" />
-            <div className="min-w-0">
-              <h1 className={`font-extrabold tracking-tight text-slate-900 ${T.h1}`}>
-                {title}
-              </h1>
-              <div className={`mt-0.5 flex items-center gap-1 text-slate-400 ${T.xs}`}>
-                <span>Home</span>
-                <ChevronRight size={10} className="shrink-0" />
-                <span>Bookings</span>
-                <ChevronRight size={10} className="shrink-0" />
-                <span className="font-semibold" style={{ color: BRAND }}>
-                  By Order Date
-                </span>
-              </div>
-            </div>
-          </div>
+    <>
+      <PageHeader title={title} search={search} setSearch={setSearch} />
 
-          <div className="flex shrink-0 items-center gap-3">
-            <button
-              type="button"
-              className={`flex items-center gap-2 whitespace-nowrap rounded-xl border border-[#E6E8F0] bg-white px-3 py-2 font-medium text-slate-700 ${T.base}`}
-            >
-              <CalendarDays size={13} className="shrink-0 text-slate-400" />
-              May 24, 2024 - Jun 23, 2024
-              <ChevronDown size={13} className="shrink-0 text-slate-400" />
-            </button>
-
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search booking ID, user, salon..."
-                className={`w-[230px] rounded-xl border border-[#E6E8F0] bg-slate-50/70 py-2 pl-8 pr-10 text-slate-700 placeholder:text-slate-400 focus:outline-none ${T.base}`}
-              />
-              <kbd
-                className={`pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-[#E6E8F0] bg-white px-1 py-px font-semibold text-slate-400 ${T.xxs}`}
-              >
-                ⌘K
-              </kbd>
-            </div>
-
-            <button type="button" className="relative shrink-0 text-slate-500">
-              <Bell size={18} />
-              <span
-                className={`absolute -right-1.5 -top-1.5 grid h-[15px] min-w-[15px] place-items-center rounded-full px-1 font-bold text-white ${T.xxs}`}
-                style={{ background: RED }}
-              >
-                12
-              </span>
-            </button>
-
-            <button type="button" className="flex shrink-0 items-center gap-2">
-              <span
-                className="grid h-8 w-8 place-items-center rounded-full text-[13px] font-bold text-white"
-                style={{ background: `linear-gradient(135deg, ${BRAND}, ${BLUE})` }}
-              >
-                A
-              </span>
-              <span className="text-left leading-tight">
-                <span className={`block font-bold text-slate-800 ${T.base}`}>Admin</span>
-                <span className={`block text-slate-400 ${T.xs}`}>Super Admin</span>
-              </span>
-              <ChevronDown size={13} className="shrink-0 text-slate-400" />
-            </button>
-          </div>
-        </div>
-
+      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Export / refresh                                                  */}
         {/* ---------------------------------------------------------------- */}
@@ -1121,8 +1038,8 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
             </div>
           </Card>
         </div>
-      </div>
-    </div>
+      </ScaledCanvas>
+    </>
   );
 };
 

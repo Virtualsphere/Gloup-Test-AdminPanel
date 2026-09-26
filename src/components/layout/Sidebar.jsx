@@ -16,6 +16,9 @@ import {
   Sparkles,
   LayoutDashboard,
   Gauge,
+  MessageSquareText,
+  Users,
+  UserRound,
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -69,6 +72,9 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/monthly-report-v2", icon: <FileText size={18} />, text: "Monthly Report V2" },
     { path: "/partner-subscriptions-v2", icon: <Receipt size={18} />, text: "Partner Subscriptions V2" },
     { path: "/reviews-ratings-v2", icon: <Star size={18} />, text: "Reviews & Ratings V2" },
+    { path: "/marketing-sms-v2", icon: <MessageSquareText size={18} />, text: "Marketing SMS V2" },
+    { path: "/users-v2", icon: <Users size={18} />, text: "Users V2" },
+    { path: "/user-details-v2", icon: <UserRound size={18} />, text: "User Profile V2" },
   ];
 
   return (

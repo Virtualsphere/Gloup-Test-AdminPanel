@@ -1,5 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -17,10 +16,8 @@ import {
   ArrowDown,
   ArrowRightLeft,
   ArrowUp,
-  Bell,
   Building2,
   CalendarDays,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -39,17 +36,24 @@ import {
   Smile,
   Star,
 } from "lucide-react";
+import { PageHeaderPortal } from "../layout/PageHeaderSlot";
+import ScaledCanvas from "../v2/ScaledCanvas";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark } from "../v2/tokens";
+import {
+  Card,
+  Chip,
+  HeaderBell,
+  HeaderSearch,
+  SalonLogo as BaseSalonLogo,
+  SectionTitle as BaseSectionTitle,
+  Select as BaseSelect,
+  Sparkline as BaseSparkline,
+} from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Reviews & Ratings" mockup.
-//
-// Same technique as DashboardV2 / PartnerSubscriptionsV2: the layout is built
-// once on a fixed DESIGN_WIDTH canvas and then uniformly scaled to whatever
-// width is available, so the arrangement is identical at every screen size -
-// nothing reflows, nothing clips, the page never scrolls sideways.
-//
-// Raising the px sizes in T below does NOT make text bigger on screen: it
-// forces a wider canvas, which then scales down further and reads smaller.
+// 1:1 reproduction of the approved "Reviews & Ratings" mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 //
 // UI only for now - every number below is static demo data matching the
 // mockup. The search box, the three filter dropdowns and the tabs do narrow /
@@ -90,26 +94,11 @@ const T = {
   kpi: "text-[28px]", // KPI values
 };
 
-const CARD = "rounded-2xl border border-[#E6E8F0] bg-white";
 const GAP = "gap-3";
-
-const AXIS = { fontSize: 11, fill: "#94A3B8" };
-const TOOLTIP = {
-  contentStyle: {
-    borderRadius: 12,
-    border: "1px solid #E3E7EF",
-    fontSize: 12,
-    boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
-  },
-  labelStyle: { fontWeight: 700, color: "#0F172A", marginBottom: 2 },
-};
 
 // ---------------------------------------------------------------------------
 // Static demo data
 // ---------------------------------------------------------------------------
-
-// Turns a list of numbers into the {i, v} rows recharts wants for a sparkline.
-const spark = (values) => values.map((v, i) => ({ i, v }));
 
 // `good` colours the delta independently of its direction: fewer negative
 // reviews is a green down-arrow, fewer neutral reviews is a red one.
@@ -414,26 +403,7 @@ const LAST_PAGE = 1829;
 // Building blocks
 // ---------------------------------------------------------------------------
 
-// min-w-0 is what lets these shrink inside the grid instead of forcing overflow.
-const Card = ({ children, className = "" }) => (
-  <div className={`flex min-w-0 flex-col ${CARD} ${className}`}>{children}</div>
-);
-
-const SectionTitle = ({ children, className = "" }) => (
-  <h2
-    className={`min-w-0 truncate font-bold tracking-tight text-slate-900 ${T.title} ${className}`}
-  >
-    {children}
-  </h2>
-);
-
-const Chip = ({ children, className = "" }) => (
-  <span
-    className={`inline-block shrink-0 whitespace-nowrap rounded-md px-2 py-[3px] font-semibold ${T.tiny} ${className}`}
-  >
-    {children}
-  </span>
-);
+const SectionTitle = (props) => <BaseSectionTitle size={T.title} {...props} />;
 
 // Filled amber stars for `value`, outlined grey for the rest.
 const Stars = ({ value, size = 14, gap = "gap-[3px]" }) => (
@@ -450,52 +420,11 @@ const Stars = ({ value, size = 14, gap = "gap-[3px]" }) => (
   </span>
 );
 
-// The mockup shows each salon's own photo; initials on a dark plate stand in
-// for them until the API returns partner logos.
-const SalonLogo = ({ name, size = 34 }) => {
-  const initials = name
-    .replace(/[^A-Za-z ]/g, "")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
-
-  return (
-    <span
-      className={`grid shrink-0 place-items-center rounded-md font-bold ${T.tiny}`}
-      style={{
-        width: size,
-        height: size,
-        background: "linear-gradient(135deg,#2B2118,#4C3C28)",
-        color: "#E3B85C",
-      }}
-    >
-      {initials}
-    </span>
-  );
-};
+const SalonLogo = (props) => <BaseSalonLogo className={`rounded-md ${T.tiny}`} {...props} />;
 
 // The small bordered dropdowns in the card headers, the filter bar and the
 // table footer.
-const Select = ({ value, onChange, options, className = "", size = T.xxs }) => (
-  <span className={`relative block shrink-0 ${className}`}>
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`w-full cursor-pointer appearance-none rounded-lg border border-[#E6E8F0] bg-white py-2 pl-3 pr-7 font-medium text-slate-600 focus:outline-none ${size}`}
-    >
-      {options.map((option) => (
-        <option key={option}>{option}</option>
-      ))}
-    </select>
-    <ChevronDown
-      size={13}
-      className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-    />
-  </span>
-);
+const Select = ({ size = T.xxs, ...props }) => <BaseSelect size={size} {...props} />;
 
 // Arrow + delta + caption. Arrow follows the direction, colour follows
 // whether that direction is good news.
@@ -516,29 +445,8 @@ const Delta = ({ value, up, good }) => {
   );
 };
 
-const Sparkline = ({ id, data, color, height = 42 }) => (
-  <div className="mt-auto w-full" style={{ height }}>
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 4, right: 2, bottom: 2, left: 2 }}>
-        <defs>
-          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.18} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <YAxis hide domain={["dataMin - 2", "dataMax + 1"]} />
-        <Area
-          type="linear"
-          dataKey="v"
-          stroke={color}
-          strokeWidth={1.8}
-          fill={`url(#${id})`}
-          dot={false}
-          isAnimationActive={false}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  </div>
+const Sparkline = (props) => (
+  <BaseSparkline height={42} fillOpacity={0.18} domain={["dataMin - 2", "dataMax + 1"]} {...props} />
 );
 
 const KpiCard = ({ kpi, className = "" }) => {
@@ -582,23 +490,9 @@ const KpiCard = ({ kpi, className = "" }) => {
   );
 };
 
-// The page title and the header affordances render into the app's own top
-// bar (the #app-header-slot that Header.jsx exposes) rather than being drawn a
-// second time inside the canvas: that bar already owns the hamburger and the
-// account menu.
-//
-// This deliberately sits OUTSIDE the scaled canvas - the app bar is chrome and
-// should keep its own type size no matter how far the canvas is scaled down.
-const PageHeaderSlot = ({ title, range, setRange, search, setSearch }) => {
-  const [slot, setSlot] = useState(null);
-
-  useEffect(() => {
-    setSlot(document.getElementById("app-header-slot"));
-  }, []);
-
-  if (!slot) return null;
-
-  return createPortal(
+// Title and header affordances live in the app bar, not the canvas.
+const PageHeader = ({ title, range, setRange, search, setSearch }) => (
+  <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <h1 className="min-w-0 truncate text-[18px] font-extrabold leading-tight tracking-tight text-slate-900">
         {title}
@@ -619,37 +513,23 @@ const PageHeaderSlot = ({ title, range, setRange, search, setSearch }) => {
           <ArrowRightLeft size={13} className="ml-1 shrink-0 text-slate-500" />
         </span>
 
-        <span className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 lg:flex">
-          <Search size={14} className="shrink-0 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search anything..."
-            className="w-[150px] bg-transparent text-[12px] text-slate-600 placeholder:text-slate-400 focus:outline-none"
-          />
-          <span className="shrink-0 rounded border border-gray-200 px-1 text-[10px] font-semibold text-slate-400">
-            ⌘K
-          </span>
-        </span>
+        <HeaderSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search anything..."
+          width={150}
+          shortcut
+        />
 
-        <button type="button" className="relative shrink-0 text-slate-600" aria-label="Notifications">
-          <Bell size={18} />
-          <span
-            className="absolute -right-1.5 -top-1.5 grid h-[15px] min-w-[15px] place-items-center rounded-full px-1 text-[9px] font-bold text-white"
-            style={{ background: ROSE }}
-          >
-            6
-          </span>
-        </button>
+        <HeaderBell count={6} color={ROSE} />
 
         <button type="button" className="shrink-0 text-slate-600" aria-label="Messages">
           <MessageSquare size={18} />
         </button>
       </div>
-    </div>,
-    slot
-  );
-};
+    </div>
+  </PageHeaderPortal>
+);
 
 // ---------------------------------------------------------------------------
 // Page
@@ -712,34 +592,6 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
     status !== STATUS_FILTERS[0] ||
     tab === "awaiting";
 
-  // Scale the fixed design canvas down to whatever width we actually have.
-  const outerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [boxHeight, setBoxHeight] = useState(undefined);
-
-  useLayoutEffect(() => {
-    const outer = outerRef.current;
-    const canvas = canvasRef.current;
-    if (!outer || !canvas) return;
-
-    const measure = () => {
-      const next = Math.min(1, outer.clientWidth / DESIGN_WIDTH);
-      // Guard against feedback loops when the height change moves a scrollbar.
-      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-      setBoxHeight((prev) => {
-        const h = Math.round(canvas.offsetHeight * next);
-        return prev === h ? prev : h;
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(outer);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
   const pageButton = (number) => (
     <button
       key={number}
@@ -757,8 +609,8 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
   );
 
   return (
-    <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
-      <PageHeaderSlot
+    <>
+      <PageHeader
         title={title}
         range={headerRange}
         setRange={setHeaderRange}
@@ -766,15 +618,7 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
         setSearch={setHeaderSearch}
       />
 
-      <div
-        ref={canvasRef}
-        className={`flex flex-col pb-4 ${GAP}`}
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
+      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* KPI row - the sixth column stacks the page actions above the     */}
         {/* shorter "Salons Reviewed" card, exactly as the mockup does.       */}
@@ -1311,8 +1155,8 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
             </div>
           </div>
         </Card>
-      </div>
-    </div>
+      </ScaledCanvas>
+    </>
   );
 };
 

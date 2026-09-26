@@ -1,9 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import {
   ArrowUpDown,
   BadgeIndianRupee,
-  Bell,
   Briefcase,
   CalendarDays,
   CheckCircle2,
@@ -26,18 +24,15 @@ import {
   Target,
   XCircle,
 } from "lucide-react";
+import { PageHeaderPortal } from "../layout/PageHeaderSlot";
+import ScaledCanvas from "../v2/ScaledCanvas";
+import { CARD, initials } from "../v2/tokens";
+import { Card, Chip as BaseChip, HeaderBell } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Monthly Report" mockup.
-//
-// Same technique as DashboardV2 / AnalyticsIntelligenceV2 / BookingsByOrderDateV2
-// / InvoicePayoutsV2: the layout is built once on a fixed DESIGN_WIDTH canvas and
-// then uniformly scaled to whatever width is available, so the arrangement is
-// identical at every screen size - nothing reflows, nothing clips, the page never
-// scrolls sideways.
-//
-// Raising the px sizes in T below does NOT make text bigger on screen: it forces
-// a wider canvas, which then scales down further and reads smaller.
+// 1:1 reproduction of the approved "Monthly Report" mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 //
 // UI only for now - every number below is static demo data matching the mockup.
 // Wire it to the monthly report thunks once the design is signed off; the live
@@ -74,7 +69,6 @@ const T = {
   kpi: "text-[22px]", // KPI count values
 };
 
-const CARD = "rounded-2xl border border-[#E6E8F0] bg-white";
 const GAP = "gap-3";
 
 // Measured column widths from the mockup, in design px, scaled onto this canvas
@@ -429,24 +423,13 @@ const ROWS_PER_PAGE = ["10", "25", "50", "100"];
 // Building blocks
 // ---------------------------------------------------------------------------
 
-// min-w-0 is what lets these shrink inside the grid instead of forcing overflow.
-const Card = ({ children, className = "" }) => (
-  <div className={`flex min-w-0 flex-col ${CARD} ${className}`}>{children}</div>
-);
-
 const Delta = ({ value, up }) => (
   <span className={`whitespace-nowrap font-semibold ${up ? "text-emerald-500" : "text-rose-500"}`}>
     {up ? "↑" : "↓"} {value}
   </span>
 );
 
-const Chip = ({ children, className }) => (
-  <span
-    className={`inline-block shrink-0 whitespace-nowrap rounded-md px-1.5 py-[2px] font-semibold ${T.tiny} ${className}`}
-  >
-    {children}
-  </span>
-);
+const Chip = (props) => <BaseChip size={`px-1.5 py-[2px] ${T.tiny}`} {...props} />;
 
 const FieldLabel = ({ children }) => (
   <span className={`mb-1 block font-medium text-slate-500 ${T.xxs}`}>{children}</span>
@@ -454,46 +437,21 @@ const FieldLabel = ({ children }) => (
 
 // The mockup shows each salon's own logo - a gold mark on a dark plate. Initials
 // under a star stand in for them until the API returns partner logos.
-const SalonLogo = ({ name }) => {
-  const initials = name
-    .replace(/[^A-Za-z ]/g, "")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
-
-  return (
-    <span
-      className="grid h-9 w-9 shrink-0 place-content-center justify-items-center rounded-lg leading-none"
-      style={{ background: "linear-gradient(135deg,#2B2118,#4C3C28)" }}
-    >
-      <Star size={9} fill={GOLD} strokeWidth={0} />
-      <span className="mt-[2px] text-[7px] font-bold tracking-tight" style={{ color: GOLD }}>
-        {initials}
-      </span>
+const SalonLogo = ({ name }) => (
+  <span
+    className="grid h-9 w-9 shrink-0 place-content-center justify-items-center rounded-lg leading-none"
+    style={{ background: "linear-gradient(135deg,#2B2118,#4C3C28)" }}
+  >
+    <Star size={9} fill={GOLD} strokeWidth={0} />
+    <span className="mt-[2px] text-[7px] font-bold tracking-tight" style={{ color: GOLD }}>
+      {initials(name.replace(/[^A-Za-z ]/g, ""))}
     </span>
-  );
-};
+  </span>
+);
 
-// The page title, subtitle and the two header affordances render into the app's
-// own top bar (the #app-header-slot that Header.jsx exposes) rather than being
-// drawn a second time inside the canvas: that bar already owns the hamburger and
-// the account menu, so repeating them here only cost a row of height.
-//
-// This deliberately sits OUTSIDE the scaled canvas - the app bar is chrome and
-// should keep its own type size no matter how far the canvas is scaled down.
-const PageHeaderSlot = ({ title, subtitle }) => {
-  const [slot, setSlot] = useState(null);
-
-  useEffect(() => {
-    setSlot(document.getElementById("app-header-slot"));
-  }, []);
-
-  if (!slot) return null;
-
-  return createPortal(
+// Title, subtitle and header affordances live in the app bar, not the canvas.
+const PageHeader = ({ title, subtitle }) => (
+  <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0">
         <h1 className="truncate text-[17px] font-extrabold leading-tight tracking-tight text-slate-900">
@@ -513,20 +471,11 @@ const PageHeaderSlot = ({ title, subtitle }) => {
           <span className="hidden lg:inline">How it works?</span>
         </button>
 
-        <button type="button" className="relative shrink-0 text-slate-500">
-          <Bell size={18} />
-          <span
-            className="absolute -right-1.5 -top-1.5 grid h-[15px] min-w-[15px] place-items-center rounded-full px-1 text-[9px] font-bold text-white"
-            style={{ background: RED }}
-          >
-            12
-          </span>
-        </button>
+        <HeaderBell count={12} color={RED} className="text-slate-500" />
       </div>
-    </div>,
-    slot
-  );
-};
+    </div>
+  </PageHeaderPortal>
+);
 
 // One page button in the footer - the active page is the only filled one.
 const PageButton = ({ pageNumber, active, onClick }) => (
@@ -556,50 +505,14 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState("10");
 
-  // Scale the fixed design canvas down to whatever width we actually have.
-  const outerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [boxHeight, setBoxHeight] = useState(undefined);
-
-  useLayoutEffect(() => {
-    const outer = outerRef.current;
-    const canvas = canvasRef.current;
-    if (!outer || !canvas) return;
-
-    const measure = () => {
-      const next = Math.min(1, outer.clientWidth / DESIGN_WIDTH);
-      // Guard against feedback loops when the height change moves a scrollbar.
-      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-      setBoxHeight((prev) => {
-        const h = Math.round(canvas.offsetHeight * next);
-        return prev === h ? prev : h;
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(outer);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
   return (
-    <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
-      <PageHeaderSlot title={title} subtitle={`Salon wise appointment summary for ${month}`} />
+    <>
+      <PageHeader title={title} subtitle={`Salon wise appointment summary for ${month}`} />
 
-      <div
-        ref={canvasRef}
-        className={`flex flex-col pb-4 ${GAP}`}
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
+      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Month picker + report download - the title row lives in the app    */}
-        {/* bar, see PageHeaderSlot above                                      */}
+        {/* bar, see PageHeader above                                          */}
         {/* ---------------------------------------------------------------- */}
         <div className="flex items-end justify-end gap-3">
           <label className="w-[148px] shrink-0">
@@ -1018,8 +931,8 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </ScaledCanvas>
+    </>
   );
 };
 

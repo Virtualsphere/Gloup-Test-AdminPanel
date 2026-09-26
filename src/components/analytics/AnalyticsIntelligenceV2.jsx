@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState } from "react";
 import {
   PieChart,
   Pie,
@@ -11,13 +11,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { CalendarDays, ChevronDown, ArrowRight, Send } from "lucide-react";
+import ScaledCanvas from "../v2/ScaledCanvas";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved mockup.
-//
-// The layout is built once on a fixed DESIGN_WIDTH canvas and then uniformly
-// scaled to fit the available width, so the arrangement is identical at every
-// screen size: nothing reflows, nothing clips, the page never scrolls sideways.
+// 1:1 reproduction of the approved mockup, on a fixed DESIGN_WIDTH canvas that
+// ScaledCanvas scales to the available width.
 //
 // DESIGN_WIDTH is tuned to the NARROWEST canvas the content fits in with zero
 // overflow (verified element-by-element in a browser). That matters for
@@ -313,45 +311,8 @@ const AnalyticsIntelligenceV2 = () => {
 
   const maxReason = Math.max(...switching.reasons.map((r) => r.pct));
 
-  // Scale the fixed design canvas down to whatever width we actually have.
-  const outerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [boxHeight, setBoxHeight] = useState(undefined);
-
-  useLayoutEffect(() => {
-    const outer = outerRef.current;
-    const canvas = canvasRef.current;
-    if (!outer || !canvas) return;
-
-    const measure = () => {
-      const next = Math.min(1, outer.clientWidth / DESIGN_WIDTH);
-      // Guard against feedback loops when the height change moves a scrollbar.
-      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-      setBoxHeight((prev) => {
-        const h = Math.round(canvas.offsetHeight * next);
-        return prev === h ? prev : h;
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(outer);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
   return (
-    <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
-      <div
-        ref={canvasRef}
-        className={`flex flex-col pb-4 ${GAP}`}
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
+    <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
       {/* ------------------------------------------------------------------ */}
       {/* Page header + filter bar                                            */}
       {/* ------------------------------------------------------------------ */}
@@ -992,9 +953,8 @@ const AnalyticsIntelligenceV2 = () => {
           />
           <ViewLink>View All</ViewLink>
         </Card>
-        </div>
       </div>
-    </div>
+    </ScaledCanvas>
   );
 };
 

@@ -93,10 +93,21 @@ Detail pages live in `components/details/`, multi-step creation flows in `compon
 
 ### Shared helpers
 
-- [hooks/useListUiState.js](src/hooks/useListUiState.js) — drop-in replacement for a cluster of `useState` list fields (page, search, filters, sort, view type), persisted in the `listUiState` Redux slice under a string key so the list survives navigating to a detail page and back. Currently only [PartnerTable.jsx](src/components/table/PartnerTable.jsx) uses it; prefer it for new list pages.
+- [hooks/useListUiState.js](src/hooks/useListUiState.js) — drop-in replacement for a cluster of `useState` list fields (page, search, filters, sort, view type), persisted in the `listUiState` Redux slice under a string key so the list survives navigating to a detail page and back. Used by [PartnerTable.jsx](src/components/table/PartnerTable.jsx) and [UsersV2.jsx](src/components/data/UsersV2.jsx); prefer it for new list pages.
+- [utils/format.js](src/utils/format.js) — `titleCase`, `pick` (first non-empty of several keys), `toDate` (moment or null), `rupees`, `downloadCsv`.
+- [utils/userModel.js](src/utils/userModel.js) — pure mappers from the admin user APIs to what the V2 user pages render (`normalizeUser`, `buildUserProfile`, `spendSeries`). Its header lists which fields are confirmed against V1 and which `pick()` lists are still guesses.
 - [utils/image.js](src/utils/image.js) — `getImageUrl()` resolves the several path shapes left over from the GCS migration (absolute URLs, `/store|/category|/banner` → `storage.googleapis.com/gloup-images`, legacy `/upload` → API base). Always route DB image paths through it.
 - [utils/loyalty.js](src/utils/loyalty.js) — `LOYALTY_TIERS` and label formatters mirroring the backend's `loyalty_status` values.
 - [utils/toast.js](src/utils/toast.js) — `showToast(id, …)` exists but almost nothing uses it; the de-facto convention is importing `toast` from `react-hot-toast` directly and passing a stable string `id` per action (e.g. `"addcategory-toast"`) so repeated submits replace rather than stack.
+
+### V2 pages ("New Pages" in the sidebar)
+
+Redesigned pages built 1:1 from approved mockups, living alongside the V1 pages under `*-v2` routes. 8 of the 10 still render **static demo data** declared at the top of each file (only UsersV2 and UserDetailsV2 call the API); each file's header comment names the slice and live page to wire it to.
+
+- **Layout**: every V2 page wraps its content in [v2/ScaledCanvas.jsx](src/components/v2/ScaledCanvas.jsx) — a fixed design-width canvas uniformly scaled to the available width. Consequence: raising a page's px sizes (its `T` type-scale map) makes text *smaller* on screen, not bigger. Anything `position: fixed` (modals) must render outside `ScaledCanvas`, because a transformed ancestor traps fixed descendants.
+- **App-bar content**: pages render their title / search / bell into Header.jsx through `<PageHeaderPortal>` ([layout/PageHeaderSlot.jsx](src/components/layout/PageHeaderSlot.jsx)); the provider wraps the layout in App.jsx. Don't draw a second header row inside the canvas.
+- **Shared kit**: [v2/ui.jsx](src/components/v2/ui.jsx) (`Card`, `SectionTitle`, `Chip`, `Select`, `SalonLogo`, `Sparkline`, `HeaderBell`, `HeaderSearch`) and [v2/tokens.js](src/components/v2/tokens.js) (`CARD`, `CHART_AXIS`, `CHART_TOOLTIP`, `initials`, `toSpark`). Components take the size class from the page's own `T` map; a page whose variant differs wraps the shared one (`const Chip = (p) => <BaseChip size=… {...p} />`) rather than copying it.
+- **Placeholders kept on purpose**: the notification bell counts and ⌘K hints are static mockup values with no backend behind them; the design deliberately keeps them.
 
 ### Real-time
 

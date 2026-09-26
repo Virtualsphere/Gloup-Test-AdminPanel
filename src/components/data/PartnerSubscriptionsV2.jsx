@@ -1,5 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -15,7 +14,6 @@ import {
 } from "recharts";
 import {
   AlertTriangle,
-  Bell,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -35,18 +33,23 @@ import {
   Upload,
   Users,
 } from "lucide-react";
+import { PageHeaderPortal } from "../layout/PageHeaderSlot";
+import ScaledCanvas from "../v2/ScaledCanvas";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
+import {
+  Card,
+  Chip,
+  HeaderBell,
+  HeaderSearch,
+  SalonLogo as BaseSalonLogo,
+  SectionTitle as BaseSectionTitle,
+  Select as BaseSelect,
+} from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Partner Subscriptions" mockup.
-//
-// Same technique as DashboardV2 / AnalyticsIntelligenceV2 / InvoicePayoutsV2:
-// the layout is built once on a fixed DESIGN_WIDTH canvas and then uniformly
-// scaled to whatever width is available, so the arrangement is identical at
-// every screen size - nothing reflows, nothing clips, the page never scrolls
-// sideways.
-//
-// Raising the px sizes in T below does NOT make text bigger on screen: it
-// forces a wider canvas, which then scales down further and reads smaller.
+// 1:1 reproduction of the approved "Partner Subscriptions" mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 //
 // UI only for now - every number below is static demo data matching the
 // mockup. Wire it to partnerManualSubscriptionSlice / partnersubscriptionSlice
@@ -84,19 +87,7 @@ const T = {
   kpi: "text-[27px]", // KPI values
 };
 
-const CARD = "rounded-2xl border border-[#E6E8F0] bg-white";
 const GAP = "gap-3";
-
-const AXIS = { fontSize: 11, fill: "#94A3B8" };
-const TOOLTIP = {
-  contentStyle: {
-    borderRadius: 12,
-    border: "1px solid #E3E7EF",
-    fontSize: 12,
-    boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
-  },
-  labelStyle: { fontWeight: 700, color: "#0F172A", marginBottom: 2 },
-};
 
 // ---------------------------------------------------------------------------
 // Static demo data
@@ -333,18 +324,7 @@ const HEADER_RANGES = [
 // Building blocks
 // ---------------------------------------------------------------------------
 
-// min-w-0 is what lets these shrink inside the grid instead of forcing overflow.
-const Card = ({ children, className = "" }) => (
-  <div className={`flex min-w-0 flex-col ${CARD} ${className}`}>{children}</div>
-);
-
-const SectionTitle = ({ children, className = "" }) => (
-  <h2
-    className={`min-w-0 truncate font-bold tracking-tight text-slate-900 ${T.title} ${className}`}
-  >
-    {children}
-  </h2>
-);
+const SectionTitle = (props) => <BaseSectionTitle size={T.title} {...props} />;
 
 const Delta = ({ value, up }) => (
   <span className={`whitespace-nowrap font-semibold ${up ? "text-emerald-500" : "text-rose-500"}`}>
@@ -352,62 +332,13 @@ const Delta = ({ value, up }) => (
   </span>
 );
 
-const Chip = ({ children, className = "" }) => (
-  <span
-    className={`inline-block shrink-0 whitespace-nowrap rounded-md px-2 py-[3px] font-semibold ${T.tiny} ${className}`}
-  >
-    {children}
-  </span>
+const SalonLogo = ({ round = false, ...props }) => (
+  <BaseSalonLogo className={`${round ? "rounded-full" : "rounded-lg"} ${T.tiny}`} {...props} />
 );
-
-// The mockup shows each salon's own logo; initials on a dark plate stand in for
-// them until the API returns partner logos.
-const SalonLogo = ({ name, round = false, size = 34 }) => {
-  const initials = name
-    .replace(/[^A-Za-z ]/g, "")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
-
-  return (
-    <span
-      className={`grid shrink-0 place-items-center font-bold ${T.tiny} ${
-        round ? "rounded-full" : "rounded-lg"
-      }`}
-      style={{
-        width: size,
-        height: size,
-        background: "linear-gradient(135deg,#2B2118,#4C3C28)",
-        color: "#E3B85C",
-      }}
-    >
-      {initials}
-    </span>
-  );
-};
 
 // The small bordered dropdowns in the card headers, the filter bar and the
 // table footer.
-const Select = ({ value, onChange, options, className = "", size = T.xxs }) => (
-  <span className={`relative block shrink-0 ${className}`}>
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`w-full cursor-pointer appearance-none rounded-lg border border-[#E6E8F0] bg-white py-2 pl-3 pr-7 font-medium text-slate-600 focus:outline-none ${size}`}
-    >
-      {options.map((option) => (
-        <option key={option}>{option}</option>
-      ))}
-    </select>
-    <ChevronDown
-      size={13}
-      className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-    />
-  </span>
-);
+const Select = ({ size = T.xxs, ...props }) => <BaseSelect size={size} {...props} />;
 
 // Donut + right-hand legend, shared by "Subscription Overview" and
 // "Plan Distribution" - same shape, different dataset and centre caption.
@@ -457,23 +388,9 @@ const DonutPanel = ({ data, total, caption, size }) => (
   </div>
 );
 
-// The page title, breadcrumb and the header affordances render into the app's
-// own top bar (the #app-header-slot that Header.jsx exposes) rather than being
-// drawn a second time inside the canvas: that bar already owns the hamburger
-// and the account menu, so repeating them here only cost a row of height.
-//
-// This deliberately sits OUTSIDE the scaled canvas - the app bar is chrome and
-// should keep its own type size no matter how far the canvas is scaled down.
-const PageHeaderSlot = ({ title, range, setRange, search, setSearch }) => {
-  const [slot, setSlot] = useState(null);
-
-  useEffect(() => {
-    setSlot(document.getElementById("app-header-slot"));
-  }, []);
-
-  if (!slot) return null;
-
-  return createPortal(
+// Title, breadcrumb and header affordances live in the app bar, not the canvas.
+const PageHeader = ({ title, range, setRange, search, setSearch }) => (
+  <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0">
         <h1 className="truncate text-[17px] font-extrabold leading-tight tracking-tight text-slate-900">
@@ -509,33 +426,19 @@ const PageHeaderSlot = ({ title, range, setRange, search, setSearch }) => {
           <MoreHorizontal size={14} />
         </button>
 
-        <span className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 lg:flex">
-          <Search size={14} className="shrink-0 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search partner or plan..."
-            className="w-[150px] bg-transparent text-[12px] text-slate-600 placeholder:text-slate-400 focus:outline-none"
-          />
-          <span className="shrink-0 rounded border border-gray-200 px-1 text-[10px] font-semibold text-slate-400">
-            ⌘K
-          </span>
-        </span>
+        <HeaderSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search partner or plan..."
+          width={150}
+          shortcut
+        />
 
-        <button type="button" className="relative shrink-0 text-slate-500">
-          <Bell size={18} />
-          <span
-            className="absolute -right-1.5 -top-1.5 grid h-[15px] min-w-[15px] place-items-center rounded-full px-1 text-[9px] font-bold text-white"
-            style={{ background: RED }}
-          >
-            12
-          </span>
-        </button>
+        <HeaderBell count={12} color={RED} className="text-slate-500" />
       </div>
-    </div>,
-    slot
-  );
-};
+    </div>
+  </PageHeaderPortal>
+);
 
 // ---------------------------------------------------------------------------
 // Page
@@ -559,37 +462,9 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
 
   const topBookings = topPartners[0].bookings;
 
-  // Scale the fixed design canvas down to whatever width we actually have.
-  const outerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [boxHeight, setBoxHeight] = useState(undefined);
-
-  useLayoutEffect(() => {
-    const outer = outerRef.current;
-    const canvas = canvasRef.current;
-    if (!outer || !canvas) return;
-
-    const measure = () => {
-      const next = Math.min(1, outer.clientWidth / DESIGN_WIDTH);
-      // Guard against feedback loops when the height change moves a scrollbar.
-      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-      setBoxHeight((prev) => {
-        const h = Math.round(canvas.offsetHeight * next);
-        return prev === h ? prev : h;
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(outer);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
   return (
-    <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
-      <PageHeaderSlot
+    <>
+      <PageHeader
         title={title}
         range={headerRange}
         setRange={setHeaderRange}
@@ -597,18 +472,10 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
         setSearch={setHeaderSearch}
       />
 
-      <div
-        ref={canvasRef}
-        className={`flex flex-col pb-4 ${GAP}`}
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
+      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Action row - the title row lives in the app bar, see              */}
-        {/* PageHeaderSlot above. The mockup wraps these three onto two lines */}
+        {/* PageHeader above. The mockup wraps these three onto two lines     */}
         {/* at its own width; one right-aligned row keeps the same order and  */}
         {/* gives the KPI grid the full canvas.                               */}
         {/* ---------------------------------------------------------------- */}
@@ -1129,8 +996,8 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
             </div>
           </div>
         </Card>
-      </div>
-    </div>
+      </ScaledCanvas>
+    </>
   );
 };
 

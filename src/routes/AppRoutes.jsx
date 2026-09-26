@@ -46,6 +46,9 @@ const InvoicePayoutsV2 = lazy(() => import("../components/data/InvoicePayoutsV2"
 const MonthlyReportV2 = lazy(() => import("../components/data/MonthlyReportV2"));
 const PartnerSubscriptionsV2 = lazy(() => import("../components/data/PartnerSubscriptionsV2"));
 const ReviewsRatingsV2 = lazy(() => import("../components/data/ReviewsRatingsV2"));
+const MarketingSMSV2 = lazy(() => import("../components/create/MarketingSMSV2"));
+const UsersV2 = lazy(() => import("../components/data/UsersV2"));
+const UserDetailsV2 = lazy(() => import("../components/details/UserDetailsV2"));
 
 const AppRoutes = () => {
   return (
@@ -66,6 +69,10 @@ const AppRoutes = () => {
         <Route path="/monthly-report-v2" element={<MonthlyReportV2 title="Monthly Report" />} />
         <Route path="/partner-subscriptions-v2" element={<PartnerSubscriptionsV2 title="Partner Subscriptions" />} />
         <Route path="/reviews-ratings-v2" element={<ReviewsRatingsV2 title="Reviews & Ratings" />} />
+        <Route path="/marketing-sms-v2" element={<MarketingSMSV2 title="Send Marketing SMS" />} />
+        <Route path="/users-v2" element={<UsersV2 title="Users" />} />
+        <Route path="/user-details-v2" element={<UserDetailsV2 />} />
+        <Route path="/user-details-v2/:id" element={<UserDetailsV2 />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin title="Admin" />} />
         <Route path="/allusers" element={<AllUsers title="Users"/>} />

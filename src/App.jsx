@@ -10,6 +10,7 @@ import Dashboard from "./components/dashboard/DashboardPage";
 
 import Auth from "./components/auth/AuthPages";
 import AppRoutes from "./routes/AppRoutes";
+import { PageHeaderSlotProvider } from "./components/layout/PageHeaderSlot";
 
 import "./index.css";
 
@@ -78,6 +79,7 @@ useEffect(() => {
   }
 
   return (
+    <PageHeaderSlotProvider>
     <div className="flex w-full min-h-screen bg-gray-50">
 
       {/* ✅ SIDEBAR */}
@@ -121,6 +123,7 @@ useEffect(() => {
         </main>
       </div>
     </div>
+    </PageHeaderSlotProvider>
   );
 };
 

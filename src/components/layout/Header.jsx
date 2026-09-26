@@ -16,9 +16,11 @@ import api from "../../utils/api";
 import { useSelector, useDispatch } from "react-redux";
 // import { getProfile } from "../../redux/slices/profileSlice";
 import { toast } from "react-hot-toast";
+import { usePageHeaderSlotRef } from "./pageHeaderSlotContext";
 
 const Header = ({ collapsed,toggleSidebar }) => {
   const dispatch = useDispatch();
+  const pageHeaderSlotRef = usePageHeaderSlotRef();
   // const [collapsed, setCollapsed] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const modalRef = useRef(null);
@@ -96,10 +98,10 @@ const Header = ({ collapsed,toggleSidebar }) => {
             <Menu size={20} />
           </button>
 
-          {/* Pages can render their own title / header affordances in here
-              instead of drawing a second header bar of their own. Stays empty
-              (and invisible) for every page that doesn't use it. */}
-          <div id="app-header-slot" className="flex min-w-0 flex-1 items-center" />
+          {/* Pages render their title / header affordances in here through
+              <PageHeaderPortal> instead of drawing a second header bar of
+              their own. Stays empty (and invisible) for every other page. */}
+          <div ref={pageHeaderSlotRef} className="flex min-w-0 flex-1 items-center" />
         </div>
 
         <div className="flex items-center space-x-4">
