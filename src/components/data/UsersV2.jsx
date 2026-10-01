@@ -39,10 +39,14 @@ import {
   Venus,
 } from "lucide-react";
 import { useListUiState } from "../../hooks/useListUiState";
-import { getAllUsersList, updateUserStatus } from "../../redux/slices/allUsersSlice";
-import { getDashboard } from "../../redux/slices/dashboardSlice";
+import {
+  fetchUsersListV2,
+  getUsersListV2,
+  getUsersSummaryV2,
+  updateUserStatus,
+} from "../../redux/slices/allUsersSlice";
 import { setListUiState } from "../../redux/slices/listUiStateSlice";
-import { downloadCsv, titleCase } from "../../utils/format";
+import { downloadCsv, titleCase, toDate } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { LOYALTY_TIERS, loyaltyLabel } from "../../utils/loyalty";
 import { ONLINE_WINDOW_MINUTES, normalizeUser } from "../../utils/userModel";
@@ -68,12 +72,11 @@ import {
 // "Users" page, built 1:1 from the approved mockup on a fixed DESIGN_WIDTH
 // canvas that ScaledCanvas scales to the available width.
 //
-// Data: the user list comes from allUsersSlice (getAllUsersList), mapped by
-// normalizeUser() in utils/userModel.js, and every KPI, the growth chart, top
-// cities and the activity overview are derived from it client-side. "Total
-// Booked Users" prefers the dashboard's customer_funnel stage
-// (min_bookings = 1) from getDashboard. The UI shows "—" for anything the API
-// doesn't return (e.g. city, source, last app open).
+// Data: the table is /getUsersListV2 (paginated, every filter and the search
+// run in SQL), mapped by normalizeUser() in utils/userModel.js. The KPIs,
+// growth chart, top cities and activity overview come from /getUsersSummaryV2.
+// Join date = User.registered_at, last app open = latest UserSession
+// activity, total bookings = paid bookings.
 //
 // Filters, search and the page live in the listUiState slice (UI_KEY), so they
 // survive opening a user's profile and coming back.
@@ -130,6 +133,22 @@ const RANGES = [
 ];
 
 const GENDER_FILTERS = ["All Gender", "Male", "Female"];
+const STATUS_OPTIONS = [
+  { value: "", label: "All Status" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "terminated", label: "Terminated" },
+];
+// getUsersListV2 `source`: signed up with an invite code or not.
+const SOURCE_OPTIONS = [
+  { value: "", label: "All Sources" },
+  { value: "referral", label: "Referral" },
+  { value: "organic", label: "Organic" },
+];
+// Search hits the API, so wait for typing to pause.
+const SEARCH_DEBOUNCE_MS = 350;
+// Upper bound for "Export Users" in one request.
+const EXPORT_LIMIT = 10000;
 const LOYALTY_FILTER_ALL = "All Tiers";
 const PAGE_SIZES = ["10", "25", "50", "100"];
 const TOP_CITY_COUNT = 5;
@@ -176,19 +195,6 @@ const pctChange = (current, previous) => {
   return ((current - previous) / previous) * 100;
 };
 
-// Signups per day for `days` days starting at `from`.
-const dailySignups = (users, from, days) => {
-  const counts = Array(days).fill(0);
-  users.forEach((u) => {
-    const index = u.joined.clone().startOf("day").diff(from, "days");
-    if (index >= 0 && index < days) counts[index] += 1;
-  });
-  return counts;
-};
-
-const latestBy = (users, field) =>
-  users.reduce((best, u) => (u[field] && (!best || u[field].isAfter(best[field])) ? u : best), null);
-
 // 1 … 4 5 6 … 20 style page list.
 const pageItems = (page, last) => {
   if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
@@ -219,6 +225,7 @@ const exportCsv = (rows) => {
       "City",
       "Status",
       "Source",
+      "Login Method",
       "Loyalty",
       "Join Date",
       "Last App Open",
@@ -234,6 +241,7 @@ const exportCsv = (rows) => {
       row.city,
       row.status ? titleCase(row.status) : "",
       row.source,
+      row.loginMethod,
       row.loyalty ? loyaltyLabel(row.loyalty) : "",
       stamp(row.joined),
       stamp(row.lastOpen),
@@ -474,10 +482,11 @@ const UsersV2 = ({ title = "Users" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const rawUsers = useSelector((state) => state.allUsers.allUsersList);
-  const loading = useSelector((state) => state.allUsers.loading);
-  const error = useSelector((state) => state.allUsers.error);
-  const dashboard = useSelector((state) => state.dashboard.dashboardList);
+  const rawUsers = useSelector((state) => state.allUsers.usersV2);
+  const total = useSelector((state) => state.allUsers.usersV2Total);
+  const loading = useSelector((state) => state.allUsers.usersV2Loading);
+  const error = useSelector((state) => state.allUsers.usersV2Error);
+  const summary = useSelector((state) => state.allUsers.usersSummaryV2);
 
   const [ui] = useListUiState(UI_KEY, UI_DEFAULTS);
   const { range, headerSearch, search, status, gender, city, source, loyalty, joinedFrom, showMore, pageSize, page } =
@@ -489,11 +498,45 @@ const UsersV2 = ({ title = "Users" }) => {
 
   const [showAllCities, setShowAllCities] = useState(false);
   const [menuFor, setMenuFor] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // The filter-bar search wins over the header one when both are filled.
+  const searchTerm = search.trim() || headerSearch.trim();
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchTerm), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [searchTerm]);
+
+  // Joined-on-or-after: the later of the header preset and the date picker.
+  const joinedFromDate = useMemo(() => {
+    const presetStart = RANGES.find((r) => r.label === range)?.start();
+    return [presetStart ? presetStart.format("YYYY-MM-DD") : "", joinedFrom].filter(Boolean).sort().pop() || "";
+  }, [range, joinedFrom]);
+
+  const listFilters = useMemo(
+    () => ({
+      search: debouncedSearch,
+      status,
+      gender: gender === GENDER_FILTERS[0] ? "" : gender.toLowerCase(),
+      city,
+      source,
+      loyalty,
+      joined_from: joinedFromDate,
+    }),
+    [debouncedSearch, status, gender, city, source, loyalty, joinedFromDate]
+  );
+
+  const size = Number(pageSize);
 
   useEffect(() => {
-    dispatch(getAllUsersList({}));
-    dispatch(getDashboard());
-  }, [dispatch]);
+    dispatch(getUsersListV2({ ...listFilters, page, limit: size }));
+  }, [dispatch, listFilters, page, size, reloadKey]);
+
+  useEffect(() => {
+    dispatch(getUsersSummaryV2());
+  }, [dispatch, reloadKey]);
 
   // Close the row menu on any click outside it.
   useEffect(() => {
@@ -510,106 +553,59 @@ const UsersV2 = ({ title = "Users" }) => {
     [rawUsers]
   );
 
-  // Filter options are built from what's actually in the data.
-  const statusOptions = useMemo(
-    () => [
-      { value: "", label: "All Status" },
-      ...[...new Set(users.map((u) => u.status).filter(Boolean))]
-        .sort()
-        .map((value) => ({ value, label: titleCase(value) })),
-    ],
-    [users]
-  );
-  const cityOptions = useMemo(
-    () => [
-      { value: "", label: "All Cities" },
-      ...[...new Set(users.map((u) => u.city).filter(Boolean))].sort().map((value) => ({ value, label: value })),
-    ],
-    [users]
-  );
-  const sourceOptions = useMemo(
-    () => [
-      { value: "", label: "All Sources" },
-      ...[...new Set(users.map((u) => u.source).filter(Boolean))].sort().map((value) => ({ value, label: value })),
-    ],
-    [users]
-  );
+  // Cities come from the summary's top cities (plus the one selected, if not in it).
+  const statusOptions = STATUS_OPTIONS;
+  const cityOptions = useMemo(() => {
+    const names = (summary?.top_cities || []).map((c) => titleCase(String(c.city).trim()));
+    if (city && !names.includes(city)) names.push(city);
+    return [{ value: "", label: "All Cities" }, ...names.map((value) => ({ value, label: value }))];
+  }, [summary, city]);
+  const sourceOptions = SOURCE_OPTIONS;
   const loyaltyOptions = [
     { value: "", label: LOYALTY_FILTER_ALL },
     ...LOYALTY_TIERS.map((tier) => ({ value: tier.value, label: tier.label })),
   ];
 
-  // ---- KPIs, growth, cities, activity ----------------------------------
+  // ---- KPIs, growth, cities, activity (getUsersSummaryV2) ------------------
   const stats = useMemo(() => {
-    const now = moment();
-    const total = users.length;
-    const male = users.filter((u) => u.gender === "male").length;
-    const female = users.filter((u) => u.gender === "female").length;
-    const dated = users.filter((u) => u.joined);
-    const hasDates = dated.length > 0;
-    const undated = total - dated.length;
+    const s = summary;
+    const totalUsers = s ? s.total_users : null;
+    const share = (n) => (totalUsers ? (n / totalUsers) * 100 : 0);
+    const hasDates = !!s && s.unknown_join_date < s.total_users;
 
-    const monthStart = (offset) => now.clone().subtract(offset, "months").startOf("month");
-    const joinedInMonth = (offset) => {
-      const start = monthStart(offset);
-      const end = start.clone().endOf("month");
-      return dated.filter((u) => u.joined.isBetween(start, end, null, "[]")).length;
-    };
-    const thisMonth = joinedInMonth(0);
-    const lastMonth = joinedInMonth(1);
-    const monthBefore = joinedInMonth(2);
+    const last30 = s?.daily_signups?.last_30_days || [];
+    const new30 = last30.reduce((sum, n) => sum + n, 0);
+    let running = (totalUsers || 0) - new30;
+    const installedTrend = last30.map((n) => (running += n));
 
-    // Installed: running total over the last 30 days.
-    const windowStart = now.clone().startOf("day").subtract(29, "days");
-    const daily30 = dailySignups(dated, windowStart, 30);
-    const new30 = daily30.reduce((sum, n) => sum + n, 0);
-    let running = total - new30;
-    const installedTrend = daily30.map((n) => (running += n));
+    const booked = s ? s.booked_users : null;
+    const male = s ? s.male_users : null;
+    const female = s ? s.female_users : null;
+    const thisMonth = s ? s.new_this_month : null;
+    const lastMonth = s ? s.new_last_month : null;
+    const monthBefore = s ? s.new_month_before : null;
 
-    const thisMonthDays = now.date();
-    const lastMonthDays = monthStart(1).daysInMonth();
+    const growthRows = s?.growth || [];
+    const growth = growthRows.map((g) => ({
+      month: moment(g.month, "YYYY-MM").format("MMM"),
+      users: g.total_users,
+    }));
+    const startOfYear = growthRows.length ? growthRows[0].total_users - growthRows[0].new_users : null;
 
-    // Booked users: dashboard funnel first, then per-user fields.
-    const funnelStage = dashboard?.customer_funnel?.stages?.find(
-      (stage) => Number(stage.min_bookings) === 1
-    );
-    let booked = null;
-    if (funnelStage?.count != null) booked = Number(funnelStage.count);
-    else if (users.some((u) => u.bookings != null))
-      booked = users.filter((u) => u.bookings > 0).length;
-    else if (users.some((u) => u.loyalty))
-      booked = users.filter((u) => u.loyalty && u.loyalty !== "new_user").length;
-
-    // Growth: cumulative users at the end of each month of this year.
-    const yearStart = now.clone().startOf("year");
-    const beforeYear = dated.filter((u) => u.joined.isBefore(yearStart)).length + undated;
-    const growth = Array.from({ length: now.month() + 1 }, (_, m) => {
-      const end = yearStart.clone().month(m).endOf("month");
-      return {
-        month: end.format("MMM"),
-        users: dated.filter((u) => u.joined.isSameOrBefore(end)).length + undated,
-      };
-    });
-
-    // Cities.
-    const cityCounts = users.reduce((acc, u) => {
-      if (u.city) acc[u.city] = (acc[u.city] || 0) + 1;
-      return acc;
-    }, {});
-    const cities = Object.entries(cityCounts)
-      .map(([name, count]) => ({ name, count, pct: total ? (count / total) * 100 : 0 }))
-      .sort((a, b) => b.count - a.count);
-
-    const share = (n) => (total ? (n / total) * 100 : 0);
+    const cities = (s?.top_cities || []).map((c) => ({
+      name: titleCase(String(c.city).trim()),
+      count: c.users,
+      pct: share(c.users),
+    }));
 
     return {
-      total,
+      total: totalUsers,
       hasDates,
       kpis: [
         {
           label: "Total Installed Users",
-          value: fmt(total),
-          delta: hasDates && total > new30 ? (new30 / (total - new30)) * 100 : null,
+          value: fmt(totalUsers),
+          delta: hasDates && totalUsers > new30 ? (new30 / (totalUsers - new30)) * 100 : null,
           caption: hasDates ? "vs last 30 days" : "All registered users",
           icon: Users,
           color: VIOLET,
@@ -620,10 +616,7 @@ const UsersV2 = ({ title = "Users" }) => {
           label: "Total Booked Users",
           value: fmt(booked),
           share: booked == null ? 0 : share(booked),
-          caption:
-            booked == null
-              ? "Booking data unavailable"
-              : `${share(booked).toFixed(1)}% of total users`,
+          caption: booked == null ? "Loading…" : `${share(booked).toFixed(1)}% of total users`,
           icon: CalendarCheck2,
           color: GREEN,
           tint: "#DCFCE7",
@@ -631,8 +624,8 @@ const UsersV2 = ({ title = "Users" }) => {
         {
           label: "Total Male Users",
           value: fmt(male),
-          share: share(male),
-          caption: `${share(male).toFixed(1)}% of total users`,
+          share: male == null ? 0 : share(male),
+          caption: male == null ? "Loading…" : `${share(male).toFixed(1)}% of total users`,
           icon: Mars,
           color: BLUE,
           tint: "#DBEAFE",
@@ -640,8 +633,8 @@ const UsersV2 = ({ title = "Users" }) => {
         {
           label: "Total Female Users",
           value: fmt(female),
-          share: share(female),
-          caption: `${share(female).toFixed(1)}% of total users`,
+          share: female == null ? 0 : share(female),
+          caption: female == null ? "Loading…" : `${share(female).toFixed(1)}% of total users`,
           icon: Venus,
           color: PINK,
           tint: "#FCE7F3",
@@ -654,7 +647,7 @@ const UsersV2 = ({ title = "Users" }) => {
           icon: CalendarPlus,
           color: ORANGE,
           tint: "#FEF3C7",
-          trend: hasDates ? spark(dailySignups(dated, monthStart(0), thisMonthDays)) : null,
+          trend: hasDates ? spark(s.daily_signups.this_month) : null,
         },
         {
           label: "New Users Last Month",
@@ -664,55 +657,30 @@ const UsersV2 = ({ title = "Users" }) => {
           icon: CalendarDays,
           color: "#A855F7",
           tint: "#F3E8FF",
-          trend: hasDates ? spark(dailySignups(dated, monthStart(1), lastMonthDays)) : null,
+          trend: hasDates ? spark(s.daily_signups.last_month) : null,
         },
       ],
       growth,
-      growthPct: pctChange(total, beforeYear),
+      growthPct: startOfYear == null || totalUsers == null ? 0 : pctChange(totalUsers, startOfYear),
       cities,
-      latestOpen: latestBy(users, "lastOpen"),
-      latestBooking: latestBy(users, "lastBooking"),
+      latestOpen: s?.latest_active
+        ? { name: s.latest_active.name || `User #${s.latest_active.id}`, lastOpen: toDate(s.latest_active.last_active_at) }
+        : null,
+      latestBooking: s?.latest_booking
+        ? {
+          name: s.latest_booking.name || `User #${s.latest_booking.id}`,
+          lastBooking: toDate(s.latest_booking.last_booking_at),
+          appointmentId: s.latest_booking.appointment_id,
+        }
+        : null,
     };
-  }, [users, dashboard]);
+  }, [summary]);
 
-  // ---- Table rows --------------------------------------------------------
-  const rows = useMemo(() => {
-    const terms = [search, headerSearch]
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean);
-    const rangeStart = RANGES.find((r) => r.label === range)?.start();
-    const from = joinedFrom ? moment(joinedFrom).startOf("day") : null;
-    const wantGender = gender === GENDER_FILTERS[0] ? "" : gender.toLowerCase();
-
-    return users
-      .filter(
-        (row) =>
-          terms.every((term) =>
-            [row.name, row.email, row.phone, String(row.id)].some((field) =>
-              field.toLowerCase().includes(term)
-            )
-          ) &&
-          (!status || row.status === status) &&
-          (!wantGender || row.gender === wantGender) &&
-          (!city || row.city === city) &&
-          (!source || row.source === source) &&
-          (!loyalty || row.loyalty === loyalty) &&
-          (!rangeStart || (row.joined && row.joined.isSameOrAfter(rangeStart))) &&
-          (!from || (row.joined && row.joined.isSameOrAfter(from)))
-      )
-      .sort((a, b) => {
-        // Newest first; users without a join date sink to the bottom.
-        if (a.joined && b.joined) return b.joined.valueOf() - a.joined.valueOf();
-        if (a.joined) return -1;
-        if (b.joined) return 1;
-        return Number(b.id) - Number(a.id);
-      });
-  }, [users, search, headerSearch, status, gender, city, source, loyalty, range, joinedFrom]);
-
-  const size = Number(pageSize);
-  const lastPage = Math.max(1, Math.ceil(rows.length / size));
+  // ---- Table rows (this page, already filtered by the API) ----------------
+  const rows = users;
+  const lastPage = Math.max(1, Math.ceil((Number(total) || 0) / size));
   const currentPage = Math.min(page, lastPage);
-  const pageRows = rows.slice((currentPage - 1) * size, currentPage * size);
+  const pageRows = rows;
 
   const resetFilters = () => patchUi(FILTER_RESET);
 
@@ -722,9 +690,27 @@ const UsersV2 = ({ title = "Users" }) => {
     const result = await dispatch(updateUserStatus({ id, status: nextStatus }));
     if (updateUserStatus.fulfilled.match(result)) {
       toast.success(`User marked ${titleCase(nextStatus)}`, { id: toastId });
-      dispatch(getAllUsersList({}));
+      setReloadKey((k) => k + 1);
     } else {
       toast.error(result.payload || "Failed to update user status", { id: toastId });
+    }
+  };
+
+  // Every user matching the filters, not just this page.
+  const exportUsers = async () => {
+    setExporting(true);
+    try {
+      const { rows: all = [], total: found = 0 } = await dispatch(
+        fetchUsersListV2({ ...listFilters, page: 1, limit: EXPORT_LIMIT })
+      ).unwrap();
+      if (found > EXPORT_LIMIT) {
+        toast(`Exported the first ${EXPORT_LIMIT.toLocaleString("en-US")} of ${found.toLocaleString("en-US")} users - narrow the filters for the rest.`, { id: "users-export-toast" });
+      }
+      exportCsv(all.map(normalizeUser));
+    } catch (err) {
+      toast.error(String(err || "Export failed"), { id: "users-export-toast" });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -736,7 +722,12 @@ const UsersV2 = ({ title = "Users" }) => {
     { key: "add", label: "Add New User", icon: Plus },
     { key: "import", label: "Import Users", icon: Upload },
     { key: "roles", label: "Manage Roles & Permissions", icon: ShieldCheck },
-    { key: "export", label: "Export Users", icon: Download, onClick: () => exportCsv(rows) },
+    {
+      key: "export",
+      label: exporting ? "Exporting…" : "Export Users",
+      icon: Download,
+      onClick: exporting ? undefined : exportUsers,
+    },
     { key: "logs", label: "View User Activity Logs", icon: History },
   ];
 
@@ -769,10 +760,8 @@ const UsersV2 = ({ title = "Users" }) => {
       ? "Loading users…"
       : error && users.length === 0
         ? error
-        : rows.length === 0
-          ? users.length === 0
-            ? "No users yet."
-            : "No users match these filters."
+        : users.length === 0
+          ? "No users match these filters."
           : null;
 
   return (
@@ -851,7 +840,15 @@ const UsersV2 = ({ title = "Users" }) => {
                   user={stats.latestBooking}
                   field="lastBooking"
                 >
-                  <LinkButton onClick={() => navigate("/bookings")}>
+                  <LinkButton
+                    onClick={() =>
+                      navigate(
+                        stats.latestBooking?.appointmentId
+                          ? `/bookings/${stats.latestBooking.appointmentId}`
+                          : "/bookings"
+                      )
+                    }
+                  >
                     View Booking <ArrowRight size={12} />
                   </LinkButton>
                 </ActivityItem>
@@ -1129,11 +1126,11 @@ const UsersV2 = ({ title = "Users" }) => {
               {/* Footer ------------------------------------------------- */}
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-t border-[#EDEFF5] px-4 py-3.5">
                 <span className={`whitespace-nowrap text-slate-600 ${T.xxs}`}>
-                  {rows.length === 0
+                  {!total
                     ? "Showing 0 users"
                     : `Showing ${fmt((currentPage - 1) * size + 1)} to ${fmt(
-                        Math.min(currentPage * size, rows.length)
-                      )} of ${fmt(rows.length)} users`}
+                        Math.min(currentPage * size, total)
+                      )} of ${fmt(total)} users`}
                 </span>
 
                 <div className="flex items-center gap-2">
