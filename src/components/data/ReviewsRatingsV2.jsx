@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import moment from "moment";
+import { toast } from "react-hot-toast";
 import {
   Area,
   AreaChart,
@@ -13,6 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowRightLeft,
   ArrowUp,
@@ -22,6 +27,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  EyeOff,
   Filter,
   Frown,
   ListFilter,
@@ -35,7 +41,20 @@ import {
   Search,
   Smile,
   Star,
+  Trash2,
+  X,
 } from "lucide-react";
+import {
+  deleteReviewReplyV2,
+  exportReviewsV2,
+  getReviewsListV2,
+  getReviewsSummaryV2,
+  replyReviewV2,
+  updateReviewRequest,
+  updateReviewStatusV2,
+} from "../../redux/slices/reviewSlice";
+import { downloadCsv, toDate } from "../../utils/format";
+import { getImageUrl } from "../../utils/image";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark } from "../v2/tokens";
@@ -55,11 +74,24 @@ import {
 // DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
 // there for why bigger px sizes in T read smaller on screen).
 //
-// UI only for now - every number below is static demo data matching the
-// mockup. The search box, the three filter dropdowns and the tabs do narrow /
-// reorder the demo rows so the table can be exercised. Wire it to
-// reviewSlice (getAllSalonReviews returns reviews + salonSummaries) once the
-// design is signed off; the live page is components/data/Review.jsx.
+// Data (reviewSlice -> admin APIs):
+//   /getReviewsListV2     one server-side page of the table (all filters in SQL)
+//   /getReviewsSummaryV2  KPIs per named date range, top salons, tab badges
+//   /updateReviewStatusV2 hide / restore, single or bulk
+//   /replyReviewV2, /deleteReviewReplyV2   the admin reply
+//   /updatereviewrequest  approve / reject a salon's removal request (V1 API)
+//
+// A review links only a customer and a salon - there is no booking or
+// service on it, so the mockup's "By Services" tab is left out. "Hidden" =
+// Reviews.status inactive; "Reported" = a salon has a pending removal
+// request. Customer New / Repeat / VIP comes from completed bookings.
+//
+// KPI values, distribution, top salons and the summary follow the header
+// date range; KPI deltas and sparklines always compare the last 30 days with
+// the 30 before, as the mockup's "vs last 30 days" caption says.
+//
+// Still placeholders: Add Manual Review (needs a decision on whose name it
+// is posted under), the bell count and the ⌘K hint.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -95,276 +127,11 @@ const T = {
 };
 
 const GAP = "gap-3";
-
-// ---------------------------------------------------------------------------
-// Static demo data
-// ---------------------------------------------------------------------------
-
-// `good` colours the delta independently of its direction: fewer negative
-// reviews is a green down-arrow, fewer neutral reviews is a red one.
-const kpis = [
-  {
-    label: "Average Rating",
-    value: "4.7",
-    stars: true,
-    delta: "0.3",
-    up: true,
-    good: true,
-    icon: Star,
-    color: "#4F46E5",
-    tint: "#E0E7FF",
-    line: "#4F46E5",
-    trend: spark([12, 13, 11, 14, 13, 15, 14, 17, 13, 16, 18, 15, 17, 19, 17, 18, 21]),
-  },
-  {
-    label: "Total Reviews",
-    value: "18,294",
-    delta: "14.8%",
-    up: true,
-    good: true,
-    icon: MessageSquareText,
-    color: "#16A34A",
-    tint: "#DCFCE7",
-    line: GREEN,
-    trend: spark([10, 12, 11, 13, 12, 11, 14, 13, 12, 15, 14, 13, 16, 12, 15, 17, 18]),
-  },
-  {
-    label: "Positive Reviews",
-    value: "16,102",
-    pct: "(88.0%)",
-    delta: "15.2%",
-    up: true,
-    good: true,
-    icon: Smile,
-    color: AMBER,
-    tint: "#FEF3C7",
-    line: YELLOW,
-    trend: spark([10, 12, 11, 13, 12, 14, 12, 13, 15, 13, 14, 16, 14, 15, 17, 16, 18]),
-  },
-  {
-    label: "Neutral Reviews",
-    value: "1,381",
-    pct: "(7.6%)",
-    delta: "2.1%",
-    up: false,
-    good: false,
-    icon: Meh,
-    color: ORANGE,
-    tint: "#FFEDD5",
-    line: ORANGE,
-    trend: spark([14, 16, 13, 15, 14, 16, 13, 15, 14, 13, 15, 14, 18, 13, 15, 14, 13]),
-  },
-  {
-    label: "Negative Reviews",
-    value: "811",
-    pct: "(4.4%)",
-    delta: "8.7%",
-    up: false,
-    good: true,
-    icon: Frown,
-    color: RED,
-    tint: "#FEE2E2",
-    line: RED,
-    trend: spark([12, 14, 13, 15, 12, 14, 16, 13, 15, 14, 13, 16, 14, 15, 17, 18, 14]),
-  },
-];
-
-const salonsReviewed = {
-  label: "Salons Reviewed",
-  value: "3,842",
-  delta: "11.3%",
-  up: true,
-  good: true,
-  icon: Building2,
-  color: VIOLET,
-  tint: "#EDE9FE",
-  line: VIOLET,
-  trend: spark([12, 13, 12, 14, 13, 12, 14, 13, 15, 13, 14, 13, 15, 14, 16, 15, 16]),
-};
-
-const ratingDistribution = [
-  { name: "5 Stars", value: 13280, pct: "72.6%", color: GREEN },
-  { name: "4 Stars", value: 2822, pct: "15.4%", color: BLUE },
-  { name: "3 Stars", value: 1104, pct: "6.0%", color: YELLOW },
-  { name: "2 Stars", value: 628, pct: "3.4%", color: ORANGE },
-  { name: "1 Star", value: 460, pct: "2.5%", color: RED },
-];
-
-const reviewsTrend = [
-  { month: "Jan", reviews: 2145 },
-  { month: "Feb", reviews: 2652 },
-  { month: "Mar", reviews: 2984 },
-  { month: "Apr", reviews: 3120 },
-  { month: "May", reviews: 3642 },
-  { month: "Jun", reviews: 3751 },
-];
-
-const topSalons = [
-  { name: "Fresh Men Beauty Salon", rating: "4.9", reviews: 842 },
-  { name: "Your Choice Salon", rating: "4.8", reviews: 622 },
-  { name: "The Waves Salon", rating: "4.7", reviews: 512 },
-  { name: "Cutting Time", rating: "4.7", reviews: 498 },
-  { name: "Adam Affordable Mens Salon", rating: "4.6", reviews: 423 },
-];
-
-const reviewSummary = [
-  { label: "Total Reviews", value: "18,294" },
-  { label: "Responded", value: "7,821", pct: "(42.8%)" },
-  { label: "Pending Response", value: "23", pct: "(0.1%)" },
-  { label: "Reported Reviews", value: "156", pct: "(0.9%)" },
-  { label: "Deleted Reviews", value: "89", pct: "(0.5%)" },
-  { label: "This Month Growth", growth: "14.8%" },
-];
-
-// The first five rows are the mockup's; the rest fill out the 10-row page.
-const reviews = [
-  {
-    id: 1,
-    salon: "Amio Unisex Family Salon",
-    email: "amio2023radhangar@gmail.com",
-    customer: "Rakesh Kumar",
-    phone: "9170114075",
-    tag: "New",
-    rating: 5,
-    review: "Very clean salon. Staff was professional and friendly.",
-    status: "Active",
-    response: "Responded",
-    date: "1 Sept 2026",
-    time: "10:30 AM",
-  },
-  {
-    id: 2,
-    salon: "B Unique Unisex Salon",
-    email: "buniqueunisex@gmail.com",
-    customer: "Anita Sharma",
-    phone: "6382641774",
-    tag: "Repeat",
-    rating: 4,
-    review: "Great experience. Quick service and no waiting.",
-    status: "Active",
-    response: "Responded",
-    date: "1 Sept 2026",
-    time: "09:15 AM",
-  },
-  {
-    id: 3,
-    salon: "Care Me Salon",
-    email: "carmehaircare@gmail.com",
-    customer: "Vikram Iyer",
-    phone: "7200775090",
-    tag: "New",
-    rating: 4,
-    review: "Good haircut. Will book again!",
-    status: "Active",
-    response: "Pending",
-    date: "1 Sept 2026",
-    time: "09:02 AM",
-  },
-  {
-    id: 4,
-    salon: "Adam Affordable Mens Salon",
-    email: "adamofficial@gmail.com",
-    customer: "Suresh Babu",
-    phone: "8015541529",
-    tag: "VIP",
-    rating: 5,
-    review: "Best salon in my area. Highly recommended.",
-    status: "Active",
-    response: "Responded",
-    date: "31 Aug 2026",
-    time: "07:45 PM",
-  },
-  {
-    id: 5,
-    salon: "Musk & Tusk",
-    email: "muskandtusk@gmail.com",
-    customer: "Deepak Raj",
-    phone: "9345678912",
-    tag: "Repeat",
-    rating: 2,
-    review: "Had to wait for long. Not satisfied.",
-    status: "Active",
-    response: "Pending",
-    date: "31 Aug 2026",
-    time: "06:20 PM",
-  },
-  {
-    id: 6,
-    salon: "Fresh Men Beauty Salon",
-    email: "freshmenbeauty@gmail.com",
-    customer: "Priya Nair",
-    phone: "9840123456",
-    tag: "VIP",
-    rating: 5,
-    review: "Loved the facial. Very relaxing and hygienic.",
-    status: "Active",
-    response: "Responded",
-    date: "31 Aug 2026",
-    time: "04:10 PM",
-  },
-  {
-    id: 7,
-    salon: "The Waves Salon",
-    email: "thewavessalon@gmail.com",
-    customer: "Karthik S",
-    phone: "9003034689",
-    tag: "Repeat",
-    rating: 3,
-    review: "Service was okay, but the place was crowded.",
-    status: "Active",
-    response: "Pending",
-    date: "31 Aug 2026",
-    time: "02:35 PM",
-  },
-  {
-    id: 8,
-    salon: "Cutting Time",
-    email: "cuttingtime@gmail.com",
-    customer: "Meena Lakshmi",
-    phone: "9884473307",
-    tag: "New",
-    rating: 5,
-    review: "Stylist understood exactly what I wanted.",
-    status: "Active",
-    response: "Responded",
-    date: "30 Aug 2026",
-    time: "06:50 PM",
-  },
-  {
-    id: 9,
-    salon: "Your Choice Salon",
-    email: "yourchoicesalon@gmail.com",
-    customer: "Arjun Mehta",
-    phone: "7824031555",
-    tag: "Repeat",
-    rating: 1,
-    review: "Booking was not honoured. Very disappointed.",
-    status: "Reported",
-    response: "Pending",
-    date: "30 Aug 2026",
-    time: "11:20 AM",
-  },
-  {
-    id: 10,
-    salon: "KGF Salon",
-    email: "kgfsalon@gmail.com",
-    customer: "Farhan Ali",
-    phone: "6382039948",
-    tag: "New",
-    rating: 4,
-    review: "Nice beard trim and good pricing.",
-    status: "Active",
-    response: "Responded",
-    date: "30 Aug 2026",
-    time: "09:40 AM",
-  },
-];
-
-const TAG_TONES = {
-  New: "bg-indigo-50 text-indigo-500",
-  Repeat: "bg-sky-50 text-sky-600",
-  VIP: "bg-orange-50 text-orange-500",
-};
+const DASH = "—";
+const DAY = "YYYY-MM-DD";
+// "All time" is sent as a range starting before the platform existed.
+const ALL_TIME_FROM = "2000-01-01";
+const REPLY_MAX = 1000;
 
 const STATUS_TONES = {
   Active: "bg-emerald-50 text-emerald-600",
@@ -372,32 +139,156 @@ const STATUS_TONES = {
   Hidden: "bg-slate-100 text-slate-500",
 };
 
+const TAG_TONES = {
+  new: "bg-indigo-50 text-indigo-500",
+  repeat: "bg-sky-50 text-sky-600",
+  vip: "bg-orange-50 text-orange-500",
+};
+const TAG_LABELS = { new: "New", repeat: "Repeat", vip: "VIP" };
+
 const RESPONSE_TONES = {
   Responded: "bg-violet-50 text-violet-500",
   Pending: "bg-amber-50 text-amber-500",
 };
 
+const STAR_COLORS = { 5: GREEN, 4: BLUE, 3: YELLOW, 2: ORANGE, 1: RED };
+
+// `sort` is the list order each tab asks the API for.
 const TABS = [
-  { key: "all", label: "All Reviews" },
-  { key: "salons", label: "By Salons" },
-  { key: "services", label: "By Services" },
-  { key: "ratings", label: "By Ratings" },
-  { key: "customers", label: "By Customers" },
-  { key: "awaiting", label: "Awaiting Response", count: 23 },
+  { key: "all", label: "All Reviews", sort: "newest" },
+  { key: "salons", label: "By Salons", sort: "salon" },
+  { key: "ratings", label: "By Ratings", sort: "rating" },
+  { key: "customers", label: "By Customers", sort: "customer" },
+  { key: "awaiting", label: "Awaiting Response", sort: "newest" },
+  { key: "reported", label: "Reported", sort: "newest" },
 ];
 
-const SALON_FILTERS = ["All Salons", ...new Set(reviews.map((row) => row.salon))];
-const RATING_FILTERS = ["All Ratings", "5 Stars", "4 Stars", "3 Stars", "2 Stars", "1 Star"];
-const STATUS_FILTERS = ["All Status", "Active", "Reported", "Hidden"];
-const BULK_ACTIONS = ["Bulk Actions", "Mark as Responded", "Hide Selected", "Delete Selected"];
-const TREND_RANGES = ["Last 6 Months", "Last 12 Months", "Last 3 Months"];
+const RATING_FILTERS = [
+  { value: "all", label: "All Ratings" },
+  { value: "5", label: "5 Stars" },
+  { value: "4", label: "4 Stars" },
+  { value: "3", label: "3 Stars" },
+  { value: "2", label: "2 Stars" },
+  { value: "1", label: "1 Star" },
+];
+const STATUS_FILTERS = [
+  { value: "all", label: "All Status" },
+  { value: "active", label: "Active" },
+  { value: "reported", label: "Reported" },
+  { value: "hidden", label: "Hidden" },
+];
+const RESPONSE_FILTERS = [
+  { value: "all", label: "All Responses" },
+  { value: "responded", label: "Responded" },
+  { value: "pending", label: "Pending Response" },
+];
+const TAG_FILTERS = [
+  { value: "all", label: "All Customers" },
+  { value: "new", label: "New (0-1 visits)" },
+  { value: "repeat", label: "Repeat (2-9 visits)" },
+  { value: "vip", label: "VIP (10+ visits)" },
+];
+const BULK_ACTIONS = [
+  { value: "", label: "Bulk Actions" },
+  { value: "hide", label: "Hide Selected" },
+  { value: "restore", label: "Restore Selected" },
+];
+const TREND_RANGES = [
+  { value: "6", label: "Last 6 Months" },
+  { value: "12", label: "Last 12 Months" },
+  { value: "3", label: "Last 3 Months" },
+];
 const PAGE_SIZES = ["10", "25", "50", "100"];
 const HEADER_RANGES = [
-  "May 24, 2024 - Jun 23, 2024",
-  "Apr 24, 2024 - May 23, 2024",
-  "Jan 01, 2024 - Jun 23, 2024",
+  { value: "all", label: "All time", days: null },
+  { value: "7", label: "Last 7 days", days: 7 },
+  { value: "30", label: "Last 30 days", days: 30 },
+  { value: "90", label: "Last 90 days", days: 90 },
+  { value: "365", label: "Last 12 months", days: 365 },
 ];
-const LAST_PAGE = 1829;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Every period the page shows, as named inclusive calendar-day ranges:
+// the selected period, the two 30-day windows behind the deltas, 12 weekly
+// sparkline buckets (w0 oldest) and 12 chart months (m0 oldest).
+const buildRanges = (days) => {
+  const today = moment();
+  const fmt = (m) => m.format(DAY);
+  const ranges = [
+    {
+      key: "current",
+      from: days ? fmt(today.clone().subtract(days - 1, "days")) : ALL_TIME_FROM,
+      to: fmt(today),
+    },
+    { key: "last30", from: fmt(today.clone().subtract(29, "days")), to: fmt(today) },
+    {
+      key: "prev30",
+      from: fmt(today.clone().subtract(59, "days")),
+      to: fmt(today.clone().subtract(30, "days")),
+    },
+  ];
+  for (let i = 0; i < 12; i++) {
+    const to = today.clone().subtract((11 - i) * 7, "days");
+    ranges.push({ key: `w${i}`, from: fmt(to.clone().subtract(6, "days")), to: fmt(to) });
+  }
+  for (let i = 0; i < 12; i++) {
+    const start = today.clone().startOf("month").subtract(11 - i, "months");
+    const end = moment.min(start.clone().endOf("month"), today);
+    ranges.push({ key: `m${i}`, from: fmt(start), to: fmt(end) });
+  }
+  return ranges;
+};
+
+// One /getReviewsListV2 row -> what the table renders.
+const toRow = (r) => ({
+  id: r.review_id,
+  storeId: String(r.store_id),
+  salon: r.store_name || DASH,
+  salonContact: r.store_email || r.store_phone || DASH,
+  userId: r.user_id,
+  customer: r.customer_name || DASH,
+  customerContact: r.user_phone || r.user_email || DASH,
+  tag: r.customer_tag,
+  completedBookings: r.completed_bookings,
+  rating: Math.round(Number(r.rating) || 0),
+  review: r.review_description || "",
+  status: r.review_status === "inactive" ? "Hidden" : r.request_id ? "Reported" : "Active",
+  request: r.request_id ? { id: r.request_id, reason: r.request_reason } : null,
+  reply: r.reply ? { text: r.reply, at: toDate(r.replied_at), by: r.replied_by_name } : null,
+  created: toDate(r.created_at),
+});
+
+const fmtInt = (n) => Number(n || 0).toLocaleString("en-IN");
+const fmtPct = (part, whole) => (whole ? `(${((part / whole) * 100).toFixed(1)}%)` : null);
+
+// Percent change; null when there's no base to compare with.
+const pctChange = (cur, prev) => (prev ? ((cur - prev) / prev) * 100 : null);
+
+// { value, up } for the Delta component, or null when it can't be computed.
+const countDelta = (cur, prev) => {
+  const change = pctChange(cur ?? 0, prev ?? 0);
+  return change === null ? null : { value: `${Math.abs(change).toFixed(1)}%`, up: change >= 0 };
+};
+
+// Compact page list: 1 … 4 5 6 … 20.
+const pageList = (page, last) => {
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+  const keep = [...new Set([1, last, page - 1, page, page + 1])]
+    .filter((n) => n >= 1 && n <= last)
+    .sort((a, b) => a - b);
+  const out = [];
+  keep.forEach((n, i) => {
+    if (i > 0 && n - keep[i - 1] > 1) out.push(`gap-${n}`);
+    out.push(n);
+  });
+  return out;
+};
+
+const titleStatus = (value) =>
+  value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : DASH;
 
 // ---------------------------------------------------------------------------
 // Building blocks
@@ -420,16 +311,40 @@ const Stars = ({ value, size = 14, gap = "gap-[3px]" }) => (
   </span>
 );
 
-const SalonLogo = (props) => <BaseSalonLogo className={`rounded-md ${T.tiny}`} {...props} />;
+// The salon's own logo when it has one, the shared initials plate otherwise.
+const SalonLogo = ({ name, logo, size }) => {
+  const [failed, setFailed] = useState(false);
+  if (logo && !failed) {
+    return (
+      <img
+        src={getImageUrl(logo)}
+        alt=""
+        onError={() => setFailed(true)}
+        className="shrink-0 rounded-md object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return <BaseSalonLogo name={name} size={size} className={`rounded-md ${T.tiny}`} />;
+};
 
 // The small bordered dropdowns in the card headers, the filter bar and the
 // table footer.
 const Select = ({ size = T.xxs, ...props }) => <BaseSelect size={size} {...props} />;
 
 // Arrow + delta + caption. Arrow follows the direction, colour follows
-// whether that direction is good news.
-const Delta = ({ value, up, good }) => {
-  const Arrow = up ? ArrowUp : ArrowDown;
+// whether that direction is good news. `goodWhenUp` decides that per KPI.
+const Delta = ({ delta, goodWhenUp }) => {
+  if (!delta) {
+    return (
+      <span className={`flex items-center gap-1 truncate text-slate-400 ${T.xxs}`}>
+        <span className="font-semibold">{DASH}</span>
+        <span className="truncate">vs last 30 days</span>
+      </span>
+    );
+  }
+  const Arrow = delta.up ? ArrowUp : ArrowDown;
+  const good = delta.up === goodWhenUp;
   return (
     <span className={`flex items-center gap-1 truncate ${T.xxs}`}>
       <Arrow
@@ -438,7 +353,7 @@ const Delta = ({ value, up, good }) => {
         className={`shrink-0 ${good ? "text-emerald-500" : "text-rose-500"}`}
       />
       <span className={`font-semibold ${good ? "text-emerald-500" : "text-rose-500"}`}>
-        {value}
+        {delta.value}
       </span>
       <span className="truncate text-slate-400">vs last 30 days</span>
     </span>
@@ -461,7 +376,7 @@ const KpiCard = ({ kpi, className = "" }) => {
           <Icon
             size={17}
             style={{ color: kpi.color }}
-            fill={kpi.stars ? "currentColor" : "none"}
+            fill={kpi.stars != null ? "currentColor" : "none"}
           />
         </span>
         <p className={`min-w-0 flex-1 truncate font-semibold text-slate-800 ${T.xs}`}>
@@ -474,15 +389,15 @@ const KpiCard = ({ kpi, className = "" }) => {
           {kpi.value}
         </p>
         {kpi.pct && <span className={`truncate text-slate-500 ${T.xxs}`}>{kpi.pct}</span>}
-        {kpi.stars && (
+        {kpi.stars != null && (
           <span className="ml-2 self-center">
-            <Stars value={5} size={15} gap="gap-1.5" />
+            <Stars value={kpi.stars} size={15} gap="gap-1.5" />
           </span>
         )}
       </div>
 
       <div className="mt-2">
-        <Delta value={kpi.delta} up={kpi.up} good={kpi.good} />
+        <Delta delta={kpi.delta} goodWhenUp={kpi.goodWhenUp} />
       </div>
 
       <Sparkline id={`kpi-${kpi.label.replace(/\W/g, "")}`} data={kpi.trend} color={kpi.line} />
@@ -507,7 +422,9 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
             className="cursor-pointer appearance-none bg-transparent pr-1 text-[12px] font-medium text-slate-600 focus:outline-none"
           >
             {HEADER_RANGES.map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
           <ArrowRightLeft size={13} className="ml-1 shrink-0 text-slate-500" />
@@ -531,66 +448,628 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
   </PageHeaderPortal>
 );
 
+// Full review, removal-request moderation, the admin reply and hide /
+// restore. Rendered outside ScaledCanvas (a fixed overlay inside the
+// transformed canvas would be positioned and scaled relative to it).
+const ReviewModal = ({ row, busy, startEditing, onDecide, onSetStatus, onSaveReply, onDeleteReply, onClose }) => {
+  const [editing, setEditing] = useState(startEditing || !row.reply);
+  const [draft, setDraft] = useState(row.reply?.text || "");
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && !busy && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, busy]);
+
+  const hidden = row.status === "Hidden";
+  const canSave = draft.trim() && draft.trim() !== row.reply?.text && !busy;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={() => !busy && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Review details"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-extrabold text-slate-900">{row.salon}</h2>
+            <p className="mt-0.5 truncate text-sm text-slate-500">{row.salonContact}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={busy}
+            aria-label="Close"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <span className="flex items-center gap-2">
+            <Stars value={row.rating} size={16} />
+            <span className="font-semibold text-slate-700">{row.rating || DASH}</span>
+          </span>
+          <Chip className={STATUS_TONES[row.status]}>{row.status}</Chip>
+          <span className="text-slate-500">
+            {row.created ? row.created.format("D MMM YYYY, hh:mm A") : DASH}
+          </span>
+        </div>
+
+        <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <span>
+            By <span className="font-semibold text-slate-800">{row.customer}</span>
+            {row.customerContact !== DASH && ` · ${row.customerContact}`}
+          </span>
+          {row.tag && (
+            <Chip className={TAG_TONES[row.tag]}>
+              {TAG_LABELS[row.tag]} · {row.completedBookings} visit
+              {row.completedBookings === 1 ? "" : "s"}
+            </Chip>
+          )}
+        </p>
+
+        <p className="mt-3 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">
+          {row.review || "No written review - rating only."}
+        </p>
+
+        {row.request && (
+          <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-rose-600">
+              Salon asked to remove this review
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
+              {row.request.reason || "No reason given."}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Approving hides the review from the apps; rejecting keeps it visible.
+            </p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => onDecide(row, "rejected")}
+                disabled={busy}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              >
+                Reject request
+              </button>
+              <button
+                type="button"
+                onClick={() => onDecide(row, "approved")}
+                disabled={busy}
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                style={{ background: ROSE }}
+              >
+                Approve removal
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Reply ----------------------------------------------------------- */}
+        <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50/40 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Admin reply</p>
+            {row.reply && !editing && (
+              <span className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  disabled={busy}
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-violet-600 hover:bg-violet-100"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteReply(row)}
+                  disabled={busy}
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                >
+                  Delete
+                </button>
+              </span>
+            )}
+          </div>
+
+          {editing ? (
+            <>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={4}
+                maxLength={REPLY_MAX}
+                autoFocus={startEditing}
+                placeholder="Write a reply to this review…"
+                className="mt-2 block w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+              />
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-400">
+                  {draft.length}/{REPLY_MAX}
+                </span>
+                <span className="flex gap-2">
+                  {row.reply && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraft(row.reply.text);
+                        setEditing(false);
+                      }}
+                      disabled={busy}
+                      className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onSaveReply(row, draft.trim())}
+                    disabled={!canSave}
+                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                    style={{ background: VIOLET }}
+                  >
+                    {busy ? "Saving…" : row.reply ? "Update reply" : "Send reply"}
+                  </button>
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">
+                {row.reply.text}
+              </p>
+              <p className="mt-1.5 text-xs text-slate-400">
+                {row.reply.by ? `By ${row.reply.by}` : "By admin"}
+                {row.reply.at && ` · ${row.reply.at.format("D MMM YYYY, hh:mm A")}`}
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => onSetStatus(row, hidden ? "active" : "inactive")}
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            {hidden ? <Eye size={15} /> : <EyeOff size={15} />}
+            {hidden ? "Restore review" : "Hide review"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={busy}
+            className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
-  const [headerRange, setHeaderRange] = useState(HEADER_RANGES[0]);
-  const [headerSearch, setHeaderSearch] = useState("");
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const list = useSelector((state) => state.allReviews.listV2);
+  const listLoading = useSelector((state) => state.allReviews.listV2Loading);
+  const listError = useSelector((state) => state.allReviews.listV2Error);
+  const summary = useSelector((state) => state.allReviews.summaryV2);
+  const summaryLoading = useSelector((state) => state.allReviews.summaryV2Loading);
+  const summaryError = useSelector((state) => state.allReviews.summaryV2Error);
+  const actionLoading = useSelector((state) => state.allReviews.actionV2Loading);
+  const requestLoading = useSelector((state) => state.allReviews.updateLoading);
+
+  const [headerRange, setHeaderRange] = useState(HEADER_RANGES[0].value);
   const [tab, setTab] = useState("all");
-  const [bulkAction, setBulkAction] = useState(BULK_ACTIONS[0]);
-  const [trendRange, setTrendRange] = useState(TREND_RANGES[0]);
+  const [trendRange, setTrendRange] = useState(TREND_RANGES[0].value);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [salon, setSalon] = useState(SALON_FILTERS[0]);
-  const [rating, setRating] = useState(RATING_FILTERS[0]);
-  const [status, setStatus] = useState(STATUS_FILTERS[0]);
+  const [salon, setSalon] = useState("all");
+  const [rating, setRating] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [response, setResponse] = useState("all");
+  const [customerTag, setCustomerTag] = useState("all");
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(() => new Set());
+  const [menuFor, setMenuFor] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
-  const topReviewCount = ratingDistribution[0];
+  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
-  const resetFilters = () => {
-    setTab("all");
-    setSearch("");
-    setSalon(SALON_FILTERS[0]);
-    setRating(RATING_FILTERS[0]);
-    setStatus(STATUS_FILTERS[0]);
-    setBulkAction(BULK_ACTIONS[0]);
+  // Any filter change sends the table back to page 1.
+  const onFilter = (setter) => (value) => {
+    setter(value);
     setPage(1);
   };
 
-  // Narrows / reorders the demo rows. "By Services" has nothing to group on
-  // until the API returns the booked service, so it shows the default order.
-  const rows = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const stars = rating === RATING_FILTERS[0] ? null : parseInt(rating, 10);
+  // The search box is typed into freely; the API sees it 300ms after typing stops.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-    const filtered = reviews.filter(
-      (row) =>
-        (!term ||
-          [row.salon, row.email, row.customer, row.phone, row.review].some((field) =>
-            field.toLowerCase().includes(term)
-          )) &&
-        (salon === SALON_FILTERS[0] || row.salon === salon) &&
-        (stars === null || row.rating === stars) &&
-        (status === STATUS_FILTERS[0] || row.status === status) &&
-        (tab !== "awaiting" || row.response === "Pending")
+  const rangeDays = HEADER_RANGES.find((r) => r.value === headerRange)?.days ?? null;
+
+  // ---- data ---------------------------------------------------------------
+
+  // Everything the list query depends on, minus paging (export reuses it).
+  const filters = useMemo(() => {
+    const params = { sort: TABS.find((t) => t.key === tab)?.sort || "newest" };
+    if (search) params.search = search;
+    if (salon !== "all") params.store_id = salon;
+    if (rating !== "all") params.rating = rating;
+    if (customerTag !== "all") params.customer_tag = customerTag;
+    if (tab === "reported") params.status = "reported";
+    else if (status !== "all") params.status = status;
+    if (tab === "awaiting") params.response = "pending";
+    else if (response !== "all") params.response = response;
+    // The Reported tab is the moderation queue, so it ignores the date range.
+    if (rangeDays && tab !== "reported") {
+      params.from = moment().subtract(rangeDays - 1, "days").format(DAY);
+      params.to = moment().format(DAY);
+    }
+    return params;
+  }, [tab, search, salon, rating, customerTag, status, response, rangeDays]);
+
+  useEffect(() => {
+    dispatch(getReviewsListV2({ ...filters, page, limit: Number(pageSize) }));
+  }, [dispatch, filters, page, pageSize, reloadKey]);
+
+  useEffect(() => {
+    dispatch(getReviewsSummaryV2({ ranges: buildRanges(rangeDays), focus: "current" }));
+  }, [dispatch, rangeDays, reloadKey]);
+
+  const rows = useMemo(() => (list?.rows || []).map(toRow), [list]);
+
+  // Selection only ever covers the rows on screen.
+  useEffect(() => {
+    setSelected(new Set());
+    setMenuFor(null);
+  }, [list]);
+
+  // Close the row menu on any click outside it.
+  useEffect(() => {
+    if (menuFor === null) return undefined;
+    const close = (e) => !e.target.closest("[data-review-menu]") && setMenuFor(null);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuFor]);
+
+  // ---- KPIs ---------------------------------------------------------------
+
+  const ranges = useMemo(() => summary?.ranges || {}, [summary]);
+  const cur = ranges.current;
+
+  const kpis = useMemo(() => {
+    const last30 = ranges.last30 || {};
+    const prev30 = ranges.prev30 || {};
+    const weeks = Array.from({ length: 12 }, (_, i) => ranges[`w${i}`] || {});
+    let lastAvg = 0;
+    const avgTrend = weeks.map((week) => (lastAvg = week.avg_rating ?? lastAvg));
+    const m = cur || {};
+    const rated = (m.positive || 0) + (m.neutral || 0) + (m.negative || 0);
+
+    return {
+      avg: {
+        label: "Average Rating",
+        value: m.avg_rating == null ? DASH : m.avg_rating.toFixed(1),
+        stars: m.avg_rating ?? 0,
+        delta:
+          last30.avg_rating != null && prev30.avg_rating != null
+            ? {
+                value: Math.abs(last30.avg_rating - prev30.avg_rating).toFixed(1),
+                up: last30.avg_rating >= prev30.avg_rating,
+              }
+            : null,
+        goodWhenUp: true,
+        icon: Star,
+        color: "#4F46E5",
+        tint: "#E0E7FF",
+        line: "#4F46E5",
+        trend: spark(avgTrend),
+      },
+      list: [
+        {
+          label: "Total Reviews",
+          value: fmtInt(m.total),
+          delta: countDelta(last30.total, prev30.total),
+          goodWhenUp: true,
+          icon: MessageSquareText,
+          color: "#16A34A",
+          tint: "#DCFCE7",
+          line: GREEN,
+          trend: spark(weeks.map((w) => w.total || 0)),
+        },
+        {
+          label: "Positive Reviews",
+          value: fmtInt(m.positive),
+          pct: fmtPct(m.positive, rated),
+          delta: countDelta(last30.positive, prev30.positive),
+          goodWhenUp: true,
+          icon: Smile,
+          color: AMBER,
+          tint: "#FEF3C7",
+          line: YELLOW,
+          trend: spark(weeks.map((w) => w.positive || 0)),
+        },
+        {
+          label: "Neutral Reviews",
+          value: fmtInt(m.neutral),
+          pct: fmtPct(m.neutral, rated),
+          delta: countDelta(last30.neutral, prev30.neutral),
+          goodWhenUp: false,
+          icon: Meh,
+          color: ORANGE,
+          tint: "#FFEDD5",
+          line: ORANGE,
+          trend: spark(weeks.map((w) => w.neutral || 0)),
+        },
+        {
+          label: "Negative Reviews",
+          value: fmtInt(m.negative),
+          pct: fmtPct(m.negative, rated),
+          delta: countDelta(last30.negative, prev30.negative),
+          goodWhenUp: false,
+          icon: Frown,
+          color: RED,
+          tint: "#FEE2E2",
+          line: RED,
+          trend: spark(weeks.map((w) => w.negative || 0)),
+        },
+      ],
+      salons: {
+        label: "Salons Reviewed",
+        value: fmtInt(m.salons),
+        delta: countDelta(last30.salons, prev30.salons),
+        goodWhenUp: true,
+        icon: Building2,
+        color: VIOLET,
+        tint: "#EDE9FE",
+        line: VIOLET,
+        trend: spark(weeks.map((w) => w.salons || 0)),
+      },
+    };
+  }, [ranges, cur]);
+
+  // ---- panels -------------------------------------------------------------
+
+  const distribution = [5, 4, 3, 2, 1].map((stars) => {
+    const value = cur?.stars?.[stars] || 0;
+    const rated = cur ? cur.positive + cur.neutral + cur.negative : 0;
+    return {
+      name: stars === 1 ? "1 Star" : `${stars} Stars`,
+      value,
+      pct: rated ? `${((value / rated) * 100).toFixed(1)}%` : "0%",
+      color: STAR_COLORS[stars],
+    };
+  });
+  const distributionTotal = distribution.reduce((acc, slice) => acc + slice.value, 0);
+
+  // Monthly review counts, independent of the header range.
+  const reviewsTrend = useMemo(() => {
+    const months = Number(trendRange);
+    return Array.from({ length: months }, (_, i) => {
+      const index = 12 - months + i;
+      const start = moment().startOf("month").subtract(11 - index, "months");
+      return {
+        month: start.format(months > 6 ? "MMM YY" : "MMM"),
+        reviews: ranges[`m${index}`]?.total || 0,
+      };
+    });
+  }, [ranges, trendRange]);
+  const trendMax = Math.max(0, ...reviewsTrend.map((point) => point.reviews));
+
+  const thisMonth = ranges.m11?.total || 0;
+  const lastMonth = ranges.m10?.total || 0;
+  const growth = pctChange(thisMonth, lastMonth);
+  const responded = cur?.responded || 0;
+  const summaryRows = [
+    { label: "Total Reviews", value: fmtInt(cur?.total) },
+    { label: "Responded", value: fmtInt(responded), pct: fmtPct(responded, cur?.total) },
+    {
+      label: "Pending Response",
+      value: fmtInt((cur?.total || 0) - responded),
+      pct: fmtPct((cur?.total || 0) - responded, cur?.total),
+    },
+    { label: "Reported Reviews", value: fmtInt(cur?.reported), pct: fmtPct(cur?.reported, cur?.all_reviews) },
+    { label: "Deleted Reviews", value: fmtInt(cur?.hidden), pct: fmtPct(cur?.hidden, cur?.all_reviews) },
+    { label: "This Month Growth", growth },
+  ];
+
+  const salonOptions = useMemo(
+    () => [
+      { value: "all", label: "All Salons" },
+      ...(summary?.salons || []).map((s) => ({ value: String(s.id), label: s.name || `#${s.id}` })),
+    ],
+    [summary]
+  );
+
+  const tabCounts = {
+    awaiting: summary?.queues?.awaiting_response || 0,
+    reported: summary?.queues?.reported_pending || 0,
+  };
+
+  // ---- table --------------------------------------------------------------
+
+  const size = Number(pageSize);
+  const total = list?.total || 0;
+  const lastPage = Math.max(1, Math.ceil(total / size));
+  const currentPage = Math.min(page, lastPage);
+  const allOnPageSelected = rows.length > 0 && rows.every((row) => selected.has(row.id));
+
+  const toggleRow = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const resetAndRefresh = () => {
+    setTab("all");
+    setSearchInput("");
+    setSearch("");
+    setSalon("all");
+    setRating("all");
+    setStatus("all");
+    setResponse("all");
+    setCustomerTag("all");
+    setPage(1);
+    reload();
+  };
+
+  // ---- actions ------------------------------------------------------------
+
+  const runAction = async (thunk, args, { pending, success }) => {
+    const toastId = "reviews-v2-action-toast";
+    toast.loading(pending, { id: toastId });
+    try {
+      const result = await dispatch(thunk(args)).unwrap();
+      toast.success(typeof success === "function" ? success(result) : success, { id: toastId });
+      reload();
+      return result;
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Something went wrong", { id: toastId });
+      return null;
+    }
+  };
+
+  // Single or bulk hide / restore. Reports anything the API skipped.
+  const setStatusFor = async (ids, nextStatus) => {
+    const result = await runAction(
+      updateReviewStatusV2,
+      { review_ids: ids, status: nextStatus },
+      {
+        pending: nextStatus === "inactive" ? "Hiding reviews..." : "Restoring reviews...",
+        success: (res) => {
+          const done = res?.updated?.length || 0;
+          const skipped = res?.skipped?.length || 0;
+          const verb = nextStatus === "inactive" ? "hidden" : "restored";
+          return skipped
+            ? `${done} ${verb}, ${skipped} skipped - the customer already has an active review for that salon`
+            : `${done} review${done === 1 ? "" : "s"} ${verb}`;
+        },
+      }
     );
+    if (result) setViewing(null);
+  };
 
-    if (tab === "salons") return [...filtered].sort((a, b) => a.salon.localeCompare(b.salon));
-    if (tab === "customers")
-      return [...filtered].sort((a, b) => a.customer.localeCompare(b.customer));
-    if (tab === "ratings") return [...filtered].sort((a, b) => b.rating - a.rating);
-    return filtered;
-  }, [search, salon, rating, status, tab]);
+  const onBulkAction = (action) => {
+    if (!action) return;
+    const ids = [...selected];
+    if (!ids.length) {
+      toast.error("Select reviews first", { id: "reviews-v2-action-toast" });
+      return;
+    }
+    const verb = action === "hide" ? "Hide" : "Restore";
+    if (!window.confirm(`${verb} ${ids.length} selected review${ids.length === 1 ? "" : "s"}?`)) return;
+    setStatusFor(ids, action === "hide" ? "inactive" : "active");
+  };
 
-  const isFiltered =
-    search.trim() !== "" ||
-    salon !== SALON_FILTERS[0] ||
-    rating !== RATING_FILTERS[0] ||
-    status !== STATUS_FILTERS[0] ||
-    tab === "awaiting";
+  const decide = async (row, decision) => {
+    const result = await runAction(
+      updateReviewRequest,
+      { id: row.request.id, review_id: row.id, status: decision },
+      {
+        pending: "Updating review request...",
+        success: decision === "approved" ? "Review removed successfully" : "Review delete request rejected",
+      }
+    );
+    if (result) setViewing(null);
+  };
+
+  const saveReply = async (row, text) => {
+    const result = await runAction(
+      replyReviewV2,
+      { review_id: row.id, reply: text },
+      { pending: "Saving reply...", success: row.reply ? "Reply updated" : "Reply sent" }
+    );
+    if (result) setViewing(null);
+  };
+
+  const deleteReply = async (row) => {
+    if (!window.confirm("Delete the reply to this review?")) return;
+    const result = await runAction(
+      deleteReviewReplyV2,
+      { review_id: row.id },
+      { pending: "Deleting reply...", success: "Reply deleted" }
+    );
+    if (result) setViewing(null);
+  };
+
+  const exportReport = async () => {
+    setExporting(true);
+    try {
+      const data = await dispatch(exportReviewsV2(filters)).unwrap();
+      if (!data.length) {
+        toast.error("No reviews to export", { id: "reviews-export-toast" });
+        return;
+      }
+      downloadCsv(
+        `reviews_${moment().format(DAY)}.csv`,
+        [
+          "Review ID",
+          "Salon",
+          "Salon Contact",
+          "Customer",
+          "Customer Contact",
+          "Customer Type",
+          "Completed Visits",
+          "Rating",
+          "Review",
+          "Status",
+          "Removal Reason",
+          "Reply",
+          "Replied At",
+          "Date",
+        ],
+        data.map(toRow).map((row) => [
+          row.id,
+          row.salon,
+          row.salonContact,
+          row.customer,
+          row.customerContact,
+          TAG_LABELS[row.tag] || "",
+          row.completedBookings ?? "",
+          row.rating || "",
+          row.review,
+          row.status,
+          row.request?.reason || "",
+          row.reply?.text || "",
+          row.reply?.at ? row.reply.at.format("YYYY-MM-DD HH:mm") : "",
+          row.created ? row.created.format("YYYY-MM-DD HH:mm") : "",
+        ])
+      );
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Failed to export reviews", {
+        id: "reviews-export-toast",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const pageButton = (number) => (
     <button
@@ -598,33 +1077,49 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
       type="button"
       onClick={() => setPage(number)}
       className={`h-8 min-w-8 rounded-lg px-2 font-semibold transition-colors ${T.xxs} ${
-        page === number
+        currentPage === number
           ? "border border-rose-100 bg-rose-50"
           : "border border-[#E6E8F0] bg-white text-slate-600 hover:bg-slate-50"
       }`}
-      style={page === number ? { color: ROSE } : undefined}
+      style={currentPage === number ? { color: ROSE } : undefined}
     >
       {number}
     </button>
   );
+
+  const error = listError || summaryError;
+  const busy = actionLoading || requestLoading;
+  const moreFiltersActive = response !== "all" || customerTag !== "all";
 
   return (
     <>
       <PageHeader
         title={title}
         range={headerRange}
-        setRange={setHeaderRange}
-        search={headerSearch}
-        setSearch={setHeaderSearch}
+        setRange={onFilter(setHeaderRange)}
+        search={searchInput}
+        setSearch={setSearchInput}
       />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+        {error && (
+          <div
+            className={`flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 ${T.xs}`}
+          >
+            <AlertTriangle size={16} className="shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Failed to load reviews: {error}</span>
+            <button type="button" onClick={reload} className="shrink-0 font-semibold underline">
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* ---------------------------------------------------------------- */}
         {/* KPI row - the sixth column stacks the page actions above the     */}
         {/* shorter "Salons Reviewed" card, exactly as the mockup does.       */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${KPI_COLS} items-end ${GAP}`}>
-          {kpis.map((kpi) => (
+          {[kpis.avg, ...kpis.list].map((kpi) => (
             <KpiCard key={kpi.label} kpi={kpi} className="h-[196px]" />
           ))}
 
@@ -635,7 +1130,9 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
             <div className="flex min-w-0 justify-end gap-2">
               <button
                 type="button"
-                className={`flex min-w-0 items-center justify-center gap-1 rounded-lg px-2 py-2 font-semibold text-white shadow-sm ${T.xxs}`}
+                disabled
+                title="Not built yet: needs a decision on whose name a manual review is posted under"
+                className={`flex min-w-0 cursor-not-allowed items-center justify-center gap-1 rounded-lg px-2 py-2 font-semibold text-white opacity-50 shadow-sm ${T.xxs}`}
                 style={{ background: ROSE }}
               >
                 <Plus size={14} className="shrink-0" />
@@ -644,14 +1141,16 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
 
               <button
                 type="button"
-                className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border border-[#E6E8F0] bg-white px-2 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-50 ${T.xxs}`}
+                onClick={exportReport}
+                disabled={exporting}
+                className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border border-[#E6E8F0] bg-white px-2 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 ${T.xxs}`}
               >
                 <Download size={14} className="shrink-0 text-slate-600" />
-                <span className="truncate">Export Report</span>
+                <span className="truncate">{exporting ? "Exporting…" : "Export Report"}</span>
               </button>
             </div>
 
-            <KpiCard kpi={salonsReviewed} className="h-[162px]" />
+            <KpiCard kpi={kpis.salons} className="h-[162px]" />
           </div>
         </div>
 
@@ -662,26 +1161,24 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
           <div className="flex items-center gap-1">
             {TABS.map((item) => {
               const active = tab === item.key;
+              const count = tabCounts[item.key];
               return (
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => {
-                    setTab(item.key);
-                    setPage(1);
-                  }}
+                  onClick={() => onFilter(setTab)(item.key)}
                   className={`relative flex items-center gap-1.5 px-5 py-3 font-medium transition-colors ${T.sm} ${
                     active ? "" : "text-slate-600 hover:text-slate-900"
                   }`}
                   style={active ? { color: ROSE } : undefined}
                 >
                   {item.label}
-                  {item.count != null && (
+                  {count > 0 && (
                     <span
                       className="grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold text-white"
                       style={{ background: ROSE }}
                     >
-                      {item.count}
+                      {count}
                     </span>
                   )}
                   {active && (
@@ -698,28 +1195,40 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
           <div className="ml-auto flex items-center gap-3">
             <button
               type="button"
-              className={`flex items-center gap-2 rounded-lg border border-[#E6E8F0] bg-white px-4 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-50 ${T.sm}`}
+              onClick={() => setShowMoreFilters((open) => !open)}
+              className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 font-medium transition-colors ${T.sm} ${
+                showMoreFilters || moreFiltersActive
+                  ? "border-rose-200 bg-rose-50 text-rose-600"
+                  : "border-[#E6E8F0] bg-white text-slate-700 hover:bg-slate-50"
+              }`}
             >
-              <Filter size={15} className="shrink-0 text-slate-600" />
+              <Filter size={15} className="shrink-0" />
               Filters
             </button>
 
-            <Select
-              value={bulkAction}
-              onChange={setBulkAction}
-              options={BULK_ACTIONS}
-              className="w-[146px] [&_select]:py-2.5"
-              size={T.sm}
-            />
+            <span title={selected.size ? `${selected.size} selected` : "Select rows with the checkboxes"}>
+              <Select
+                value=""
+                onChange={onBulkAction}
+                options={BULK_ACTIONS.map((option) =>
+                  option.value || !selected.size
+                    ? option
+                    : { ...option, label: `${option.label} (${selected.size})` }
+                )}
+                className="w-[176px] [&_select]:py-2.5"
+                size={T.sm}
+              />
+            </span>
 
             <button
               type="button"
-              onClick={resetFilters}
-              className="grid h-[42px] w-[42px] place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-600 transition-colors hover:bg-slate-50"
-              aria-label="Reset filters"
-              title="Reset filters"
+              onClick={resetAndRefresh}
+              disabled={listLoading || summaryLoading}
+              className="grid h-[42px] w-[42px] place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              aria-label="Reset filters and refresh"
+              title="Reset filters and refresh"
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={16} className={listLoading || summaryLoading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
@@ -739,27 +1248,36 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={ratingDistribution}
+                      data={
+                        distributionTotal
+                          ? distribution
+                          : [{ name: "No reviews", value: 1, color: "#E2E8F0" }]
+                      }
                       dataKey="value"
                       nameKey="name"
                       innerRadius="64%"
                       outerRadius="100%"
-                      paddingAngle={1}
+                      paddingAngle={distributionTotal ? 1 : 0}
                       startAngle={90}
                       endAngle={-270}
                       stroke="none"
+                      isAnimationActive={false}
                     >
-                      {ratingDistribution.map((slice) => (
-                        <Cell key={slice.name} fill={slice.color} />
-                      ))}
+                      {(distributionTotal ? distribution : [{ name: "none", color: "#E2E8F0" }]).map(
+                        (slice) => (
+                          <Cell key={slice.name} fill={slice.color} />
+                        )
+                      )}
                     </Pie>
-                    <Tooltip {...TOOLTIP} formatter={(value) => value.toLocaleString("en-IN")} />
+                    {distributionTotal > 0 && (
+                      <Tooltip {...TOOLTIP} formatter={(value) => value.toLocaleString("en-IN")} />
+                    )}
                   </PieChart>
                 </ResponsiveContainer>
 
                 <div className="pointer-events-none absolute inset-0 grid place-content-center justify-items-center">
                   <span className={`font-extrabold leading-none tracking-tight text-slate-900 ${T.donut}`}>
-                    18,294
+                    {fmtInt(distributionTotal)}
                   </span>
                   <span className={`mt-1.5 leading-none text-slate-500 ${T.tiny}`}>
                     Total Reviews
@@ -768,7 +1286,7 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
               </div>
 
               <ul className="flex min-w-0 flex-1 flex-col gap-4">
-                {ratingDistribution.map((slice) => (
+                {distribution.map((slice) => (
                   <li key={slice.name} className="flex items-center gap-2">
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -778,7 +1296,7 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
                       {slice.name}
                     </span>
                     <span className={`shrink-0 whitespace-nowrap font-semibold text-slate-800 ${T.xxs}`}>
-                      {slice.value.toLocaleString("en-US")}
+                      {fmtInt(slice.value)}
                     </span>
                     <span className={`w-[46px] shrink-0 whitespace-nowrap text-right text-slate-500 ${T.tiny}`}>
                       ({slice.pct})
@@ -789,7 +1307,7 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
             </div>
 
             <div className="px-4 pb-4 pt-2">
-              <span className={`font-bold text-slate-900 ${T.sm}`}>{topReviewCount.pct}</span>
+              <span className={`font-bold text-slate-900 ${T.sm}`}>{distribution[0].pct}</span>
               <span className={`ml-1.5 text-slate-600 ${T.xs}`}>5 Star Reviews</span>
             </div>
           </Card>
@@ -823,18 +1341,19 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
                     axisLine={false}
                     tick={AXIS}
                     dy={6}
+                    interval={0}
                     padding={{ left: 24, right: 12 }}
                   />
                   <YAxis
-                    domain={[0, 4000]}
-                    ticks={[0, 1000, 2000, 3000, 4000]}
+                    domain={[0, trendMax > 0 ? "auto" : 4]}
+                    allowDecimals={false}
                     tickLine={false}
                     axisLine={false}
                     tick={AXIS}
                     width={48}
                     tickFormatter={(value) => (value >= 1000 ? `${value / 1000}K` : value)}
                   />
-                  <Tooltip {...TOOLTIP} formatter={(value) => value.toLocaleString("en-US")} />
+                  <Tooltip {...TOOLTIP} formatter={(value) => value.toLocaleString("en-IN")} />
                   <Area
                     type="linear"
                     dataKey="reviews"
@@ -845,13 +1364,15 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
                     dot={{ r: 4.5, fill: GREEN, stroke: "#fff", strokeWidth: 1.5 }}
                     activeDot={{ r: 6 }}
                   >
-                    <LabelList
-                      dataKey="reviews"
-                      position="top"
-                      offset={10}
-                      formatter={(value) => value.toLocaleString("en-US")}
-                      style={{ fontSize: 11, fontWeight: 600, fill: "#0F172A" }}
-                    />
+                    {reviewsTrend.length <= 6 && (
+                      <LabelList
+                        dataKey="reviews"
+                        position="top"
+                        offset={10}
+                        formatter={(value) => value.toLocaleString("en-IN")}
+                        style={{ fontSize: 11, fontWeight: 600, fill: "#0F172A" }}
+                      />
+                    )}
                   </Area>
                 </AreaChart>
               </ResponsiveContainer>
@@ -864,6 +1385,7 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
               <SectionTitle>Top Reviewed Salons</SectionTitle>
               <button
                 type="button"
+                onClick={() => onFilter(setTab)("salons")}
                 className={`shrink-0 font-semibold text-blue-600 hover:underline ${T.xxs}`}
               >
                 View All
@@ -871,20 +1393,48 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
             </div>
 
             <ul className="flex flex-1 flex-col justify-center gap-3.5 px-4 py-3">
-              {topSalons.map((item) => (
-                <li key={item.name} className="flex items-center gap-3">
-                  <SalonLogo name={item.name} size={36} />
+              {!summary?.top_salons?.length && (
+                <li className={`text-center text-slate-400 ${T.xs}`}>
+                  {summaryLoading ? "Loading…" : "No reviews in this period."}
+                </li>
+              )}
+              {(summary?.top_salons || []).map((item) => (
+                <li key={item.store_id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSalon(String(item.store_id));
+                      setTab("all");
+                      setPage(1);
+                    }}
+                    title="Show this salon's reviews"
+                    className="flex w-full items-center gap-3 text-left"
+                  >
+                    <SalonLogo name={item.store_name || "?"} logo={item.store_logo} size={36} />
 
-                  <div className="min-w-0 flex-1 leading-tight">
-                    <p className={`truncate font-semibold text-slate-800 ${T.xs}`}>{item.name}</p>
-                    <p className={`mt-1 flex items-center gap-1 text-slate-500 ${T.tiny}`}>
-                      <Star size={12} className="shrink-0 text-amber-400" fill="currentColor" />
-                      <span className="font-semibold text-slate-700">{item.rating}</span>
-                      <span className="truncate">({item.reviews} reviews)</span>
-                    </p>
-                  </div>
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className={`block truncate font-semibold text-slate-800 ${T.xs}`}>
+                        {item.store_name || DASH}
+                      </span>
+                      <span className={`mt-1 flex items-center gap-1 text-slate-500 ${T.tiny}`}>
+                        <Star size={12} className="shrink-0 text-amber-400" fill="currentColor" />
+                        <span className="font-semibold text-slate-700">
+                          {item.average_rating == null ? DASH : item.average_rating.toFixed(1)}
+                        </span>
+                        <span className="truncate">
+                          ({fmtInt(item.review_count)} review{item.review_count === 1 ? "" : "s"})
+                        </span>
+                      </span>
+                    </span>
 
-                  <Chip className={STATUS_TONES.Active}>Active</Chip>
+                    <Chip
+                      className={
+                        item.store_status === "active" ? STATUS_TONES.Active : STATUS_TONES.Hidden
+                      }
+                    >
+                      {titleStatus(item.store_status)}
+                    </Chip>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -897,16 +1447,26 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
             </div>
 
             <ul className="flex flex-1 flex-col justify-around px-4 pb-3 pt-2">
-              {reviewSummary.map((row) => (
+              {summaryRows.map((row) => (
                 <li key={row.label} className="flex items-center justify-between gap-2">
                   <span className={`truncate text-slate-500 ${T.xxs}`}>{row.label}</span>
-                  {row.growth ? (
-                    <span
-                      className={`flex shrink-0 items-center gap-1 font-bold text-emerald-500 ${T.xs}`}
-                    >
-                      <ArrowUp size={13} strokeWidth={2.4} />
-                      {row.growth}
-                    </span>
+                  {"growth" in row ? (
+                    row.growth === null ? (
+                      <span className={`shrink-0 font-bold text-slate-400 ${T.xs}`}>{DASH}</span>
+                    ) : (
+                      <span
+                        className={`flex shrink-0 items-center gap-1 font-bold ${T.xs} ${
+                          row.growth >= 0 ? "text-emerald-500" : "text-rose-500"
+                        }`}
+                      >
+                        {row.growth >= 0 ? (
+                          <ArrowUp size={13} strokeWidth={2.4} />
+                        ) : (
+                          <ArrowDown size={13} strokeWidth={2.4} />
+                        )}
+                        {Math.abs(row.growth).toFixed(1)}%
+                      </span>
+                    )
                   ) : (
                     <span className={`shrink-0 whitespace-nowrap ${T.xs}`}>
                       <span className="font-bold text-slate-900">{row.value}</span>
@@ -929,11 +1489,8 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
               className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search by salon, customer, review content..."
               className={`w-full rounded-lg border border-[#E6E8F0] bg-white py-2.5 pl-10 pr-3 text-slate-700 placeholder:text-slate-400 focus:outline-none ${T.xs}`}
             />
@@ -941,47 +1498,89 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
 
           <Select
             value={salon}
-            onChange={setSalon}
-            options={SALON_FILTERS}
+            onChange={onFilter(setSalon)}
+            options={salonOptions}
             className="w-[186px] [&_select]:py-2.5"
             size={T.xs}
+            truncate
           />
           <Select
             value={rating}
-            onChange={setRating}
+            onChange={onFilter(setRating)}
             options={RATING_FILTERS}
             className="w-[176px] [&_select]:py-2.5"
             size={T.xs}
           />
-          <Select
-            value={status}
-            onChange={setStatus}
-            options={STATUS_FILTERS}
-            className="w-[176px] [&_select]:py-2.5"
-            size={T.xs}
-          />
+          <span
+            className={tab === "reported" ? "pointer-events-none opacity-50" : ""}
+            title={tab === "reported" ? "The Reported tab only shows reported reviews" : undefined}
+          >
+            <Select
+              value={tab === "reported" ? "reported" : status}
+              onChange={onFilter(setStatus)}
+              options={STATUS_FILTERS}
+              className="w-[176px] [&_select]:py-2.5"
+              size={T.xs}
+            />
+          </span>
 
           <button
             type="button"
-            className={`flex w-[208px] shrink-0 items-center gap-2 rounded-lg border border-[#E6E8F0] bg-white px-3.5 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-50 ${T.xs}`}
+            onClick={() => setShowMoreFilters((open) => !open)}
+            className={`flex w-[208px] shrink-0 items-center gap-2 rounded-lg border px-3.5 py-2.5 font-medium transition-colors ${T.xs} ${
+              showMoreFilters || moreFiltersActive
+                ? "border-rose-200 bg-rose-50 text-rose-600"
+                : "border-[#E6E8F0] bg-white text-slate-700 hover:bg-slate-50"
+            }`}
           >
-            <ListFilter size={15} className="shrink-0 text-slate-600" />
+            <ListFilter size={15} className="shrink-0" />
             More Filters
+            {moreFiltersActive && <span className="ml-auto h-2 w-2 rounded-full" style={{ background: ROSE }} />}
           </button>
         </div>
+
+        {showMoreFilters && (
+          <div className="flex items-center justify-end gap-4">
+            <span className={`text-slate-500 ${T.xs}`}>Response</span>
+            <span
+              className={tab === "awaiting" ? "pointer-events-none opacity-50" : ""}
+              title={tab === "awaiting" ? "The Awaiting Response tab only shows unanswered reviews" : undefined}
+            >
+              <Select
+                value={tab === "awaiting" ? "pending" : response}
+                onChange={onFilter(setResponse)}
+                options={RESPONSE_FILTERS}
+                className="w-[186px] [&_select]:py-2.5"
+                size={T.xs}
+              />
+            </span>
+            <span className={`text-slate-500 ${T.xs}`}>Customer</span>
+            <Select
+              value={customerTag}
+              onChange={onFilter(setCustomerTag)}
+              options={TAG_FILTERS}
+              className="w-[208px] [&_select]:py-2.5"
+              size={T.xs}
+            />
+          </div>
+        )}
 
         {/* ---------------------------------------------------------------- */}
         {/* Reviews table                                                    */}
         {/* ---------------------------------------------------------------- */}
         <Card>
-          <table className="w-full table-fixed border-collapse text-left">
+          <table
+            className={`w-full table-fixed border-collapse text-left transition-opacity ${
+              listLoading && rows.length ? "opacity-60" : ""
+            }`}
+          >
             <colgroup>
-              <col style={{ width: 20 }} />
-              <col style={{ width: 52 }} />
-              <col style={{ width: 256 }} />
+              <col style={{ width: 40 }} />
+              <col style={{ width: 48 }} />
+              <col style={{ width: 252 }} />
               <col style={{ width: 210 }} />
               <col style={{ width: 176 }} />
-              <col style={{ width: 272 }} />
+              <col style={{ width: 256 }} />
               <col style={{ width: 118 }} />
               <col style={{ width: 128 }} />
               <col style={{ width: 132 }} />
@@ -991,7 +1590,17 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
 
             <thead>
               <tr className="border-b border-[#EDEFF5] bg-[#F9FAFC]">
-                <th className="rounded-tl-2xl" />
+                <th className="rounded-tl-2xl pl-4">
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    onChange={() =>
+                      setSelected(allOnPageSelected ? new Set() : new Set(rows.map((row) => row.id)))
+                    }
+                    aria-label="Select all reviews on this page"
+                    className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
+                  />
+                </th>
                 {["#", "Salon", "Customer", "Rating", "Review", "Status", "Response", "Date"].map(
                   (column) => (
                     <th
@@ -1012,132 +1621,241 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
             </thead>
 
             <tbody>
-              {rows.length === 0 && (
+              {rows.length === 0 ? (
                 <tr>
                   <td colSpan={11} className={`py-10 text-center text-slate-400 ${T.xs}`}>
-                    No reviews match these filters.
+                    {listLoading
+                      ? "Loading reviews…"
+                      : tab === "reported"
+                        ? "No pending removal requests."
+                        : tab === "awaiting"
+                          ? "Every review has a reply."
+                          : "No reviews match these filters."}
                   </td>
                 </tr>
-              )}
+              ) : (
+                rows.map((row, index) => (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60 ${
+                      selected.has(row.id) ? "bg-rose-50/40" : ""
+                    }`}
+                  >
+                    <td className="pl-4 align-middle">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleRow(row.id)}
+                        aria-label={`Select review ${row.id}`}
+                        className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
+                      />
+                    </td>
 
-              {rows.map((row, index) => (
-                <tr
-                  key={row.id}
-                  className="border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60"
-                >
-                  <td />
+                    <td className={`py-3.5 pr-3 align-middle text-slate-700 ${T.xs}`}>
+                      {(currentPage - 1) * size + index + 1}
+                    </td>
 
-                  <td className={`py-3.5 pr-3 align-middle text-slate-700 ${T.xs}`}>{index + 1}</td>
+                    <td className="py-3.5 pr-3 align-middle leading-tight">
+                      <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
+                        {row.salon}
+                      </span>
+                      <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
+                        {row.salonContact}
+                      </span>
+                    </td>
 
-                  <td className="py-3.5 pr-3 align-middle leading-tight">
-                    <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
-                      {row.salon}
-                    </span>
-                    <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
-                      {row.email}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 pr-3 align-middle">
-                    <span className="flex min-w-0 items-center gap-3">
-                      <span className="min-w-0 flex-1 leading-tight">
-                        <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
-                          {row.customer}
+                    <td className="py-3.5 pr-3 align-middle">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="min-w-0 flex-1 leading-tight">
+                          {row.userId ? (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/user-details-v2/${row.userId}`)}
+                              className={`block max-w-full truncate text-left font-semibold text-slate-900 hover:underline ${T.xs}`}
+                            >
+                              {row.customer}
+                            </button>
+                          ) : (
+                            <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
+                              {row.customer}
+                            </span>
+                          )}
+                          <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
+                            {row.customerContact}
+                          </span>
                         </span>
-                        <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
-                          {row.phone}
+                        {row.tag && (
+                          <span
+                            title={`${row.completedBookings} completed visit${row.completedBookings === 1 ? "" : "s"}`}
+                          >
+                            <Chip className={TAG_TONES[row.tag]}>{TAG_LABELS[row.tag]}</Chip>
+                          </span>
+                        )}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 pr-3 align-middle">
+                      <span className="flex items-center gap-2.5">
+                        <Stars value={row.rating} size={15} gap="gap-1.5" />
+                        <span className={`font-medium text-slate-700 ${T.xs}`}>
+                          {row.rating || DASH}
                         </span>
                       </span>
-                      <Chip className={TAG_TONES[row.tag]}>{row.tag}</Chip>
-                    </span>
-                  </td>
+                    </td>
 
-                  <td className="py-3.5 pr-3 align-middle">
-                    <span className="flex items-center gap-2.5">
-                      <Stars value={row.rating} size={15} gap="gap-1.5" />
-                      <span className={`font-medium text-slate-700 ${T.xs}`}>{row.rating}</span>
-                    </span>
-                  </td>
+                    <td className={`py-3.5 pr-3 align-middle leading-snug text-slate-700 ${T.xs}`}>
+                      <span className={`line-clamp-2 ${row.review ? "" : "text-slate-400"}`}>
+                        {row.review || "Rating only"}
+                      </span>
+                      {row.request && row.status === "Reported" && (
+                        <span className={`mt-1 block truncate text-rose-600 ${T.tiny}`}>
+                          Removal requested: {row.request.reason || "no reason given"}
+                        </span>
+                      )}
+                    </td>
 
-                  <td className={`py-3.5 pr-3 align-middle leading-snug text-slate-700 ${T.xs}`}>
-                    <span className="line-clamp-2">{row.review}</span>
-                  </td>
+                    <td className="py-3.5 pr-3 align-middle">
+                      <Chip className={STATUS_TONES[row.status]}>{row.status}</Chip>
+                    </td>
 
-                  <td className="py-3.5 pr-3 align-middle">
-                    <Chip className={STATUS_TONES[row.status]}>{row.status}</Chip>
-                  </td>
+                    <td className="py-3.5 pr-3 align-middle">
+                      {row.reply ? (
+                        <span title={row.reply.text}>
+                          <Chip className={RESPONSE_TONES.Responded}>Responded</Chip>
+                        </span>
+                      ) : row.status === "Hidden" ? (
+                        <span className={`text-slate-400 ${T.xs}`}>{DASH}</span>
+                      ) : (
+                        <Chip className={RESPONSE_TONES.Pending}>Pending</Chip>
+                      )}
+                    </td>
 
-                  <td className="py-3.5 pr-3 align-middle">
-                    <Chip className={RESPONSE_TONES[row.response]}>{row.response}</Chip>
-                  </td>
+                    <td className="py-3.5 pr-3 align-middle leading-tight">
+                      <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>
+                        {row.created ? row.created.format("D MMM YYYY") : DASH}
+                      </span>
+                      <span className={`mt-0.5 block whitespace-nowrap text-slate-700 ${T.xs}`}>
+                        {row.created ? row.created.format("hh:mm A") : ""}
+                      </span>
+                    </td>
 
-                  <td className="py-3.5 pr-3 align-middle leading-tight">
-                    <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>
-                      {row.date}
-                    </span>
-                    <span className={`mt-0.5 block whitespace-nowrap text-slate-700 ${T.xs}`}>
-                      {row.time}
-                    </span>
-                  </td>
+                    <td className="py-3.5 pr-3 align-middle">
+                      <span className="relative flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setViewing({ row, startEditing: false })}
+                          className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-slate-100 ${
+                            row.status === "Reported" ? "text-rose-600" : "text-slate-700"
+                          }`}
+                          aria-label={row.status === "Reported" ? "Review removal request" : "View review"}
+                          title={row.status === "Reported" ? "Review removal request" : "View review"}
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewing({ row, startEditing: true })}
+                          className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-slate-100 ${
+                            row.reply ? "text-violet-500" : "text-slate-700"
+                          }`}
+                          aria-label={row.reply ? "Edit reply" : "Reply to review"}
+                          title={row.reply ? "Edit reply" : "Reply to review"}
+                        >
+                          <Reply size={16} />
+                        </button>
+                        <span data-review-menu className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setMenuFor(menuFor === row.id ? null : row.id)}
+                            className="grid h-8 w-8 place-items-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100"
+                            aria-label="More actions"
+                            aria-expanded={menuFor === row.id}
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                          {menuFor === row.id && (
+                            <span
+                              role="menu"
+                              className={`absolute right-0 top-9 z-20 flex w-[168px] flex-col rounded-xl border border-[#E6E8F0] bg-white py-1 shadow-lg ${T.xs}`}
+                            >
+                              <button
+                                type="button"
+                                role="menuitem"
+                                disabled={busy}
+                                onClick={() => {
+                                  setMenuFor(null);
+                                  setStatusFor([row.id], row.status === "Hidden" ? "active" : "inactive");
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
+                              >
+                                {row.status === "Hidden" ? <Eye size={14} /> : <EyeOff size={14} />}
+                                {row.status === "Hidden" ? "Restore review" : "Hide review"}
+                              </button>
+                              {row.reply && (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setMenuFor(null);
+                                    deleteReply(row);
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Trash2 size={14} />
+                                  Delete reply
+                                </button>
+                              )}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </td>
 
-                  <td className="py-3.5 pr-3 align-middle">
-                    <span className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        className="grid h-8 w-8 place-items-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100"
-                        aria-label="View review"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className="grid h-8 w-8 place-items-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100"
-                        aria-label="Reply to review"
-                      >
-                        <Reply size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className="grid h-8 w-8 place-items-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100"
-                        aria-label="More actions"
-                      >
-                        <MoreVertical size={16} />
-                      </button>
-                    </span>
-                  </td>
-
-                  <td />
-                </tr>
-              ))}
+                    <td />
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
 
           {/* Footer ----------------------------------------------------- */}
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-t border-[#EDEFF5] px-4 py-3.5">
             <span className={`whitespace-nowrap text-slate-600 ${T.xxs}`}>
-              {isFiltered
-                ? `Showing ${rows.length} matching review${rows.length === 1 ? "" : "s"}`
-                : "Showing 1 to 10 of 18,294 reviews"}
+              {total === 0
+                ? "Showing 0 reviews"
+                : `Showing ${fmtInt((currentPage - 1) * size + 1)} to ${fmtInt(
+                    Math.min(currentPage * size, total)
+                  )} of ${fmtInt(total)} reviews`}
+              {selected.size > 0 && ` · ${selected.size} selected`}
             </span>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-400 transition-colors hover:bg-slate-50"
+                onClick={() => setPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:text-slate-300"
                 aria-label="Previous page"
               >
                 <ChevronLeft size={14} />
               </button>
 
-              {[1, 2, 3].map(pageButton)}
-              <span className={`px-1.5 text-slate-500 ${T.xxs}`}>...</span>
-              {pageButton(LAST_PAGE)}
+              {pageList(currentPage, lastPage).map((item) =>
+                typeof item === "number" ? (
+                  pageButton(item)
+                ) : (
+                  <span key={item} className={`px-1.5 text-slate-500 ${T.xxs}`}>
+                    ...
+                  </span>
+                )
+              )}
 
               <button
                 type="button"
-                onClick={() => setPage((prev) => Math.min(LAST_PAGE, prev + 1))}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-600 transition-colors hover:bg-slate-50"
+                onClick={() => setPage(Math.min(lastPage, currentPage + 1))}
+                disabled={currentPage === lastPage}
+                className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:text-slate-300"
                 aria-label="Next page"
               >
                 <ChevronRight size={14} />
@@ -1148,7 +1866,7 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
               <span className={`whitespace-nowrap text-slate-600 ${T.xxs}`}>Rows per page</span>
               <Select
                 value={pageSize}
-                onChange={setPageSize}
+                onChange={onFilter(setPageSize)}
                 options={PAGE_SIZES}
                 className="w-[64px]"
               />
@@ -1156,6 +1874,20 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
           </div>
         </Card>
       </ScaledCanvas>
+
+      {viewing && (
+        <ReviewModal
+          key={viewing.row.id}
+          row={viewing.row}
+          startEditing={viewing.startEditing}
+          busy={busy}
+          onDecide={decide}
+          onSetStatus={(row, next) => setStatusFor([row.id], next)}
+          onSaveReply={saveReply}
+          onDeleteReply={deleteReply}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </>
   );
 };
