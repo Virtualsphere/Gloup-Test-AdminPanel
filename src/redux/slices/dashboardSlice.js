@@ -383,12 +383,12 @@ export const getRevenueGrowth = createAsyncThunk(
   }
 );
 
-// get stores by date
+// get stores registered between fromDate and toDate (YYYY-MM-DD)
 export const getStoresByDate = createAsyncThunk(
   "dashboard/getStoresByDate",
-  async (date, { rejectWithValue }) => {
+  async ({ fromDate, toDate }, { rejectWithValue }) => {
     try {
-      const response = await api.post("/admin/app/getStoresByDate", { date }, {
+      const response = await api.post("/admin/app/getStoresByDate", { fromDate, toDate }, {
         headers: {
           "Content-Type": "application/json",
         },
@@ -400,6 +400,50 @@ export const getStoresByDate = createAsyncThunk(
         error.response?.data?.error?.message ||
         error.message ||
         "Failed to fetch stores by date";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// dashboard V2 metrics: the same metrics for each { key, from, to } range (YYYY-MM-DD, inclusive)
+export const getDashboardV2Metrics = createAsyncThunk(
+  "dashboard/getDashboardV2Metrics",
+  async (ranges, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/app/getDashboardV2Metrics", { ranges }, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch dashboard metrics";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// dashboard V2 alerts: idle salons, overdue payouts, subscription dues, checkout drop-offs
+export const getDashboardV2Alerts = createAsyncThunk(
+  "dashboard/getDashboardV2Alerts",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/app/getDashboardV2Alerts", params, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: false,
+      });
+      return response.data.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to fetch dashboard alerts";
       return rejectWithValue(message);
     }
   }
@@ -431,6 +475,8 @@ const initialState = {
   customers: {},
   revenueGrowth: {},
   storesByDate: {},
+  dashboardV2Metrics: {},
+  dashboardV2Alerts: {},
 };
 
 const dashboardSlice = createSlice({
@@ -463,6 +509,8 @@ const dashboardSlice = createSlice({
       state.customers = {};
       state.revenueGrowth = {};
       state.storesByDate = {};
+      state.dashboardV2Metrics = {};
+      state.dashboardV2Alerts = {};
     },
     applyLiveStatsFromSSE(state, action) {
       const payload = action.payload || {};
@@ -705,6 +753,32 @@ const dashboardSlice = createSlice({
       .addCase(getStoresByDate.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to fetch stores by date";
+      })
+      // Get dashboard V2 metrics
+      .addCase(getDashboardV2Metrics.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getDashboardV2Metrics.fulfilled, (state, action) => {
+        state.loading = false;
+        state.dashboardV2Metrics = action.payload;
+      })
+      .addCase(getDashboardV2Metrics.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to fetch dashboard metrics";
+      })
+      // Get dashboard V2 alerts
+      .addCase(getDashboardV2Alerts.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getDashboardV2Alerts.fulfilled, (state, action) => {
+        state.loading = false;
+        state.dashboardV2Alerts = action.payload;
+      })
+      .addCase(getDashboardV2Alerts.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to fetch dashboard alerts";
       })
       // Update dashboard data start date
       .addCase(updateDashboardDataStartDate.fulfilled, (state, action) => {

@@ -152,14 +152,23 @@ const MonthlyReportDetails = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
+                      {/* booking_time = appointment day + slot start (IST); null
+                          when the booking has no slot, so fall back to the day. */}
                       {item.booking_time
                         ? new Date(item.booking_time).toLocaleString("en-IN", {
                             day: "2-digit",
                             month: "short",
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: "Asia/Kolkata",
                           })
-                        : "—"}
+                        : item.appointment_date
+                          ? new Date(item.appointment_date).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              timeZone: "Asia/Kolkata",
+                            })
+                          : "—"}
                     </td>
                     <td className="px-4 py-3 text-right font-medium">
                       ₹{Number(item.amount).toFixed(2)}

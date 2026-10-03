@@ -16,9 +16,11 @@ import api from "../../utils/api";
 import { useSelector, useDispatch } from "react-redux";
 // import { getProfile } from "../../redux/slices/profileSlice";
 import { toast } from "react-hot-toast";
+import { usePageHeaderSlotRef } from "./pageHeaderSlotContext";
 
 const Header = ({ collapsed,toggleSidebar }) => {
   const dispatch = useDispatch();
+  const pageHeaderSlotRef = usePageHeaderSlotRef();
   // const [collapsed, setCollapsed] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const modalRef = useRef(null);
@@ -86,14 +88,20 @@ const Header = ({ collapsed,toggleSidebar }) => {
       `}
     >
       <div className="h-13 px-4 flex items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center min-w-0 flex-1">
           <button
             onClick={toggleSidebar}
             className="p-2 rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200"
-            aria-label="Toggle sidebar"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <Menu size={20} />
-          </button> 
+          </button>
+
+          {/* Pages render their title / header affordances in here through
+              <PageHeaderPortal> instead of drawing a second header bar of
+              their own. Stays empty (and invisible) for every other page. */}
+          <div ref={pageHeaderSlotRef} className="flex min-w-0 flex-1 items-center" />
         </div>
 
         <div className="flex items-center space-x-4">

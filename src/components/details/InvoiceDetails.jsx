@@ -209,10 +209,12 @@ const InvoiceDetails = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
+                      {/* booking_time = appointment day + slot start (IST). */}
                       {item.booking_time
                         ? new Date(item.booking_time).toLocaleTimeString("en-IN", {
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: "Asia/Kolkata",
                           })
                         : "—"}
                     </td>
