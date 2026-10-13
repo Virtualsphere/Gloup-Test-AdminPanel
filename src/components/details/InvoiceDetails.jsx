@@ -119,6 +119,7 @@ const InvoiceDetails = () => {
     subscription_remaining_debt,
     subscription_plan_amount,
     subscription_gst_amount,
+    subscription_cycle,
     net_payout_preview,
   } = details;
 
@@ -236,6 +237,17 @@ const InvoiceDetails = () => {
             <span>Total</span>
             <span>₹{Number(total_amount || 0).toFixed(2)}</span>
           </div>
+
+          {/* Booking cycles: between fees the salon has free bookings; the
+              next fee needs them used up AND the renewal date reached. */}
+          {subscriptionDeduction === 0 && subscription_cycle?.state === "waiting" && (
+            <div className="bg-slate-50 text-slate-600 px-4 py-2 text-xs border-t">
+              Subscription free period: {subscription_cycle.bookings_in_cycle ?? 0}/
+              {subscription_cycle.renewal_booking_limit} free bookings used · the next fee is charged on or
+              after {subscription_cycle.renewal_date || "the renewal date"}, once they are used up. Nothing is
+              deducted from this invoice.
+            </div>
+          )}
 
           {subscriptionDeduction > 0 && (
             <div className="bg-amber-50 text-amber-800 px-4 py-3 border-t border-amber-100 space-y-1">

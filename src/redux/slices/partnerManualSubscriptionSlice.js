@@ -46,11 +46,13 @@ export const fetchAllSubscriptions = createAsyncThunk(
 
 export const assignSubscription = createAsyncThunk(
   "partnerManualSubscription/assignSubscription",
-  async ({ storeId, planAmount }, { rejectWithValue }) => {
+  // renewalBookingLimit (free bookings per cycle) is optional; the backend
+  // keeps the salon's current one, else uses the free booking limit.
+  async ({ storeId, planAmount, renewalBookingLimit }, { rejectWithValue }) => {
     try {
       const response = await api.post(
         "/admin/app/assignmanualpartnersubscription",
-        { store_id: storeId, plan_amount: planAmount },
+        { store_id: storeId, plan_amount: planAmount, renewal_booking_limit: renewalBookingLimit },
         { withCredentials: false }
       );
       return response.data.data;
@@ -66,11 +68,11 @@ export const assignSubscription = createAsyncThunk(
 
 export const updateSubscription = createAsyncThunk(
   "partnerManualSubscription/updateSubscription",
-  async ({ storeId, planAmount }, { rejectWithValue }) => {
+  async ({ storeId, planAmount, renewalBookingLimit }, { rejectWithValue }) => {
     try {
       const response = await api.post(
         "/admin/app/updatemanualpartnersubscription",
-        { store_id: storeId, plan_amount: planAmount },
+        { store_id: storeId, plan_amount: planAmount, renewal_booking_limit: renewalBookingLimit },
         { withCredentials: false }
       );
       return response.data.data;

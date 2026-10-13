@@ -74,7 +74,10 @@ import {
 //
 // "Subscriptions" are the manual system (PartnerManualSubscriptions): one row
 // per salon with a flat monthly amount (+18% GST), recovered by deducting it
-// from the salon's daily invoice payout when an admin marks it paid. There
+// from the salon's daily invoice payout when an admin marks it paid. After a
+// fee is fully paid the salon gets its renewal_booking_limit free bookings;
+// the next fee is charged once the renewal date (a month later) has come AND
+// those are used up (backend partnerSubscriptionBilling.js). There
 // are no plan names and no expiry - plans show as their amount, and statuses
 // are Active (settled) / Payment Due / Deactivated, plus Pending for salons
 // past their free bookings with no subscription yet.
@@ -224,6 +227,18 @@ const pageList = (page, last) => {
   return out;
 };
 
+// The free bookings of a waiting cycle are used up (the next fee then
+// waits only for the renewal date).
+const freeBookingsUsed = (row) =>
+  row.cycle?.state === "waiting" && (row.cycle.bookings_in_cycle ?? 0) >= (row.renewalLimit ?? Infinity);
+
+// "Renews 6 Oct · 4/10 free bookings" or "Being collected" for a cycle.
+const cycleLabel = (cycle, limit) => {
+  if (!cycle) return DASH;
+  if (cycle.state !== "waiting") return `Being collected (${limit ?? DASH} free bookings after it's paid)`;
+  return `Renews ${fmtDay(cycle.renewal_date)} · ${cycle.bookings_in_cycle ?? 0}/${limit ?? DASH} free bookings`;
+};
+
 // One /getManualSubscriptionsListV2 row -> what the table renders.
 const toRow = (r, today) => ({
   key: `${r.kind}-${r.store_id}`,
@@ -239,8 +254,12 @@ const toRow = (r, today) => ({
   status: r.status,
   owed: r.owed_now,
   storedOwed: r.stored_outstanding,
+  // Renewal date while in the free period; null while a fee is owed.
   nextDue: r.next_due_date,
   daysToDue: r.next_due_date ? moment(r.next_due_date, DAY).diff(moment(today, DAY), "days") : null,
+  renewalLimit: r.renewal_booking_limit,
+  // { state: "collecting" | "waiting", bookings_in_cycle, renewal_booking_limit, ... }
+  cycle: r.cycle,
   start: r.activated_at,
   deactivatedAt: r.deactivated_at,
   collected: r.collected_total,
@@ -433,12 +452,16 @@ const Dialog = ({ title, subtitle, onClose, busy, children, footer, wide = false
 const btnGhost = "rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100";
 const btnPrimary = "rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-40";
 
-// Assign (new / renew) or edit a subscription's monthly amount.
-const PlanDialog = ({ mode, row, candidates, busy, onSubmit, onClose }) => {
+// Assign (new / renew) or edit a subscription's amount and its renewal
+// booking limit (free bookings per cycle, after each fee is fully paid).
+const PlanDialog = ({ mode, row, candidates, defaultLimit, busy, onSubmit, onClose }) => {
   const [storeId, setStoreId] = useState(row ? String(row.storeId) : "");
   const [amount, setAmount] = useState(mode === "edit" && row ? String(row.planAmount) : "");
+  const [limit, setLimit] = useState(String(row?.renewalLimit ?? defaultLimit ?? ""));
   const value = Number(amount);
-  const valid = value > 0 && storeId;
+  const limitValue = Number(limit);
+  const limitValid = limit.trim() !== "" && Number.isInteger(limitValue) && limitValue >= 0;
+  const valid = value > 0 && storeId && limitValid;
   const title = { assign: "Assign Subscription", renew: "Renew Subscription", edit: "Edit Subscription" }[mode];
 
   return (
@@ -454,7 +477,7 @@ const PlanDialog = ({ mode, row, candidates, busy, onSubmit, onClose }) => {
           </button>
           <button
             type="button"
-            onClick={() => onSubmit({ storeId: Number(storeId), planAmount: value })}
+            onClick={() => onSubmit({ storeId: Number(storeId), planAmount: value, renewalBookingLimit: limitValue })}
             disabled={!valid || busy}
             className={btnPrimary}
             style={{ background: BRAND }}
@@ -505,13 +528,30 @@ const PlanDialog = ({ mode, row, candidates, busy, onSubmit, onClose }) => {
         </p>
       )}
 
+      <label className="mt-3 block text-sm font-semibold text-slate-700">
+        Free bookings per cycle
+        <input
+          type="number"
+          min="0"
+          step="1"
+          value={limit}
+          onChange={(e) => setLimit(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-violet-200"
+        />
+      </label>
+      <p className="mt-1.5 text-xs text-slate-500">
+        After each fee is fully paid, the next one is charged only once the renewal date (a month later) has
+        come and the partner has had more than this many paid bookings.
+      </p>
+
       {mode === "edit" ? (
         <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          The new amount applies from the next billing cycle. Dues already accrued stay as they are.
+          A new amount applies to the next fee charged; a fee already being collected stays as it is. A new
+          free-booking count applies to the current cycle.
         </p>
       ) : (
         <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          The first month's fee is due today and is deducted from the partner's next daily payout.
+          The first fee is charged today and is deducted from the partner's payouts from today on.
         </p>
       )}
       {mode === "renew" && row?.storedOwed > 0 && (
@@ -547,7 +587,9 @@ const ViewDialog = ({ row, onClose }) => {
   const facts = [
     ["Plan", row.planAmount ? `${planLabel(row.planAmount)} + GST = ${fmtMoney(row.cycleFee)}` : DASH],
     ["Started", fmtDay(row.start)],
-    [row.status === "inactive" ? "Deactivated" : "Next due date", fmtDay(row.status === "inactive" ? row.deactivatedAt : row.nextDue)],
+    row.status === "inactive"
+      ? ["Deactivated", fmtDay(row.deactivatedAt)]
+      : ["Next fee", cycleLabel(sub ? sub.cycle : row.cycle, sub ? sub.renewal_booking_limit : row.renewalLimit)],
     ["Owed today", fmtMoney(sub ? sub.owed_now : row.owed)],
     ["Collected so far", fmtMoney(state.data ? state.data.collected_total : row.collected)],
     ["Lifetime bookings", fmtInt(row.bookings)],
@@ -893,13 +935,13 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
     }
   };
 
-  const submitPlan = ({ storeId, planAmount }) => {
+  const submitPlan = ({ storeId, planAmount, renewalBookingLimit }) => {
     if (dialog.mode === "edit") {
-      run(updateSubscription, { storeId, planAmount }, "Subscription updated");
+      run(updateSubscription, { storeId, planAmount, renewalBookingLimit }, "Subscription updated");
     } else {
       run(
         assignSubscription,
-        { storeId, planAmount },
+        { storeId, planAmount, renewalBookingLimit },
         dialog.mode === "renew" ? "Subscription renewed" : "Subscription assigned"
       );
     }
@@ -932,7 +974,7 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
           "Owed today",
           "Collected so far",
           "Start date",
-          "Next due date",
+          "Renewal date",
           "Lifetime bookings",
         ],
         data.map((row) => [
@@ -1300,7 +1342,7 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
             <thead>
               <tr className="border-y border-[#EDEFF5] bg-[#F9FAFC]">
                 <th />
-                {["#", "Partner", "Contact", "Plan", "Bookings", "Amount (+18% GST)", "Status", "Start Date", "Next Due Date"].map(
+                {["#", "Partner", "Contact", "Plan", "Bookings", "Amount (+18% GST)", "Status", "Start Date", "Next Fee"].map(
                   (column) => (
                     <th
                       key={column}
@@ -1400,16 +1442,23 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
                     </td>
 
                     <td className="py-2.5 pr-2 align-middle leading-tight">
-                      {live ? (
+                      {live && row.owed > 0 ? (
                         <>
-                          <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>{fmtDay(row.nextDue)}</span>
+                          <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>Collecting fee</span>
+                          <span className={`block whitespace-nowrap font-semibold ${T.tiny}`} style={{ color: RED }}>
+                            {fmtMoney(row.owed)} owed now
+                          </span>
+                        </>
+                      ) : live ? (
+                        <>
+                          <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>
+                            Renews {fmtDay(row.nextDue)}
+                          </span>
                           <span
                             className={`block whitespace-nowrap font-semibold ${T.tiny}`}
-                            style={{ color: row.owed > 0 ? RED : row.daysToDue <= 7 ? AMBER : GREEN }}
+                            style={{ color: freeBookingsUsed(row) || row.daysToDue <= 7 ? AMBER : GREEN }}
                           >
-                            {row.owed > 0
-                              ? `${fmtMoney(row.owed)} owed now`
-                              : `${row.daysToDue} day${row.daysToDue === 1 ? "" : "s"} left`}
+                            {row.cycle?.bookings_in_cycle ?? 0}/{row.renewalLimit ?? DASH} free bookings
                           </span>
                         </>
                       ) : row.status === "pending" ? (
@@ -1562,6 +1611,7 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
           mode={dialog.mode}
           row={dialog.row}
           candidates={needingSubscription || []}
+          defaultLimit={freeBookingLimit}
           busy={actionLoading}
           onSubmit={submitPlan}
           onClose={() => setDialog(null)}

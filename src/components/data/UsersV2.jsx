@@ -76,7 +76,8 @@ import {
 // run in SQL), mapped by normalizeUser() in utils/userModel.js. The KPIs,
 // growth chart, top cities and activity overview come from /getUsersSummaryV2.
 // Join date = User.registered_at, last app open = latest UserSession
-// activity, total bookings = paid bookings.
+// activity, total bookings = paid bookings that weren't cancelled/refunded,
+// placed from 2026-06-11 (earlier ones are left out on purpose).
 //
 // Filters, search and the page live in the listUiState slice (UI_KEY), so they
 // survive opening a user's profile and coming back.
