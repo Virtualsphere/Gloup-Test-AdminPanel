@@ -735,7 +735,7 @@ const AnalyticsIntelligenceV2 = () => {
       columns: PROFIT_COLUMNS,
       rows: profRows,
       note: prof
-        ? `GloUp revenue = ₹${prof.platform_fee} platform fee × served bookings + subscription fees deducted from payouts. Contribution = revenue − CAC (GloUp-funded discounts). Margin = contribution ÷ GMV. High ≥ 20%, Medium ≥ 10%, Low ≥ 0%, else Negative.`
+        ? `GloUp revenue = platform fees paid on served bookings + subscription fees deducted from payouts. Contribution = revenue − CAC (GloUp-funded discounts). Margin = contribution ÷ GMV. High ≥ 20%, Medium ≥ 10%, Low ≥ 0%, else Negative.`
         : null,
       onExport: exportRows("salon_profitability", PROFIT_COLUMNS, profRows),
     },
@@ -964,7 +964,7 @@ const AnalyticsIntelligenceV2 = () => {
             )}
             {prof && (
               <p className={`mt-2 leading-snug text-slate-400 ${T.sm}`}>
-                Revenue = ₹{prof.platform_fee} platform fee × served bookings + subscription fees. Contribution =
+                Revenue = platform fees paid on served bookings + subscription fees. Contribution =
                 revenue − CAC. Margin = contribution ÷ GMV.
               </p>
             )}

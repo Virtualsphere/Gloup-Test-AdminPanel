@@ -531,9 +531,9 @@ const HOW_IT_WORKS = [
     title: "Metrics",
     items: [
       "Bookings: paid appointments, by appointment date. Checkouts whose payment failed or expired are not bookings.",
-      "Revenue (GMV): amount paid on completed appointments - the same figure as the V1 dashboard's total sales.",
+      "Revenue: what Gloup itself earns - the platform fee customers paid on bookings that weren't cancelled or refunded, plus manual subscription fees (incl. GST) collected from salon payouts, counted on the day the payout was marked paid.",
       "Cancellations: paid bookings later cancelled or refunded. Cancellation rate = cancellations ÷ bookings.",
-      "CAC spend: the discount Gloup funds on each booking (service price minus what the customer paid, nothing for \"important\" services) - the invoice page's Acquisition Cost column. CAC per booking = CAC spend ÷ non-cancelled bookings.",
+      "CAC spend: the discount Gloup funds on each booking (the service's list price when it was booked minus what the customer paid, nothing for \"important\" services), so later price edits don't change past months. CAC per booking = CAC spend ÷ non-cancelled bookings.",
       "Users, partners and subscriptions are running totals at the end of the period. Users count from their registration date; users older than that field with no history are counted as existing from the start.",
     ],
   },
@@ -734,7 +734,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
 
   const kpis = [
     { label: "Total Bookings", value: fmtInt(cur.bookings), delta: toDelta(pct.bookings), icon: CalendarCheck, tint: "#EDE7FF", color: BRAND },
-    { label: "Total Revenue (GMV)", value: fmtInr(cur.revenue), delta: toDelta(pct.revenue), icon: IndianRupee, tint: "#E1F7EC", color: GREEN },
+    { label: "Total Revenue", value: fmtInr(cur.revenue), delta: toDelta(pct.revenue), icon: IndianRupee, tint: "#E1F7EC", color: GREEN },
     { label: "Total Users", value: fmtCompact(cur.total_users), delta: toDelta(pct.users), icon: Users, tint: "#FFF2DC", color: "#E08700" },
     { label: "Total Partners", value: fmtInt(cur.total_partners), delta: toDelta(pct.partners), icon: Store, tint: "#E6EFFF", color: BLUE },
     { label: "Total Subscriptions", value: fmtInt(cur.active_subscriptions), delta: toDelta(pct.subscriptions), icon: Gift, tint: "#FDE6F0", color: PINK },

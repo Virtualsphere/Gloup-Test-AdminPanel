@@ -36,7 +36,6 @@ import { useListUiState } from "../../hooks/useListUiState";
 import { downloadCsv } from "../../utils/format";
 import {
   bookingpdfDownload,
-  fetchBookingsByOrderDate,
   fetchBookingsListV2,
   fetchBookingsSummaryV2,
   fetchTopSalonsByDateRange,
@@ -51,11 +50,13 @@ import { fetchServiceCategories } from "../../redux/slices/partnersSlice";
 // DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
 // there for why bigger px sizes in T read smaller on screen).
 //
+// Only PAID bookings are shown (payment_status success / sucssess, not
+// refunded - getBookingsListV2's "paid" filter); there is no payment filter.
 // The table comes from /admin/app/getBookingsListV2 (phone, salon city, slot
-// time, services/categories, and SQL-side search / payment / booking-type
-// filters). Like the V1 page it filters on the appointment date
-// (booking_date), despite the page name. Counts (KPIs, status donut, today's
-// activity) are V1's /getBookingsDetailsByOrderDate totalCount with limit 1;
+// time, services/categories, and SQL-side search / booking-type filters).
+// Like the V1 page it filters on the appointment date (booking_date),
+// despite the page name. Counts (KPIs, status donut, today's activity) are
+// getBookingsListV2 totals with limit 1, also paid only;
 // Top Performing Salon is /getTopSalonsByDateRange; revenue, avg order value,
 // today's revenue and peak hours are /getBookingsSummaryV2 (revenue uses the
 // invoice pages' pricing rule, peak hours = hour the booking was placed).
@@ -97,8 +98,8 @@ const EXPORT_LIMIT = 10000;
 
 const UI_KEY = "bookingsByOrderDateV2";
 
-// Payment tab -> getBookingsListV2 `payment` filter.
-const PAYMENT_TAB_FILTER = { All: "", Paid: "paid", Unpaid: "unpaid" };
+// The page lists paid bookings only (getBookingsListV2 `payment` filter).
+const PAID_ONLY = "paid";
 // Search hits the API, so wait for typing to pause.
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -112,15 +113,6 @@ const STATUS_META = {
   pending: { label: "Pending", color: SLATE, chip: "bg-slate-100 text-slate-500" },
 };
 const COUNTED_STATUSES = ["completed", "booked", "confirmed", "cancelled", "refunded"];
-
-// getBookingsListV2 `payment` filters, in donut order.
-const PAYMENT_META = {
-  paid: { label: "Paid", color: GREEN },
-  unpaid: { label: "Unpaid", color: AMBER },
-  failed: { label: "Failed", color: SLATE },
-  refunded: { label: "Refunded", color: VIOLET },
-};
-const COUNTED_PAYMENTS = Object.keys(PAYMENT_META);
 
 const PAYMENT_STYLES = {
   Paid: "bg-emerald-50 text-emerald-600",
@@ -254,7 +246,6 @@ const defaultUi = () => {
     fromDate: addDays(today, -(DEFAULT_DAYS - 1)),
     toDate: today,
     status: "",
-    paymentTab: "All",
     bookingType: "",
     search: "",
     page: 1,
@@ -557,7 +548,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
 
   const defaults = useMemo(defaultUi, []);
   const [ui, setField] = useListUiState(UI_KEY, defaults);
-  const { fromDate, toDate, status, paymentTab, bookingType, search, page, rowsPerPage } = ui;
+  const { fromDate, toDate, status, bookingType, search, page, rowsPerPage } = ui;
   const limit = Number(rowsPerPage);
 
   const [selected, setSelected] = useState([]);
@@ -606,11 +597,11 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
       fromDate,
       toDate,
       status,
-      payment: PAYMENT_TAB_FILTER[paymentTab] || "",
+      payment: PAID_ONLY,
       search: debouncedSearch.trim(),
       service_category_id: bookingType,
     }),
-    [fromDate, toDate, status, paymentTab, debouncedSearch, bookingType]
+    [fromDate, toDate, status, debouncedSearch, bookingType]
   );
 
   useEffect(() => {
@@ -648,13 +639,10 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
   }, [dispatch, fromDate, toDate, reloadKey]);
 
   // ---- Range counts: total, per status, and the previous equal period -----
+  // Paid bookings only, like the table.
   const count = useCallback(
-    (params) => dispatch(fetchBookingsByOrderDate({ ...params, limit: 1 })).unwrap().then((r) => r.total),
-    [dispatch]
-  );
-  // Payment split needs getBookingsListV2's payment filter.
-  const countByPayment = useCallback(
-    (params) => dispatch(fetchBookingsListV2({ ...params, limit: 1 })).unwrap().then((r) => r.total),
+    (params) =>
+      dispatch(fetchBookingsListV2({ ...params, payment: PAID_ONLY, limit: 1 })).unwrap().then((r) => r.total),
     [dispatch]
   );
 
@@ -668,18 +656,14 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
       count({ fromDate, toDate }),
       count({ fromDate: prevFrom, toDate: prevTo }),
       ...COUNTED_STATUSES.map((s) => count({ fromDate, toDate, status: s })),
-      ...COUNTED_PAYMENTS.map((payment) => countByPayment({ fromDate, toDate, payment })),
     ])
-      .then(([total, previous, ...rest]) => {
+      .then(([total, previous, ...byStatus]) => {
         if (cancelled) return;
-        const byStatus = rest.slice(0, COUNTED_STATUSES.length);
-        const byPayment = rest.slice(COUNTED_STATUSES.length);
         setCounts({
           total,
           previous,
           days: len,
           byStatus: Object.fromEntries(COUNTED_STATUSES.map((s, i) => [s, byStatus[i]])),
-          byPayment: Object.fromEntries(COUNTED_PAYMENTS.map((p, i) => [p, byPayment[i]])),
         });
       })
       .catch(() => !cancelled && setCounts({ failed: true }));
@@ -687,7 +671,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
     return () => {
       cancelled = true;
     };
-  }, [count, countByPayment, fromDate, toDate, reloadKey]);
+  }, [count, fromDate, toDate, reloadKey]);
 
   // ---- Today's activity (appointments dated today) ------------------------
   useEffect(() => {
@@ -909,20 +893,6 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
       }))
     : [];
 
-  const paymentSlices = ok
-    ? [
-      ...COUNTED_PAYMENTS.map((key) => ({ key, value: counts.byPayment[key] })),
-      { key: "other", value: Math.max(0, rangeTotal - COUNTED_PAYMENTS.reduce((a, k) => a + counts.byPayment[k], 0)) },
-    ]
-      .filter((slice) => slice.value > 0)
-      .map((slice) => ({
-        label: slice.key === "other" ? "Other" : PAYMENT_META[slice.key].label,
-        value: slice.value,
-        pct: `${pctOf(slice.value, rangeTotal).toFixed(1)}%`,
-        color: slice.key === "other" ? "#CBD5E1" : PAYMENT_META[slice.key].color,
-      }))
-    : [];
-
   const todayRows = [
     { label: "Scheduled Today", value: today && !today.failed ? fmtInt(today.scheduled) : DASH, icon: CalendarPlus, color: BLUE },
     { label: "Completed", value: today && !today.failed ? fmtInt(today.completed) : DASH, icon: CheckCircle2, color: GREEN },
@@ -1030,24 +1000,6 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
         {/* Filter bar                                                        */}
         {/* ---------------------------------------------------------------- */}
         <div className={`relative flex items-center gap-2.5 px-3 py-2.5 ${CARD}`}>
-          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-[#E6E8F0] p-0.5">
-            {["All", "Paid", "Unpaid"].map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setFilter("paymentTab", tab)}
-                className={`rounded-lg px-3 py-1 font-semibold transition-colors ${T.base} ${
-                  paymentTab === tab
-                    ? "text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-                style={paymentTab === tab ? { background: GREEN } : undefined}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
           <div className="relative min-w-0 flex-1">
             <Search
               size={13}
@@ -1432,8 +1384,6 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
           {/* Right rail */}
           <div className={`flex min-w-0 flex-col ${GAP}`}>
             <DonutCard title="Bookings by Status" total={fmtInt(rangeTotal)} slices={statusSlices} />
-
-            <DonutCard title="Bookings by Payment" total={fmtInt(rangeTotal)} slices={paymentSlices} />
 
             <Card className="p-3.5">
               <CardTitle>Today&apos;s Activity</CardTitle>

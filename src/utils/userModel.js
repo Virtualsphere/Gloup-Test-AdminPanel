@@ -7,8 +7,9 @@ import { loyaltyLabel } from "./loyalty";
 //
 // normalizeUser: one row of /getUsersListV2 (also tolerates the older
 // /getallusers rows, which lack the V2-only fields). V2 rows carry
-// registered_at, last_active_at, last_booking_at, total_bookings (real count
-// of paid bookings), source ("referral" | "organic") and login_method.
+// registered_at, last_active_at, last_booking_at, total_bookings (paid
+// bookings that weren't cancelled/refunded, placed from 2026-06-11), source
+// ("referral" | "organic") and login_method.
 // User.paid_booking_count is NOT a booking count any more (it was reset to 0
 // for tier pricing), so it is deliberately not read.
 //
@@ -185,7 +186,9 @@ export const buildUserProfile = (data) => {
 
     bookings,
     counts: {
-      total: bookings.length,
+      // The API's rule (paid, not cancelled/refunded, placed from 2026-06-11),
+      // not the length of the list, which holds every paid booking.
+      total: summary.total_bookings ?? bookings.length,
       upcoming: upcomingList.length,
       completed: byStatus("completed").length,
       cancelled: byStatus("cancelled").length,

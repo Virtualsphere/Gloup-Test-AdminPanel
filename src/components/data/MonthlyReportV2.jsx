@@ -23,21 +23,17 @@ import {
   Mail,
   MapPin,
   MoreVertical,
-  Pencil,
   Phone,
   Search,
   Star,
   Target,
-  X,
   XCircle,
 } from "lucide-react";
 import {
   downloadMonthlyInvoicePDF,
   fetchMonthlyReportSalonsV2,
   fetchMonthlyReportSummaryV2,
-  fetchPlatformFee,
   queryMonthlyReportSalonsV2,
-  updatePlatformFee,
 } from "../../redux/slices/monthlyInvoiceSlice";
 import { downloadXlsx, headerCell } from "../../utils/excelExport";
 import { downloadCsv } from "../../utils/format";
@@ -55,13 +51,12 @@ import { Card, Chip as BaseChip, HeaderBell } from "../v2/ui";
 // Data (monthlyInvoiceSlice):
 //   /getMonthlyReportSummaryV2   KPIs + money strip, month vs previous month
 //   /getMonthlyReportSalonsV2    the salon table (search, city, sort, paging)
-//   /getplatformfee, /updateplatformfee   per-booking platform fee setting
 //   V1 /getmonthlyinvoicedetails page + /downloadmonthlyinvoicepdf for a salon
 // Definitions: a month is the visit month (booking_date, IST). Bookings =
 // paid bookings; "served" = paid and not cancelled / refunded. Amount Paid In
-// = invoice value (same pricing as the invoice pages). Platform fee = served
-// bookings x the admin's per-booking fee - a reporting figure for now; the
-// booking flow charges its own fee. CAC = discount Gloup funds per booking.
+// = invoice value (same pricing as the invoice pages). Platform fee = sum of
+// the fee stored on each served booking (appointments.platform_fee). CAC =
+// discount Gloup funds per booking.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1460;
@@ -262,7 +257,7 @@ const HOW_IT_WORKS = [
   "Every figure is for the selected visit month (the day of the appointment, IST), compared with the month before.",
   "Bookings are paid bookings. Completed / cancelled are their current status; cancelled includes refunded.",
   "Amount Paid In is the invoice value - important services at full price, the rest at what the customer paid (same as the invoice pages).",
-  "Platform fee = served (paid, not cancelled) bookings × the platform fee you set here.",
+  "Platform fee = the fee customers actually paid on served (paid, not cancelled) bookings, as stored on each booking.",
   "Payout is what was paid out to the salon for that month's visit days, after any subscription fee.",
   "CAC is the discount Gloup funds per booking. Ratings are all-time, active reviews only.",
 ];
@@ -324,71 +319,6 @@ const PageButton = ({ pageNumber, active, onClick }) => (
   </button>
 );
 
-// Admin-editable per-booking platform fee. Rendered outside ScaledCanvas.
-const PlatformFeeDialog = ({ current, busy, onSave, onClose }) => {
-  const [value, setValue] = useState(current == null ? "" : String(current));
-  const n = Number(value);
-  const valid = value.trim() !== "" && Number.isFinite(n) && n >= 0 && Math.round(n * 100) === n * 100;
-
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && !busy && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, busy]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => !busy && onClose()}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Platform fee"
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-extrabold text-slate-900">Platform fee</h2>
-            <p className="mt-0.5 text-sm text-slate-500">Charged to the customer on every booking.</p>
-          </div>
-          <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
-            <X size={18} />
-          </button>
-        </div>
-        <label className="mt-4 block text-sm font-semibold text-slate-700">
-          Fee per booking (₹)
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            autoFocus
-            className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-violet-200"
-          />
-        </label>
-        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Used by this report (served bookings × fee), for every month shown. It doesn't change what the app charges at
-          checkout yet.
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={busy} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => onSave(n)}
-            disabled={!valid || busy}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-            style={{ background: BRAND }}
-          >
-            {busy ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -402,8 +332,6 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
     salonsV2,
     salonsV2Loading,
     salonsV2Error,
-    platformFee,
-    platformFeeSaving,
   } = useSelector((state) => state.monthlyInvoice);
 
   const [month, setMonth] = useState(istMonth);
@@ -414,7 +342,6 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState("10");
   const [reloadKey, setReloadKey] = useState(0);
-  const [feeDialog, setFeeDialog] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [busyExport, setBusyExport] = useState(null); // "report" | "xlsx" | "csv"
@@ -459,10 +386,6 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
     dispatch(fetchMonthlyReportSummaryV2({ month }));
   }, [dispatch, month, reloadKey]);
 
-  useEffect(() => {
-    dispatch(fetchPlatformFee());
-  }, [dispatch]);
-
   // Close the row menu on any click outside it.
   useEffect(() => {
     if (menuFor === null) return undefined;
@@ -478,21 +401,9 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
   const currentPage = Math.min(page, lastPage);
   const cur = summary?.month === month ? summary.current : null;
   const prev = summary?.month === month ? summary.previous : null;
-  const feeUsed = summary?.platform_fee ?? platformFee;
   const vsLabel = prev ? `vs ${shortMonth(prev.month)}` : "";
 
   // ---- actions ------------------------------------------------------------
-
-  const saveFee = async (fee) => {
-    try {
-      await dispatch(updatePlatformFee({ fee })).unwrap();
-      toast.success(`Platform fee set to ${fmtMoney(fee, 2)} per booking`, { id: "monthly-v2-fee" });
-      setFeeDialog(false);
-      reload();
-    } catch (err) {
-      toast.error(typeof err === "string" ? err : "Failed to save", { id: "monthly-v2-fee" });
-    }
-  };
 
   const downloadPdf = async (row) => {
     setMenuFor(null);
@@ -565,7 +476,6 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
       };
       const summarySheet = [
         [{ value: `Monthly Report - ${monthLabel(month)}`, fontWeight: "bold" }],
-        [{ value: `Platform fee used: ₹${Number(feeUsed).toFixed(2)} per served booking` }],
         [],
         [headerCell("Metric"), headerCell(monthLabel(cur.month)), headerCell(monthLabel(prev.month))],
         line("Partners (salons with bookings)", cur.partners, prev.partners, "int"),
@@ -618,7 +528,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
 
   const strip = [
     { label: "Total Amount Paid In", value: fmtMoney(cur?.gross, 2), note: "(From Customers)" },
-    { label: "Total Platform Fee", value: fmtMoney(cur?.platform_fee_total, 2), note: cur ? `(${fmtInt(cur.active_bookings)} × ${fmtMoney(feeUsed, 2)})` : "" },
+    { label: "Total Platform Fee", value: fmtMoney(cur?.platform_fee_total, 2), note: cur ? `(${fmtInt(cur.active_bookings)} served bookings)` : "" },
     { label: "Total GST", value: fmtMoney(cur?.gst, 2), note: "(Collected)" },
     { label: "Total Partner Payout", value: fmtMoney(cur?.payout, 2), note: "(To Partners)" },
     { label: "Estimated CAC", value: fmtMoney(cur?.cac_spend, 2), note: "(This Month)" },
@@ -646,22 +556,9 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
         )}
 
         {/* ---------------------------------------------------------------- */}
-        {/* Platform fee + month picker + report download                    */}
+        {/* Month picker + report download                                   */}
         {/* ---------------------------------------------------------------- */}
         <div className="flex items-end justify-end gap-3">
-          <div className="mr-auto">
-            <FieldLabel>Platform fee</FieldLabel>
-            <button
-              type="button"
-              onClick={() => setFeeDialog(true)}
-              className={`flex items-center gap-2 rounded-xl border border-[#E6E8F0] bg-white px-3 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-50 ${T.sm}`}
-              title="Set the per-booking platform fee this report uses"
-            >
-              {fmtMoney(platformFee, 2)} per booking
-              <Pencil size={12} className="shrink-0 text-slate-400" />
-            </button>
-          </div>
-
           <label className="w-[170px] shrink-0">
             <FieldLabel>Month</FieldLabel>
             <span className="relative block">
@@ -969,7 +866,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
                   <td className="py-3 pr-1.5 align-middle leading-tight">
                     <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.platform_fee)}</span>
                     <span className={`mt-1 block truncate text-slate-400 ${T.tiny}`}>
-                      ({fmtInt(row.active_bookings)} × {fmtMoney(feeUsed, 2)})
+                      ({fmtInt(row.active_bookings)} served)
                     </span>
                   </td>
 
@@ -1122,9 +1019,6 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
         </div>
       </ScaledCanvas>
 
-      {feeDialog && (
-        <PlatformFeeDialog current={platformFee} busy={platformFeeSaving} onSave={saveFee} onClose={() => setFeeDialog(false)} />
-      )}
     </>
   );
 };

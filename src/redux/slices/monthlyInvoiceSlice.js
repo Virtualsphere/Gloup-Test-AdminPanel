@@ -103,27 +103,6 @@ export const queryMonthlyReportSalonsV2 = createAsyncThunk(
     postV2("/admin/app/getMonthlyReportSalonsV2", params, "Failed to fetch monthly report", rejectWithValue)
 );
 
-// Per-booking platform fee (admin setting) the report multiplies by bookings.
-export const fetchPlatformFee = createAsyncThunk(
-  "monthlyInvoice/fetchPlatformFee",
-  async (_, { rejectWithValue }) => {
-    const data = await postV2("/admin/app/getplatformfee", {}, "Failed to fetch platform fee", rejectWithValue);
-    return data?.platform_fee ?? data;
-  }
-);
-
-export const updatePlatformFee = createAsyncThunk(
-  "monthlyInvoice/updatePlatformFee",
-  async ({ fee }, { rejectWithValue }) => {
-    const data = await postV2(
-      "/admin/app/updateplatformfee",
-      { platform_fee: fee },
-      "Failed to update platform fee",
-      rejectWithValue
-    );
-    return data?.platform_fee ?? data;
-  }
-);
 
 const monthlyInvoiceSlice = createSlice({
   name: "monthlyInvoice",
@@ -150,8 +129,6 @@ const monthlyInvoiceSlice = createSlice({
     salonsV2: { rows: [], total: 0 },
     salonsV2Loading: false,
     salonsV2Error: null,
-    platformFee: null,
-    platformFeeSaving: false,
   },
   reducers: {
     clearMonthlyInvoiceDetails: (state) => {
@@ -229,20 +206,6 @@ const monthlyInvoiceSlice = createSlice({
       .addCase(fetchMonthlyReportSalonsV2.rejected, (state, action) => {
         state.salonsV2Loading = false;
         state.salonsV2Error = action.payload;
-      })
-
-      .addCase(fetchPlatformFee.fulfilled, (state, action) => {
-        state.platformFee = action.payload;
-      })
-      .addCase(updatePlatformFee.pending, (state) => {
-        state.platformFeeSaving = true;
-      })
-      .addCase(updatePlatformFee.fulfilled, (state, action) => {
-        state.platformFeeSaving = false;
-        state.platformFee = action.payload;
-      })
-      .addCase(updatePlatformFee.rejected, (state) => {
-        state.platformFeeSaving = false;
       });
   },
 });

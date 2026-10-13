@@ -163,7 +163,7 @@ const PartnerManualSubscriptions = ({ title }) => {
                   <th className="px-4 py-2 text-left">Partner</th>
                   <th className="px-4 py-2 text-right">Plan (+18% GST)</th>
                   <th className="px-4 py-2 text-right">Outstanding Due</th>
-                  <th className="px-4 py-2 text-left">Next Due Date</th>
+                  <th className="px-4 py-2 text-left">Next Fee</th>
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-right">Actions</th>
                 </tr>
@@ -189,8 +189,22 @@ const PartnerManualSubscriptions = ({ title }) => {
                         <span className="text-green-700">Settled</span>
                       )}
                     </td>
+                    {/* Booking cycles: after a fee is paid off the salon gets
+                        renewal_booking_limit free bookings; the next fee needs
+                        that many AND the renewal date (next_due_date). */}
                     <td className="px-4 py-2 text-gray-600">
-                      {s.next_due_date ? String(s.next_due_date).slice(0, 10) : "—"}
+                      {s.status === "active" && s.cycle_state === "waiting" ? (
+                        <>
+                          <div>Renews {s.next_due_date ? String(s.next_due_date).slice(0, 10) : "—"}</div>
+                          <div className="text-xs text-gray-400">
+                            after {s.renewal_booking_limit} free bookings
+                          </div>
+                        </>
+                      ) : s.status === "active" ? (
+                        "Being collected"
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       <span
