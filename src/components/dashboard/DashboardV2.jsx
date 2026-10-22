@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -17,7 +19,11 @@ import {
   BadgeIndianRupee,
   CalendarCheck,
   CalendarDays,
+<<<<<<< HEAD
   ChartColumn,
+=======
+  CheckCircle2,
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
   ChevronDown,
   CircleCheck,
   CircleChevronDown,
@@ -26,9 +32,13 @@ import {
   Gift,
   Handshake,
   Info,
+<<<<<<< HEAD
   MapPin,
   Megaphone,
   Scissors,
+=======
+  IndianRupee,
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
   ShoppingCart,
   Store,
   Target,
@@ -36,11 +46,14 @@ import {
   UserCheck,
   UserRound,
   Users,
+  Wallet,
+  X,
 } from "lucide-react";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
 import {
+<<<<<<< HEAD
   Card,
   Delta,
   HeaderBell,
@@ -62,6 +75,21 @@ import {
 // date pickers hold local state only. The live dashboard payload
 // (dashboardSlice getDashboard, rendered by DashboardPage.jsx) carries none of
 // the marketing spend, Meta reach or alert data yet.
+=======
+  getDashboardV2Alerts,
+  getDashboardV2Metrics,
+} from "../../redux/slices/dashboardSlice";
+
+// ---------------------------------------------------------------------------
+// 1:1 reproduction of the approved executive dashboard mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
+//
+// Data: one /getDashboardV2Metrics call returns the same metrics for every
+// date range the page needs (the selected period, the two before it, and
+// the last 12 calendar months for the charts), plus /getDashboardV2Alerts.
+// Definitions of each metric live next to the backend query.
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -94,10 +122,32 @@ const T = {
 const GAP = "gap-3";
 const PAD = "p-3";
 
+// Filter options exactly as drawn in the mockup.
+const PERIODS = ["This Month", "Last Month", "This Week", "Last 90 Days", "This Year"];
+// Set from the date pill's picker; only listed in the dropdown while active.
+const CUSTOM_PERIOD = "Custom Range";
+const CARD_PERIODS = ["This Month", "Last Month", "Last 6 Months"];
+const REFRESH_MS = { Off: 0, "15 sec": 15000, "30 sec": 30000, "1 min": 60000, "5 min": 300000 };
+
+// Calendar months fetched for the charts: enough for "Last 6 Months" plus
+// the 6 months it is compared against.
+const HISTORY_MONTHS = 12;
+
+// A salon with no paid bookings created in this many days is flagged.
+const IDLE_SALON_DAYS = 7;
+// How far back unpaid daily invoices count as overdue payouts.
+const OVERDUE_PAYOUT_DAYS = 30;
+
+// Scorecard bands, as % change vs the prior period.
+const GROWTH_GOOD = 10;
+const GROWTH_ATTENTION = -2;
+const LOWER_BETTER_BAND = 5;
+
 // ---------------------------------------------------------------------------
-// Static demo data - UI only for now, wire up to the backend later.
+// Date helpers - all on "YYYY-MM-DD" / "YYYY-MM" strings in local time
 // ---------------------------------------------------------------------------
 
+<<<<<<< HEAD
 const COMPARE_LABEL = "vs Jul 2026";
 
 const kpis = [
@@ -108,8 +158,15 @@ const kpis = [
   { label: "Total Subscriptions", value: "23", delta: "130.0%", up: true, icon: Crown, tint: "#FDE6F0", color: PINK },
   // The rate fell, which is good news: the arrow points down, drawn green.
   { label: "Cancellation Rate", value: "2.73%", delta: "31.9%", up: false, good: true, icon: CircleChevronDown, tint: "#DCF3F0", color: "#0E9384" },
+=======
+const MONTHS_LONG = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 ];
+const MONTHS_SHORT = MONTHS_LONG.map((m) => m.slice(0, 3));
 
+<<<<<<< HEAD
 const scorecard = [
   { metric: "Bookings Growth", icon: CalendarCheck, color: "#4F6BED", value: "954", delta: "81.7%", up: true, status: "GOOD", logic: "Beyond the ±10% band" },
   { metric: "Revenue Growth", icon: ChartColumn, color: BLUE, value: "₹1,06,117.50", delta: "78.0%", up: true, status: "GOOD", logic: "Beyond the ±10% band" },
@@ -128,13 +185,69 @@ const bookingsRevenue = [
   { month: "July", bookings: 525, revenue: 59600.77 },
   { month: "August", bookings: 954, revenue: 106117.5 },
 ];
+=======
+const pad2 = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const parseYmd = (s) => {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+const addDays = (s, n) => {
+  const d = parseYmd(s);
+  d.setDate(d.getDate() + n);
+  return ymd(d);
+};
+const monthKeyOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+const parseMonthKey = (key) => key.split("-").map(Number);
+const shiftMonth = (key, n) => {
+  const [y, m] = parseMonthKey(key);
+  return monthKeyOf(new Date(y, m - 1 + n, 1));
+};
+const monthName = (key, short = false) => {
+  const [, m] = parseMonthKey(key);
+  return (short ? MONTHS_SHORT : MONTHS_LONG)[m - 1];
+};
+// Oldest first, ending at `endKey`.
+const monthRange = (endKey, count) =>
+  Array.from({ length: count }, (_, i) => shiftMonth(endKey, i - count + 1));
+// A calendar month as a range; the current month stops at today.
+const monthSpan = (key, today) => {
+  const [y, m] = parseMonthKey(key);
+  const last = ymd(new Date(y, m, 0));
+  return { from: `${key}-01`, to: last > today ? today : last };
+};
+const fmtDay = (s) => {
+  const d = parseYmd(s);
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+};
+// Inclusive day count between two "YYYY-MM-DD" dates.
+const daysBetween = (from, to) =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
 
-const marketingSpend = [
-  { month: "June", meta: 17500, other: 4500, organic: 3000 },
-  { month: "July", meta: 27500, other: 7875, organic: 4000 },
-  { month: "August", meta: 39232, other: 10800, organic: 6014 },
-];
+// The selected header period plus the two equal periods before it
+// (index 0 = selected). Month-based periods compare against whole months;
+// a custom range compares against the same number of days right before it.
+const resolvePeriod = (period, today, custom) => {
+  const t = parseYmd(today);
+  const thisMonth = monthKeyOf(t);
+  const year = t.getFullYear();
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 
+  if (period === CUSTOM_PERIOD && custom) {
+    const len = daysBetween(custom.from, custom.to);
+    const ranges = [0, 1, 2].map((i) => {
+      const from = addDays(custom.from, -len * i);
+      const to = addDays(from, len - 1);
+      return { from, to, label: `${fmtDay(from)} – ${fmtDay(to)}` };
+    });
+    return {
+      ranges,
+      unit: "Period",
+      compareLabel: `vs previous ${len} day${len === 1 ? "" : "s"}`,
+    };
+  }
+
+<<<<<<< HEAD
 const marketingKpis = [
   { label: "Marketing Spend", value: "₹56,045.95", delta: "42.3%", up: true, icon: Megaphone, color: BRAND, tint: "#EDE7FF" },
   { label: "CAC (Overall)", value: "₹58.75", delta: "21.7%", up: true, icon: UserCheck, color: GREEN, tint: "#E1F7EC" },
@@ -146,51 +259,82 @@ const userGrowth = [
   { month: "Jul", value: 16000 },
   { month: "Aug", value: 25700 },
 ];
+=======
+  if (period === "This Week") {
+    const monday = addDays(today, -((t.getDay() + 6) % 7));
+    const ranges = [0, 1, 2].map((i) => {
+      const from = addDays(monday, -7 * i);
+      const to = i === 0 ? today : addDays(from, 6);
+      return { from, to, label: `${fmtDay(from)} – ${fmtDay(to)}` };
+    });
+    return { ranges, unit: "Week", compareLabel: "vs previous week" };
+  }
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 
-const partnerGrowth = [
-  { month: "Jun", value: 233 },
-  { month: "Jul", value: 249 },
-  { month: "Aug", value: 212 },
-];
+  if (period === "Last 90 Days") {
+    const ranges = [0, 1, 2].map((i) => {
+      const to = addDays(today, -90 * i);
+      const from = addDays(to, -89);
+      return { from, to, label: `${fmtDay(from)} – ${fmtDay(to)}` };
+    });
+    return { ranges, unit: "Period", compareLabel: "vs previous 90 days" };
+  }
 
-const subscriptionGrowth = [
-  { month: "Jun", value: 4 },
-  { month: "Jul", value: 10 },
-  { month: "Aug", value: 23 },
-];
+  if (period === "This Year") {
+    const ranges = [0, 1, 2].map((i) => ({
+      from: `${year - i}-01-01`,
+      to: i === 0 ? today : `${year - i}-12-31`,
+      label: String(year - i),
+    }));
+    return { ranges, unit: "Year", compareLabel: `vs ${year - 1}` };
+  }
 
+<<<<<<< HEAD
 // Rate = cancellations / bookings of the month (6/235, 21/525, 26/954).
 const cancellations = [
   { month: "June", count: 6, rate: 2.55 },
   { month: "July", count: 21, rate: 4.0 },
   { month: "August", count: 26, rate: 2.73 },
 ];
+=======
+  const end = period === "Last Month" ? shiftMonth(thisMonth, -1) : thisMonth;
+  const keys = [end, shiftMonth(end, -1), shiftMonth(end, -2)];
+  return {
+    ranges: keys.map((key) => ({ ...monthSpan(key, today), label: monthName(key) })),
+    unit: "Month",
+    compareLabel: `vs ${monthName(keys[1], true)} ${parseMonthKey(keys[1])[0]}`,
+  };
+};
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 
-const metaReach = [
-  { month: "July", reach: 11420 },
-  { month: "August", reach: 10800 },
-];
+// Months shown / summed by a card-level filter (bookings & acquisition cards).
+const resolveCardWindow = (win, thisMonth) => {
+  if (win === "Last 6 Months") {
+    return {
+      chart: monthRange(thisMonth, 6),
+      current: monthRange(thisMonth, 6),
+      previous: monthRange(shiftMonth(thisMonth, -6), 6),
+      compareLabel: "vs previous 6 months",
+    };
+  }
+  const end = win === "Last Month" ? shiftMonth(thisMonth, -1) : thisMonth;
+  const prev = shiftMonth(end, -1);
+  return {
+    chart: monthRange(end, 3),
+    current: [end],
+    previous: [prev],
+    compareLabel: `vs ${monthName(prev, true)}`,
+  };
+};
 
-const juneToJuly = [
-  { metric: "Bookings", a: "235", b: "525", change: "+290", pct: "123.4%", up: true },
-  { metric: "Revenue", a: "₹23,437.58", b: "₹59,600.77", change: "+₹36,163.19", pct: "154.3%", up: true },
-  { metric: "CAC Spend", a: "₹25,000.00", b: "₹39,375.00", change: "+₹14,375.00", pct: "57.5%", up: true },
-  { metric: "Cancellations", a: "6", b: "21", change: "+15", pct: "250.0%", up: true },
-  { metric: "Users", a: "8.0K", b: "16.0K", change: "+8.0K", pct: "100.0%", up: true },
-  { metric: "Partners", a: "233", b: "249", change: "+16", pct: "6.9%", up: true },
-  { metric: "Subscriptions", a: "N/A", b: "10", change: null, pct: null },
-];
+// ---------------------------------------------------------------------------
+// Number helpers
+// ---------------------------------------------------------------------------
 
-const julyToAugust = [
-  { metric: "Bookings", a: "525", b: "954", change: "+429", pct: "81.7%", up: true },
-  { metric: "Revenue", a: "₹59,600.77", b: "₹1,06,117.50", change: "+₹46,516.73", pct: "78.0%", up: true },
-  { metric: "CAC Spend", a: "₹39,375.00", b: "₹56,045.95", change: "+₹16,670.95", pct: "42.3%", up: true },
-  { metric: "Cancellations", a: "21", b: "26", change: "+5", pct: "23.8%", up: true },
-  { metric: "Users", a: "16.0K", b: "25.7K", change: "+9.7K", pct: "60.6%", up: true },
-  { metric: "Partners", a: "249", b: "212", change: "-37", pct: "-14.9%", up: false },
-  { metric: "Subscriptions", a: "10", b: "23", change: "+13", pct: "130.0%", up: true },
-];
+const pctChange = (cur, prev) =>
+  cur == null || prev == null || prev === 0 ? null : ((cur - prev) / prev) * 100;
 
+<<<<<<< HEAD
 // Each alert is drawn in its own tone: tinted row, tinted border, coloured
 // title and link.
 const alerts = [
@@ -200,6 +344,27 @@ const alerts = [
   { icon: MapPin, color: "#2563EB", bg: "#EEF4FF", border: "#CFE0FD", title: "Perungudi demand is 31% higher", sub: "than availability", action: "View Details" },
   { icon: Scissors, color: "#12A06A", bg: "#EDFAF3", border: "#C6EBD9", title: "Haircut ₹99 converting 2.4x", sub: "better than ₹149", action: "View Report" },
 ];
+=======
+// { value: "12.3%", up } for <Delta>, or null when there is nothing to compare.
+const toDelta = (pct) =>
+  pct == null ? null : { value: `${Math.abs(pct).toFixed(1)}%`, up: pct >= 0 };
+
+const rateOf = (m) =>
+  m?.bookings ? (m.cancellations / m.bookings) * 100 : null;
+
+const DASH = "—";
+const fmtInt = (v) => (v == null ? DASH : Number(v).toLocaleString("en-IN"));
+const fmtInr = (v) =>
+  v == null
+    ? DASH
+    : `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtPct = (v) => (v == null ? DASH : `${v.toFixed(2)}%`);
+const fmtCompact = (v) =>
+  v == null ? DASH : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : `${v}`;
+const fmtSigned = (v, fmt) => (v < 0 ? `-${fmt(Math.abs(v))}` : `+${fmt(v)}`);
+
+const inr = (v) => `₹${Number(v).toLocaleString("en-IN")}`;
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 
 const PERIODS = ["This Month", "Last Month", "This Week", "Last 90 Days", "This Year"];
 const CARD_PERIODS = ["This Month", "Last Month", "Last 6 Months"];
@@ -225,10 +390,29 @@ const CardTitle = ({ children, right }) => (
   </div>
 );
 
+<<<<<<< HEAD
 const ViewLink = ({ children }) => (
   <button
     type="button"
     className={`mt-auto flex w-full items-center justify-center gap-1.5 pt-2 font-semibold hover:underline ${T.base}`}
+=======
+// `good` colours the delta independently of its direction, for metrics where
+// going down is the good outcome (cancellation rate, CAC).
+const Delta = ({ value, up, good = up }) => (
+  <span
+    className={`inline-flex items-center gap-0.5 whitespace-nowrap font-semibold ${good ? "text-emerald-500" : "text-rose-500"
+      }`}
+  >
+    {up ? "↑" : "↓"} {value}
+  </span>
+);
+
+const ViewLink = ({ children, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`mt-auto flex w-full items-center justify-center gap-1.5 pt-4 font-bold hover:underline ${T.lg}`}
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
     style={{ color: BRAND }}
   >
     {children}
@@ -259,6 +443,7 @@ const KpiTile = ({ delta, up, good, ...props }) => (
   />
 );
 
+<<<<<<< HEAD
 // Tinted, bordered mini stat under the bookings / cancellation / meta charts.
 const StatBox = ({ label, value, delta, up, good, bg, border }) => (
   <div
@@ -266,28 +451,76 @@ const StatBox = ({ label, value, delta, up, good, bg, border }) => (
     style={{ background: bg, borderColor: border }}
   >
     <p className={`truncate text-slate-600 ${T.sm}`}>{label}</p>
+=======
+// Bordered mini stat used under the bookings chart and in the acquisition card.
+const StatBox = ({ label, value, delta, good, note }) => (
+  <div className="min-w-0 rounded-xl border border-[#E3E7EF] px-3 py-2.5">
+    <p className={`truncate text-slate-500 ${T.sm}`}>{label}</p>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
     <div className="mt-1 flex items-baseline justify-between gap-2">
       <span className="whitespace-nowrap text-[17px] font-extrabold tracking-tight text-slate-900">
         {value}
       </span>
+<<<<<<< HEAD
       {delta && <Delta value={delta} up={up} good={good} size={T.sm} />}
+=======
+      {delta && (
+        <span className={T.sm}>
+          <Delta {...delta} good={good ?? delta.up} />
+        </span>
+      )}
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
     </div>
+    {note && <p className={`mt-0.5 truncate text-slate-400 ${T.xs}`}>{note}</p>}
   </div>
 );
 
+const STATUS_STYLES = {
+  GOOD: "bg-emerald-50 text-emerald-600",
+  ATTENTION: "bg-amber-50 text-amber-600 ring-1 ring-amber-200",
+  STABLE: "bg-slate-100 text-slate-600",
+  "N/A": "bg-slate-50 text-slate-400",
+};
+
+const STATUS_DOT = {
+  GOOD: BRAND,
+  ATTENTION: AMBER,
+  STABLE: "#94A3B8",
+  "N/A": "#CBD5E1",
+};
+
 const StatusPill = ({ status }) => (
   <span
+<<<<<<< HEAD
     className={`inline-block whitespace-nowrap rounded-full px-2 py-[3px] text-[8.5px] font-bold ${
       status === "GOOD"
         ? "bg-emerald-50 text-emerald-600"
         : "bg-amber-50 text-amber-600 ring-1 ring-amber-200"
     }`}
+=======
+    className={`inline-block whitespace-nowrap rounded-md px-2 py-1 font-bold ${T.xs} ${STATUS_STYLES[status]}`}
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
   >
     {status}
   </span>
 );
 
-// Shared by the two month-on-month comparison tables.
+// Placeholder for a metric the backend doesn't provide yet - shown instead of
+// made-up numbers so it's obvious what still needs an API.
+const Pending = ({ children, className = "" }) => (
+  <div
+    className={`flex flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center ${className}`}
+  >
+    <span
+      className={`rounded-md bg-slate-200/70 px-2 py-0.5 font-bold uppercase tracking-wide text-slate-500 ${T.xs}`}
+    >
+      Backend pending
+    </span>
+    <p className={`max-w-[300px] text-slate-500 ${T.sm}`}>{children}</p>
+  </div>
+);
+
+// Shared by the two period-on-period comparison tables.
 const ComparisonTable = ({ columns, rows }) => (
   <table className="w-full table-auto border-collapse text-left">
     <thead>
@@ -295,9 +528,13 @@ const ComparisonTable = ({ columns, rows }) => (
         {columns.map((col, i) => (
           <th
             key={col}
+<<<<<<< HEAD
             className={`pb-2 pr-2 font-bold uppercase tracking-wide text-slate-400 ${T.nano} ${
               i ? "text-right" : ""
             }`}
+=======
+            className={`whitespace-nowrap pb-2.5 pr-2 font-bold uppercase tracking-wide text-slate-400 ${T.xs}`}
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
           >
             {col}
           </th>
@@ -316,6 +553,7 @@ const ComparisonTable = ({ columns, rows }) => (
             className={`whitespace-nowrap py-[5px] pr-2 text-right font-semibold ${T.xs} ${
               !row.change
                 ? "text-slate-400"
+<<<<<<< HEAD
                 : row.change.startsWith("-")
                   ? "text-rose-500"
                   : "text-emerald-600"
@@ -326,6 +564,18 @@ const ComparisonTable = ({ columns, rows }) => (
           <td className={`whitespace-nowrap py-[5px] text-right ${T.xs}`}>
             {row.pct ? (
               <Delta value={row.pct} up={row.up} size={T.xs} iconSize={11} />
+=======
+                : row.good
+                  ? "text-emerald-600"
+                  : "text-rose-500"
+              }`}
+          >
+            {row.change || "N/A"}
+          </td>
+          <td className={`whitespace-nowrap py-2.5 ${T.base}`}>
+            {row.delta ? (
+              <Delta {...row.delta} good={row.good} />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
             ) : (
               <span className="text-slate-400">N/A</span>
             )}
@@ -337,6 +587,7 @@ const ComparisonTable = ({ columns, rows }) => (
 );
 
 // One of the three mini panels inside the growth card.
+<<<<<<< HEAD
 const GrowthMini = ({ icon, iconColor, title, caption, value, delta, up, tint, border, children }) => {
   const Icon = icon;
   return (
@@ -431,12 +682,198 @@ const PageHeader = ({ title, period, setPeriod, refreshInterval, setRefreshInter
     </div>
   </PageHeaderPortal>
 );
+=======
+const GrowthMini = ({ title, caption, value, delta, children }) => (
+  <div className="flex min-w-0 flex-col rounded-xl border border-[#E3E7EF] p-3">
+    <p className={`font-bold text-slate-900 ${T.md}`}>{title}</p>
+    <p className={`mt-0.5 text-slate-500 ${T.sm}`}>{caption}</p>
+    <div className="mt-2 h-[112px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        {children}
+      </ResponsiveContainer>
+    </div>
+    <div className="mt-2 flex items-baseline justify-between gap-2">
+      <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>{value}</span>
+      {delta && (
+        <span className={T.sm}>
+          <Delta {...delta} />
+        </span>
+      )}
+    </div>
+  </div>
+);
+
+// Growth metrics: higher is better.
+const growthStatus = (pct) => {
+  if (pct == null) return { status: "N/A", logic: "Not enough history" };
+  if (pct >= GROWTH_GOOD) return { status: "GOOD", logic: `Beyond the +${GROWTH_GOOD}% band` };
+  if (pct <= GROWTH_ATTENTION) return { status: "ATTENTION", logic: `Beyond the ${GROWTH_ATTENTION}% band` };
+  return { status: "STABLE", logic: `Within ${GROWTH_ATTENTION}% to +${GROWTH_GOOD}%` };
+};
+
+// Cost-style metrics (cancellation rate, CAC per booking): lower is better.
+const lowerBetterStatus = (pct) => {
+  if (pct == null) return { status: "N/A", logic: "Not enough history" };
+  if (pct <= -LOWER_BETTER_BAND) return { status: "GOOD", logic: `Beyond the -${LOWER_BETTER_BAND}% band` };
+  if (pct >= LOWER_BETTER_BAND) return { status: "ATTENTION", logic: `Beyond the +${LOWER_BETTER_BAND}% band` };
+  return { status: "STABLE", logic: `Within ±${LOWER_BETTER_BAND}%` };
+};
+
+// Popover under the date pill for picking any from/to range. Absolutely
+// positioned inside the canvas (not fixed), so the scaling doesn't trap it.
+const DateRangePicker = ({ initial, today, onApply, onClose }) => {
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
+  const error = !from || !to
+    ? "Pick both dates"
+    : from > to
+      ? "Start date must be before end date"
+      : to > today
+        ? "End date can't be in the future"
+        : null;
+
+  return (
+    <div className="absolute right-0 top-full z-20 mt-2 w-[280px] rounded-2xl border border-[#E3E7EF] bg-white p-4 shadow-lg">
+      <p className={`mb-3 font-bold text-slate-900 ${T.md}`}>Custom date range</p>
+      {[
+        ["From", from, setFrom],
+        ["To", to, setTo],
+      ].map(([label, value, set]) => (
+        <label key={label} className={`mb-2 flex items-center justify-between gap-3 text-slate-600 ${T.base}`}>
+          {label}
+          <input
+            type="date"
+            value={value}
+            max={today}
+            onChange={(e) => set(e.target.value)}
+            className={`rounded-lg border border-slate-200 px-2 py-1.5 text-slate-800 focus:outline-none ${T.base}`}
+          />
+        </label>
+      ))}
+      <p className={`min-h-[16px] text-rose-500 ${T.sm}`}>{error}</p>
+      <div className="mt-2 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className={`rounded-lg px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-100 ${T.base}`}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={!!error}
+          onClick={() => onApply({ from, to })}
+          className={`rounded-lg px-3 py-1.5 font-semibold text-white disabled:opacity-40 ${T.base}`}
+          style={{ background: BRAND }}
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const HOW_IT_WORKS = [
+  {
+    title: "Filters",
+    items: [
+      "The period dropdown (or a custom range from the date pill) drives the KPI tiles, the scorecard, the comparison tables and the monthly charts. Every change is compared with the equal period just before it: whole months for This / Last Month, the previous week, the previous 90 days, the previous year, or the same number of days before a custom range.",
+      "The Bookings & Revenue and Acquisition cards have their own filter. \"Last 6 Months\" is compared with the 6 months before it.",
+      "The growth, partner, subscription and cancellation charts show the 3 calendar months ending with the selected period.",
+    ],
+  },
+  {
+    title: "Metrics",
+    items: [
+      "Bookings: paid appointments, by appointment date. Checkouts whose payment failed or expired are not bookings.",
+      "Revenue: what Gloup itself earns - the platform fee customers paid on bookings that weren't cancelled or refunded, plus manual subscription fees (incl. GST) collected from salon payouts, counted on the day the payout was marked paid.",
+      "Cancellations: paid bookings later cancelled or refunded. Cancellation rate = cancellations ÷ bookings.",
+      "CAC spend: the discount Gloup funds on each booking (the service's list price when it was booked minus what the customer paid, nothing for \"important\" services), so later price edits don't change past months. CAC per booking = CAC spend ÷ non-cancelled bookings.",
+      "Users, partners and subscriptions are running totals at the end of the period. Users count from their registration date; users older than that field with no history are counted as existing from the start.",
+    ],
+  },
+  {
+    title: "Scorecard status",
+    items: [
+      `Growth metrics: GOOD at +${GROWTH_GOOD}% or more, ATTENTION at ${GROWTH_ATTENTION}% or less, otherwise STABLE.`,
+      `Cancellation rate and CAC per booking (lower is better): GOOD at -${LOWER_BETTER_BAND}% or less, ATTENTION at +${LOWER_BETTER_BAND}% or more.`,
+    ],
+  },
+  {
+    title: "Alerts",
+    items: [
+      `Zero bookings: active salons, listed for over ${IDLE_SALON_DAYS} days, with no paid booking in the last ${IDLE_SALON_DAYS} days.`,
+      `Overdue payout: past invoice days (up to ${OVERDUE_PAYOUT_DAYS} days back) with bookings but no payout marked. The amount is the invoice total before any subscription deduction.`,
+      "Checkout drop-offs: customers whose payment failed or expired today.",
+      "Subscription dues: what active partner subscriptions owe right now, including GST.",
+    ],
+  },
+];
+
+// Rendered outside ScaledCanvas - a fixed overlay inside the transformed
+// canvas would be positioned (and scaled) relative to it.
+const HowItWorksModal = ({ dataStartDate, onClose }) => {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="How the dashboard works"
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <h2 className="text-lg font-extrabold text-slate-900">How the dashboard works</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {HOW_IT_WORKS.map((section) => (
+          <div key={section.title} className="mb-4">
+            <h3 className="mb-1.5 text-sm font-bold uppercase tracking-wide text-slate-500">
+              {section.title}
+            </h3>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {section.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+
+        <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          {dataStartDate
+            ? `Booking, revenue, CAC and partner numbers only count activity from ${dataStartDate} (the go-live date set on the V1 dashboard).`
+            : "No go-live date is set, so booking, revenue, CAC and partner numbers cover all time."}{" "}
+          Meta reach, the ad-channel split and the area / price-point alerts need data the platform doesn&apos;t collect yet.
+        </p>
+      </div>
+    </div>
+  );
+};
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 const DashboardV2 = ({ title = "Dashboard" }) => {
+<<<<<<< HEAD
   const [period, setPeriod] = useState(PERIODS[0]);
   const [refreshInterval, setRefreshInterval] = useState(REFRESH_INTERVALS[1]);
   const [revenuePeriod, setRevenuePeriod] = useState(CARD_PERIODS[0]);
@@ -453,12 +890,393 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
       />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+=======
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const [period, setPeriod] = useState("This Month");
+  const [refreshInterval, setRefreshInterval] = useState("30 sec");
+  const [bookingsWindow, setBookingsWindow] = useState("This Month");
+  const [acquisitionWindow, setAcquisitionWindow] = useState("This Month");
+  const [customRange, setCustomRange] = useState(null);
+  const [showRangePicker, setShowRangePicker] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState([]);
+
+  const { dashboardV2Metrics, dashboardV2Alerts } = useSelector((state) => state.dashboard);
+
+  const today = ymd(new Date());
+  const thisMonth = today.slice(0, 7);
+  const periodInfo = useMemo(
+    () => resolvePeriod(period, today, customRange),
+    [period, today, customRange]
+  );
+  // The chart months, plus the 3 months ending with the selected period in
+  // case a custom range reaches back further than that.
+  const periodEndMonth = periodInfo.ranges[0].to.slice(0, 7);
+  const historyKeys = useMemo(
+    () => [...new Set([...monthRange(periodEndMonth, 3), ...monthRange(thisMonth, HISTORY_MONTHS)])],
+    [periodEndMonth, thisMonth]
+  );
+
+  const selectPeriod = (value) => {
+    if (value !== CUSTOM_PERIOD) setCustomRange(null);
+    setPeriod(value);
+  };
+  const applyCustomRange = (range) => {
+    setCustomRange(range);
+    setPeriod(CUSTOM_PERIOD);
+    setShowRangePicker(false);
+  };
+  const closeHowItWorks = useCallback(() => setShowHowItWorks(false), []);
+
+  // Keys: "p0".."p2" for the header period, "YYYY-MM" for chart months.
+  const ranges = useMemo(
+    () => [
+      ...periodInfo.ranges.map(({ from, to }, i) => ({ key: `p${i}`, from, to })),
+      ...historyKeys.map((key) => ({ key, ...monthSpan(key, today) })),
+    ],
+    [periodInfo, historyKeys, today]
+  );
+
+  // Everything is re-fetched on each refresh. Promise.allSettled so one failing
+  // endpoint only blanks its own cards instead of the whole page.
+  const load = useCallback(async () => {
+    const requests = [
+      ["Dashboard metrics", getDashboardV2Metrics(ranges)],
+      [
+        "Alerts",
+        getDashboardV2Alerts({ idle_days: IDLE_SALON_DAYS, overdue_days: OVERDUE_PAYOUT_DAYS }),
+      ],
+    ];
+    const results = await Promise.allSettled(
+      requests.map(([, thunk]) => dispatch(thunk).unwrap())
+    );
+    setFailed(requests.filter((_, i) => results[i].status === "rejected").map(([name]) => name));
+    setLoaded(true);
+  }, [dispatch, ranges]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    const ms = REFRESH_MS[refreshInterval];
+    if (!ms) return undefined;
+    const id = setInterval(load, ms);
+    return () => clearInterval(id);
+  }, [load, refreshInterval]);
+
+  // -------------------------------------------------------------------------
+  // Metric lookups
+  // -------------------------------------------------------------------------
+
+  const byKey = dashboardV2Metrics?.ranges || {};
+  const at = (key) => byKey[key] || null;
+  const pick = (key, field) => at(key)?.[field] ?? null;
+
+  // Additive metrics summed over several months (null only if all are null).
+  const sumOver = (keys, field) => {
+    const values = keys.map((k) => pick(k, field)).filter((v) => v != null);
+    return values.length ? values.reduce((a, b) => a + b, 0) : null;
+  };
+  const cacPerBooking = (keys) => {
+    const spend = sumOver(keys, "cac_spend");
+    const count = sumOver(keys, "cac_bookings");
+    return spend == null || !count ? null : spend / count;
+  };
+
+  const [cur, last, before] = ["p0", "p1", "p2"].map((key) => {
+    const m = at(key);
+    return m ? { ...m, rate: rateOf(m) } : {};
+  });
+  const [curRange, lastRange, beforeRange] = periodInfo.ranges;
+  const compareLabel = periodInfo.compareLabel;
+  const rangeLabel = `${fmtDay(curRange.from)} – ${fmtDay(curRange.to)} ${curRange.to.slice(0, 4)}`;
+
+  const change = (field) => pctChange(cur[field] ?? null, last[field] ?? null);
+  const pct = {
+    bookings: change("bookings"),
+    revenue: change("revenue"),
+    rate: pctChange(cur.rate ?? null, last.rate ?? null),
+    cac: change("cac_per_booking"),
+    users: change("total_users"),
+    partners: change("total_partners"),
+    subscriptions: change("active_subscriptions"),
+  };
+
+  const kpis = [
+    { label: "Total Bookings", value: fmtInt(cur.bookings), delta: toDelta(pct.bookings), icon: CalendarCheck, tint: "#EDE7FF", color: BRAND },
+    { label: "Total Revenue", value: fmtInr(cur.revenue), delta: toDelta(pct.revenue), icon: IndianRupee, tint: "#E1F7EC", color: GREEN },
+    { label: "Total Users", value: fmtCompact(cur.total_users), delta: toDelta(pct.users), icon: Users, tint: "#FFF2DC", color: "#E08700" },
+    { label: "Total Partners", value: fmtInt(cur.total_partners), delta: toDelta(pct.partners), icon: Store, tint: "#E6EFFF", color: BLUE },
+    { label: "Total Subscriptions", value: fmtInt(cur.active_subscriptions), delta: toDelta(pct.subscriptions), icon: Gift, tint: "#FDE6F0", color: PINK },
+    { label: "Cancellation Rate", value: fmtPct(cur.rate), delta: toDelta(pct.rate), invert: true, icon: Slash, tint: "#DCF3F0", color: "#0E9384" },
+  ];
+
+  const scorecard = [
+    { metric: "Bookings Growth", value: fmtInt(cur.bookings), delta: toDelta(pct.bookings), ...growthStatus(pct.bookings) },
+    { metric: "Revenue Growth", value: fmtInr(cur.revenue), delta: toDelta(pct.revenue), ...growthStatus(pct.revenue) },
+    { metric: "CAC efficiency (per booking)", value: fmtInr(cur.cac_per_booking), delta: toDelta(pct.cac), invert: true, ...lowerBetterStatus(pct.cac) },
+    { metric: "Cancellation Rate", value: fmtPct(cur.rate), delta: toDelta(pct.rate), invert: true, ...lowerBetterStatus(pct.rate) },
+    { metric: "User Growth", value: fmtCompact(cur.total_users), delta: toDelta(pct.users), ...growthStatus(pct.users) },
+    { metric: "Partner Growth", value: fmtInt(cur.total_partners), delta: toDelta(pct.partners), ...growthStatus(pct.partners) },
+    { metric: "Subscription Growth", value: fmtInt(cur.active_subscriptions), delta: toDelta(pct.subscriptions), ...growthStatus(pct.subscriptions) },
+  ];
+
+  // Bookings & revenue card - its own filter.
+  const bw = resolveCardWindow(bookingsWindow, thisMonth);
+  const bwShort = bw.chart.length > 3;
+  const bookingsRevenue = bw.chart.map((key) => ({
+    month: monthName(key, bwShort),
+    bookings: pick(key, "bookings"),
+    revenue: pick(key, "revenue"),
+  }));
+  const revenueMax = Math.max(0, ...bookingsRevenue.map((d) => d.revenue || 0)) || 1;
+  const bwBookings = sumOver(bw.current, "bookings");
+  const bwRevenue = sumOver(bw.current, "revenue");
+
+  // Acquisition card - its own filter.
+  const aw = resolveCardWindow(acquisitionWindow, thisMonth);
+  const awShort = aw.chart.length > 3;
+  const awSpend = sumOver(aw.current, "cac_spend");
+  const awCac = cacPerBooking(aw.current);
+  const acquisitionSpend = aw.chart.map((key) => ({
+    month: monthName(key, awShort),
+    spend: pick(key, "cac_spend"),
+  }));
+
+  // Monthly charts follow the header period: the 3 months ending at its end.
+  const growthMonths = monthRange(periodEndMonth, 3);
+  const growthSeries = (field) =>
+    growthMonths.map((key) => ({ month: monthName(key, true), value: pick(key, field) }));
+
+  const cancellations = growthMonths.map((key) => {
+    const rate = rateOf(at(key));
+    return {
+      month: monthName(key),
+      count: pick(key, "cancellations"),
+      rate: rate == null ? null : Number(rate.toFixed(2)),
+    };
+  });
+  const cancelMax = Math.max(0, ...cancellations.map((d) => d.count || 0)) || 1;
+  const rateMax = Math.max(0, ...cancellations.map((d) => d.rate || 0)) || 1;
+
+  const comparisonRows = (a, b) => {
+    const row = (metric, va, vb, fmt, lowerIsBetter = false) => {
+      const diff = va == null || vb == null ? null : vb - va;
+      const p = pctChange(vb, va);
+      const up = diff != null && diff >= 0;
+      return {
+        metric,
+        a: fmt(va),
+        b: fmt(vb),
+        change: diff == null ? null : fmtSigned(diff, fmt),
+        delta: toDelta(p),
+        good: diff === 0 || (lowerIsBetter ? !up : up),
+      };
+    };
+    return [
+      row("Bookings", a.bookings ?? null, b.bookings ?? null, fmtInt),
+      row("Revenue", a.revenue ?? null, b.revenue ?? null, fmtInr),
+      row("CAC Spend", a.cac_spend ?? null, b.cac_spend ?? null, fmtInr, true),
+      row("Cancellations", a.cancellations ?? null, b.cancellations ?? null, fmtInt, true),
+      row("Users", a.total_users ?? null, b.total_users ?? null, fmtCompact),
+      row("Partners", a.total_partners ?? null, b.total_partners ?? null, fmtInt),
+      row("Subscriptions", a.active_subscriptions ?? null, b.active_subscriptions ?? null, fmtInt),
+    ];
+  };
+
+  const alertsData = dashboardV2Alerts || {};
+  const alerts = [];
+  if (alertsData.idle_salons?.count > 0) {
+    const n = alertsData.idle_salons.count;
+    alerts.push({
+      icon: AlertTriangle,
+      tint: "#FEE4E2",
+      color: RED,
+      title: `${n} salon${n === 1 ? " has" : "s have"} zero bookings`,
+      sub: `for ${alertsData.idle_salons.days} days`,
+      action: "View Partners",
+      to: "/partner",
+      critical: true,
+    });
+  }
+  if (alertsData.overdue_payouts?.invoices > 0) {
+    const { amount, partners } = alertsData.overdue_payouts;
+    alerts.push({
+      icon: Clock,
+      tint: "#FFF2DC",
+      color: "#E08700",
+      title: `${inr(Math.round(amount))} overdue payout`,
+      sub: `to ${partners} partner${partners === 1 ? "" : "s"}`,
+      action: "View Payouts",
+      to: "/invoice",
+    });
+  }
+  if (alertsData.checkout_dropoffs?.users > 0) {
+    const n = alertsData.checkout_dropoffs.users;
+    alerts.push({
+      icon: ShoppingCart,
+      tint: "#EDE7FF",
+      color: BRAND,
+      title: `${n} user${n === 1 ? "" : "s"} dropped off at checkout`,
+      sub: "today",
+      action: "View",
+      // Failed/expired checkouts end up cancelled with payment_status failed;
+      // /bookings filters by created date, the same basis as this count.
+      to: `/bookings?fromDate=${today}&toDate=${today}&status=cancelled&paymentStatus=failed`,
+    });
+  }
+  if (alertsData.subscription_dues?.partners > 0) {
+    const { amount, partners } = alertsData.subscription_dues;
+    alerts.push({
+      icon: Wallet,
+      tint: "#FDE6F0",
+      color: PINK,
+      title: `${inr(Math.round(amount))} subscription dues`,
+      sub: `from ${partners} partner${partners === 1 ? "" : "s"}`,
+      action: "View",
+      to: "/partner-subscriptions",
+    });
+  }
+  if (dashboardV2Alerts?.date && alerts.length === 0) {
+    alerts.push({
+      icon: CheckCircle2,
+      tint: "#E1F7EC",
+      color: GREEN,
+      title: "Nothing needs attention",
+      sub: "no idle salons, overdue payouts or dues",
+    });
+  }
+
+  const unitLabel = periodInfo.unit;
+
+  return (
+    <>
+    <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+        {/* ---------------------------------------------------------------- */}
+        {/* Page header + filter bar                                        */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className={`font-extrabold tracking-tight text-slate-900 ${T.h1}`}>{title}</h1>
+            <p className={`mt-0.5 text-slate-500 ${T.md}`}>
+              {loaded ? "Real-time overview of GloUp platform performance" : "Loading dashboard…"}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowRangePicker((open) => !open)}
+                className={`flex items-center gap-2 whitespace-nowrap rounded-xl border bg-white px-3 py-2 font-medium text-slate-700 hover:border-slate-300 ${T.md} ${period === CUSTOM_PERIOD ? "border-[#5B21F0]" : "border-slate-200"
+                  }`}
+              >
+                {rangeLabel}
+                <CalendarDays size={13} className="shrink-0 text-slate-400" />
+              </button>
+              {showRangePicker && (
+                <DateRangePicker
+                  initial={curRange}
+                  today={today}
+                  onApply={applyCustomRange}
+                  onClose={() => setShowRangePicker(false)}
+                />
+              )}
+            </div>
+
+            <Select
+              value={period}
+              onChange={selectPeriod}
+              options={period === CUSTOM_PERIOD ? [...PERIODS, CUSTOM_PERIOD] : PERIODS}
+            />
+
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${REFRESH_MS[refreshInterval] ? "bg-emerald-500" : "bg-slate-300"
+                  }`}
+              />
+              <div className="leading-tight">
+                <p className={`whitespace-nowrap font-semibold text-slate-700 ${T.base}`}>
+                  Auto refresh
+                </p>
+                <div className="relative">
+                  <select
+                    value={refreshInterval}
+                    onChange={(e) => setRefreshInterval(e.target.value)}
+                    className={`appearance-none bg-transparent pr-3 text-slate-500 focus:outline-none ${T.sm}`}
+                  >
+                    {Object.keys(REFRESH_MS).map((o) => (
+                      <option key={o}>{o}</option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={10}
+                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowHowItWorks(true)}
+              className={`flex items-center gap-1.5 whitespace-nowrap font-medium text-slate-600 hover:text-slate-900 ${T.md}`}
+            >
+              <Info size={14} className="shrink-0 text-slate-400" />
+              How it works?
+            </button>
+          </div>
+        </div>
+
+        {failed.length > 0 && (
+          <div
+            className={`rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 font-medium text-rose-600 ${T.base}`}
+          >
+            Couldn&apos;t load: {failed.join(", ")}. Affected cards show “{DASH}”.
+          </div>
+        )}
+
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                 */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid grid-cols-6 ${GAP}`}>
+<<<<<<< HEAD
           {kpis.map(({ icon, color, tint, ...kpi }) => (
             <KpiTile key={kpi.label} {...kpi} icon={icon} iconColor={color} iconTint={tint} />
+=======
+          {kpis.map(({ icon: Icon, ...kpi }) => (
+            <div
+              key={kpi.label}
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#E3E7EF] bg-white p-3.5"
+            >
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: kpi.tint }}
+              >
+                <Icon size={20} style={{ color: kpi.color }} />
+              </div>
+
+              <div className="min-w-0">
+                <p className={`truncate text-slate-500 ${T.base}`}>{kpi.label}</p>
+                <p
+                  className={`mt-0.5 whitespace-nowrap font-extrabold tracking-tight text-slate-900 ${T.kpi}`}
+                >
+                  {kpi.value}
+                </p>
+                <p className={`mt-0.5 flex items-center gap-1.5 ${T.sm}`}>
+                  {kpi.delta && (
+                    <Delta {...kpi.delta} good={kpi.invert ? !kpi.delta.up : kpi.delta.up} />
+                  )}
+                  <span className="truncate text-slate-400">{compareLabel}</span>
+                </p>
+              </div>
+            </div>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
           ))}
         </div>
 
@@ -470,6 +1288,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
           <Card className={PAD}>
             <CardTitle>Performance Scorecard</CardTitle>
 
+<<<<<<< HEAD
             <div className="overflow-hidden rounded-lg border border-[#E6E8F0]">
               <table className="w-full table-fixed border-collapse text-left">
                 <colgroup>
@@ -489,6 +1308,54 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                         {h}
                       </th>
                     ))}
+=======
+            <table className="w-full table-auto border-collapse text-left">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  {[
+                    "Metric",
+                    "Latest Value",
+                    `Change vs Prior ${unitLabel}`,
+                    "Status",
+                    "Logic Applied",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className={`pb-2.5 pr-2 font-bold uppercase leading-tight tracking-wide text-slate-400 ${T.xs}`}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {scorecard.map((row) => (
+                  <tr key={row.metric}>
+                    <td className={`py-2 pr-2 ${T.base}`}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ background: STATUS_DOT[row.status] }}
+                        />
+                        <span className="font-medium text-slate-700">{row.metric}</span>
+                      </span>
+                    </td>
+                    <td className={`whitespace-nowrap py-2 pr-2 text-slate-600 ${T.base}`}>
+                      {row.value}
+                    </td>
+                    <td className={`whitespace-nowrap py-2 pr-2 ${T.base}`}>
+                      {row.delta ? (
+                        <Delta {...row.delta} good={row.invert ? !row.delta.up : row.delta.up} />
+                      ) : (
+                        <span className="text-slate-400">N/A</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-2">
+                      <StatusPill status={row.status} />
+                    </td>
+                    {/* 10px keeps "Beyond the +10% band" on one line in this column. */}
+                    <td className={`whitespace-nowrap py-2 text-slate-400 ${T.xs}`}>{row.logic}</td>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   </tr>
                 </thead>
                 <tbody>
@@ -522,14 +1389,25 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
               </table>
             </div>
 
-            <ViewLink>View Full Performance Report</ViewLink>
+            <ViewLink onClick={() => navigate("/monthly-report")}>
+              View Full Performance Report
+            </ViewLink>
           </Card>
 
           {/* Bookings & revenue performance */}
           <Card className={PAD}>
             <CardTitle
               right={
+<<<<<<< HEAD
                 <Select value={revenuePeriod} onChange={setRevenuePeriod} options={CARD_PERIODS} />
+=======
+                <Select
+                  compact
+                  value={bookingsWindow}
+                  onChange={setBookingsWindow}
+                  options={CARD_PERIODS}
+                />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
               }
             >
               Bookings &amp; Revenue Performance
@@ -557,10 +1435,16 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS_TEXT} dy={6} />
                   <YAxis
                     yAxisId="left"
+<<<<<<< HEAD
                     domain={[0, 1250]}
                     ticks={[0, 250, 500, 750, 1000, 1250]}
                     interval={0}
                     tickFormatter={(v) => v.toLocaleString("en-IN")}
+=======
+                    domain={[0, (dataMax) => Math.max(4, Math.ceil(dataMax * 1.25))]}
+                    allowDecimals={false}
+                    tickCount={6}
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                     tickLine={false}
                     axisLine={false}
                     tick={AXIS_TEXT}
@@ -573,6 +1457,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                       style: { fontSize: 10, fill: "#64748B", textAnchor: "middle" },
                     }}
                   />
+<<<<<<< HEAD
                   <YAxis
                     yAxisId="right"
                     orientation="right"
@@ -584,6 +1469,18 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     axisLine={false}
                     tick={AXIS_TEXT}
                     width={50}
+=======
+                  {/* The revenue axis is hidden and unlabelled, so its floor is
+                      offset below zero purely to park the line in a clear band
+                      above the bars and their value labels - at 0 the line cut
+                      straight through the tallest bar. Exact values are still in
+                      the tooltip and the stat boxes below. */}
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    domain={[-revenueMax * 1.13, revenueMax * 1.18]}
+                    hide
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   />
                   <Tooltip
                     {...TOOLTIP}
@@ -604,11 +1501,25 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     yAxisId="left"
                     dataKey="bookings"
                     name="Total Bookings"
+<<<<<<< HEAD
                     fill="url(#dash-bookings-bar)"
                     radius={[4, 4, 0, 0]}
                     barSize={44}
                     isAnimationActive={false}
                   />
+=======
+                    fill={BRAND}
+                    radius={[5, 5, 0, 0]}
+                    barSize={bwShort ? 34 : 54}
+                  >
+                    <LabelList
+                      dataKey="bookings"
+                      position="top"
+                      offset={8}
+                      style={{ fontSize: 12, fontWeight: 700, fill: "#0F172A" }}
+                    />
+                  </Bar>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   <Line
                     yAxisId="right"
                     type="linear"
@@ -625,23 +1536,56 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
             </div>
 
             <div className={`mt-3 grid grid-cols-2 ${GAP}`}>
+<<<<<<< HEAD
               <StatBox label="Total Bookings" value="954" delta="81.7%" up bg="#F7F5FE" border="#E4DEFB" />
               <StatBox label="Total Revenue" value="₹1,06,117.50" delta="78.0%" up bg="#F7F5FE" border="#E4DEFB" />
+=======
+              <StatBox
+                label="Total Bookings"
+                value={fmtInt(bwBookings)}
+                delta={toDelta(pctChange(bwBookings, sumOver(bw.previous, "bookings")))}
+                note={bw.compareLabel}
+              />
+              <StatBox
+                label="Total Revenue"
+                value={fmtInr(bwRevenue)}
+                delta={toDelta(pctChange(bwRevenue, sumOver(bw.previous, "revenue")))}
+                note={bw.compareLabel}
+              />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
             </div>
 
-            <ViewLink>View Detailed Analytics</ViewLink>
+            <ViewLink onClick={() => navigate("/analytics-intelligence")}>
+              View Detailed Analytics
+            </ViewLink>
           </Card>
 
+<<<<<<< HEAD
           {/* Acquisition cost & marketing efficiency */}
           <Card className={PAD}>
             <CardTitle
               right={
                 <Select value={marketingPeriod} onChange={setMarketingPeriod} options={CARD_PERIODS} />
+=======
+          {/* Acquisition cost & marketing efficiency. CAC here is what the
+              invoice page calls "Acquisition Cost": the discount Gloup funds
+              on each non-important service. */}
+          <Card>
+            <CardTitle
+              right={
+                <Select
+                  compact
+                  value={acquisitionWindow}
+                  onChange={setAcquisitionWindow}
+                  options={CARD_PERIODS}
+                />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
               }
             >
               Acquisition Cost &amp; Marketing Efficiency
             </CardTitle>
 
+<<<<<<< HEAD
             <div className="grid grid-cols-3 gap-2">
               {marketingKpis.map(({ icon, color, tint, ...kpi }) => {
                 const Icon = icon;
@@ -678,10 +1622,48 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
               <LegendDot square color={BRAND} label="Meta Ads" />
               <LegendDot square color={BLUE} label="Other Ads" />
               <LegendDot square color={GREEN} label="Organic / Others" />
+=======
+            <div className={`grid grid-cols-3 ${GAP}`}>
+              {(() => {
+                const spendDelta = toDelta(pctChange(awSpend, sumOver(aw.previous, "cac_spend")));
+                const cacDelta = toDelta(pctChange(awCac, cacPerBooking(aw.previous)));
+                return (
+                  <>
+                    <StatBox
+                      label="CAC Spend"
+                      value={fmtInr(awSpend)}
+                      delta={spendDelta}
+                      good={spendDelta ? !spendDelta.up : undefined}
+                      note={aw.compareLabel}
+                    />
+                    <StatBox
+                      label="CAC (Overall)"
+                      value={fmtInr(awCac)}
+                      delta={cacDelta}
+                      good={cacDelta ? !cacDelta.up : undefined}
+                      note="per booking"
+                    />
+                    <StatBox label="Meta Reach" value={DASH} note="Backend pending" />
+                  </>
+                );
+              })()}
+            </div>
+
+            <p className={`mt-4 font-bold text-slate-900 ${T.md}`}>
+              Acquisition Spend by Month (₹)
+            </p>
+
+            <div className="mt-2 flex items-center gap-4">
+              <LegendDot color={BRAND} label="Discounts funded (CAC)" />
+              <span className={`text-slate-400 ${T.sm}`}>
+                Meta / Other / Organic split: backend pending
+              </span>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
             </div>
 
             <div className="h-[150px] w-full">
               <ResponsiveContainer width="100%" height="100%">
+<<<<<<< HEAD
                 <BarChart data={marketingSpend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#EEF1F6" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS_TEXT} dy={6} />
@@ -695,11 +1677,17 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     tick={AXIS_TEXT}
                     width={42}
                   />
+=======
+                <BarChart data={acquisitionSpend} margin={{ top: 22, right: 8, bottom: 0, left: 8 }}>
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={6} />
+                  <YAxis hide domain={[0, (dataMax) => Math.max(1, dataMax * 1.2)]} />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   <Tooltip
                     {...TOOLTIP}
                     cursor={{ fill: "rgba(91,33,240,0.05)" }}
                     formatter={(value) => inr(value)}
                   />
+<<<<<<< HEAD
                   <Bar dataKey="meta" name="Meta Ads" stackId="spend" fill={BRAND} barSize={60} isAnimationActive={false} />
                   <Bar dataKey="other" name="Other Ads" stackId="spend" fill={BLUE} barSize={60} isAnimationActive={false} />
                   <Bar
@@ -711,11 +1699,28 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     radius={[4, 4, 0, 0]}
                     isAnimationActive={false}
                   />
+=======
+                  <Bar
+                    dataKey="spend"
+                    name="CAC Spend"
+                    fill={BRAND}
+                    barSize={awShort ? 40 : 82}
+                    radius={[5, 5, 0, 0]}
+                  >
+                    <LabelList
+                      dataKey="spend"
+                      position="top"
+                      offset={6}
+                      formatter={(v) => (v == null ? "" : inr(Math.round(v)))}
+                      style={{ fontSize: 11, fontWeight: 700, fill: "#0F172A" }}
+                    />
+                  </Bar>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
-            <ViewLink>View Marketing Report</ViewLink>
+            <ViewLink onClick={() => navigate("/invoice")}>View Invoices</ViewLink>
           </Card>
         </div>
 
@@ -733,6 +1738,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                 iconColor={BLUE}
                 title="User Growth"
                 caption="Total users by month"
+<<<<<<< HEAD
                 value="25.7K"
                 delta="60.6%"
                 up
@@ -765,6 +1771,14 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     tick={AXIS_TEXT}
                     width={30}
                   />
+=======
+                value={fmtCompact(cur.total_users)}
+                delta={toDelta(pct.users)}
+              >
+                <LineChart data={growthSeries("total_users")} margin={{ top: 8, right: 10, bottom: 0, left: 10 }}>
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={4} />
+                  <YAxis hide domain={[(min) => Math.floor(min * 0.95), (max) => Math.ceil(max * 1.05)]} />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   <Tooltip {...TOOLTIP} formatter={(v) => Number(v).toLocaleString("en-IN")} />
                   <Area
                     type="linear"
@@ -784,6 +1798,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                 iconColor={GREEN}
                 title="Partner / Salon Network"
                 caption="Total partners by month"
+<<<<<<< HEAD
                 value="212"
                 delta="14.9%"
                 up={false}
@@ -802,6 +1817,14 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     tick={AXIS_TEXT}
                     width={28}
                   />
+=======
+                value={fmtInt(cur.total_partners)}
+                delta={toDelta(pct.partners)}
+              >
+                <BarChart data={growthSeries("total_partners")} margin={{ top: 8, right: 10, bottom: 0, left: 10 }}>
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={4} />
+                  <YAxis hide />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   <Tooltip {...TOOLTIP} cursor={{ fill: "rgba(240,68,56,0.05)" }} />
                   <Bar
                     dataKey="value"
@@ -819,6 +1842,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                 iconColor={GREEN}
                 title="Subscription Growth"
                 caption="Total subscriptions by month"
+<<<<<<< HEAD
                 value="23"
                 delta="130.0%"
                 up
@@ -837,6 +1861,17 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     tick={AXIS_TEXT}
                     width={24}
                   />
+=======
+                value={fmtInt(cur.active_subscriptions)}
+                delta={toDelta(pct.subscriptions)}
+              >
+                <BarChart
+                  data={growthSeries("active_subscriptions")}
+                  margin={{ top: 8, right: 10, bottom: 0, left: 10 }}
+                >
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={4} />
+                  <YAxis hide />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   <Tooltip {...TOOLTIP} cursor={{ fill: "rgba(18,183,106,0.05)" }} />
                   <Bar
                     dataKey="value"
@@ -850,7 +1885,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
               </GrowthMini>
             </div>
 
-            <ViewLink>View All Growth Reports</ViewLink>
+            <ViewLink onClick={() => navigate("/partner")}>View All Growth Reports</ViewLink>
           </Card>
 
           {/* Cancellation analysis */}
@@ -867,6 +1902,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
 
             <div className="mt-1 h-[140px] w-full">
               <ResponsiveContainer width="100%" height="100%">
+<<<<<<< HEAD
                 <ComposedChart data={cancellations} margin={{ top: 12, right: 0, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#EEF1F6" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS_TEXT} dy={6} />
@@ -892,6 +1928,18 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     tick={AXIS_TEXT}
                     width={30}
                   />
+=======
+                <ComposedChart
+                  data={cancellations}
+                  margin={{ top: 18, right: 10, bottom: 0, left: 10 }}
+                >
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={6} />
+                  {/* Same idea as the bookings chart: headroom on the bar axis
+                      plus a tighter rate axis keeps the rate line clear of the
+                      bars instead of running behind them. */}
+                  <YAxis yAxisId="left" domain={[0, cancelMax * 1.55]} hide />
+                  <YAxis yAxisId="right" orientation="right" domain={[0, rateMax * 1.1]} hide />
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
                   <Tooltip
                     {...TOOLTIP}
                     cursor={{ fill: "rgba(236,72,153,0.05)" }}
@@ -922,17 +1970,39 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
               </ResponsiveContainer>
             </div>
 
+<<<<<<< HEAD
             <div className={`mt-3 grid grid-cols-2 ${GAP}`}>
               <StatBox label="Total Cancellations" value="26" bg="#FEF1F5" border="#F8D6E1" />
               <StatBox label="Cancellation Rate" value="2.73%" delta="31.9%" up={false} good bg="#FEF1F5" border="#F8D6E1" />
+=======
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <p className={`text-slate-500 ${T.sm}`}>Total Cancellations</p>
+                <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.stat}`}>
+                  {fmtInt(cur.cancellations)}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className={`text-slate-500 ${T.sm}`}>Cancellation Rate</p>
+                <div className="mt-1 flex items-baseline justify-between gap-2">
+                  <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>
+                    {fmtPct(cur.rate)}
+                  </span>
+                  {pct.rate != null && (
+                    <span className={T.sm}>
+                      <Delta {...toDelta(pct.rate)} good={pct.rate < 0} />
+                    </span>
+                  )}
+                </div>
+              </div>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
             </div>
-
-            <ViewLink>View Cancellation Report</ViewLink>
           </Card>
 
           {/* Meta performance overview */}
           <Card className={PAD}>
             <CardTitle>Meta Performance Overview</CardTitle>
+<<<<<<< HEAD
             <p className={`-mt-1.5 mb-2 text-slate-500 ${T.xs}`}>Months without reported reach are omitted</p>
 
             <div className="h-[160px] w-full">
@@ -972,21 +2042,33 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
             </div>
 
             <ViewLink>View Meta Ads Report</ViewLink>
+=======
+            <Pending>
+              Meta Ads reach isn&apos;t tracked yet - it needs a Meta Marketing API
+              integration (or manual entry) on the backend.
+            </Pending>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
           </Card>
         </div>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Row 4 - Month-on-month tables / Alerts                            */}
+        {/* Row 4 - Period-on-period tables / Alerts                          */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW4_COLS} ${GAP}`}>
+<<<<<<< HEAD
           <Card className={PAD}>
             <CardTitle>Month-on-Month Performance</CardTitle>
+=======
+          <Card>
+            <CardTitle>{unitLabel}-on-{unitLabel} Performance</CardTitle>
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
             <ComparisonTable
-              columns={["Metric", "June", "July", "Change", "% Change"]}
-              rows={juneToJuly}
+              columns={["Metric", beforeRange.label, lastRange.label, "Change", "% Change"]}
+              rows={comparisonRows(before, last)}
             />
           </Card>
 
+<<<<<<< HEAD
           <Card className={PAD}>
             <CardTitle>July → August</CardTitle>
             <ComparisonTable
@@ -1009,7 +2091,20 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
               }
             >
               Alerts &amp; Insights
+=======
+          <Card>
+            <CardTitle>
+              {lastRange.label} → {curRange.label}
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
             </CardTitle>
+            <ComparisonTable
+              columns={["Metric", lastRange.label, curRange.label, "Change", "% Change"]}
+              rows={comparisonRows(last, cur)}
+            />
+          </Card>
+
+          <Card>
+            <CardTitle>Alerts &amp; Insights</CardTitle>
 
             <ul className="flex flex-1 flex-col justify-between gap-1">
               {alerts.map(({ icon, ...alert }) => {
@@ -1034,6 +2129,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                       <span className={`block truncate text-slate-500 ${T.nano}`}>{alert.sub}</span>
                     </span>
 
+<<<<<<< HEAD
                     <button
                       type="button"
                       className={`flex shrink-0 items-center gap-1 font-semibold hover:underline ${T.nano}`}
@@ -1049,6 +2145,37 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
           </Card>
         </div>
       </ScaledCanvas>
+=======
+                  {alert.action && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(alert.to)}
+                      className={`flex shrink-0 items-center gap-1 font-semibold hover:underline ${T.xs}`}
+                      style={{ color: BRAND }}
+                    >
+                      {alert.action}
+                      <ArrowRight size={11} className="shrink-0" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Pending className="mt-2">
+              Area demand vs supply and price-point conversion alerts need search
+              and listing-view tracking.
+            </Pending>
+          </Card>
+        </div>
+    </ScaledCanvas>
+
+    {showHowItWorks && (
+      <HowItWorksModal
+        dataStartDate={dashboardV2Metrics?.dashboard_data_start_date}
+        onClose={closeHowItWorks}
+      />
+    )}
+>>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
     </>
   );
 };

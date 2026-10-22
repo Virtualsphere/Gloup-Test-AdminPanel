@@ -67,6 +67,43 @@ export const downloadMonthlyInvoicePDF = createAsyncThunk(
   }
 );
 
+// ---- V2 (MonthlyReportV2 page) ----
+
+const v2Error = (error, fallback) =>
+  error.response?.data?.error?.message || error.message || fallback;
+
+const postV2 = async (url, body, fallback, rejectWithValue) => {
+  try {
+    const response = await api.post(url, body, { withCredentials: false });
+    return response.data.data ?? null;
+  } catch (error) {
+    return rejectWithValue(v2Error(error, fallback));
+  }
+};
+
+// The month's totals next to the previous month's, plus the platform fee
+// used and the cities with bookings.
+export const fetchMonthlyReportSummaryV2 = createAsyncThunk(
+  "monthlyInvoice/fetchMonthlyReportSummaryV2",
+  async ({ month }, { rejectWithValue }) =>
+    postV2("/admin/app/getMonthlyReportSummaryV2", { month }, "Failed to fetch monthly summary", rejectWithValue)
+);
+
+// One page of salons. `params`: month, page, limit, search, city, sort.
+export const fetchMonthlyReportSalonsV2 = createAsyncThunk(
+  "monthlyInvoice/fetchMonthlyReportSalonsV2",
+  async (params, { rejectWithValue }) =>
+    postV2("/admin/app/getMonthlyReportSalonsV2", params, "Failed to fetch monthly report", rejectWithValue)
+);
+
+// Same query, every row, not stored - downloads.
+export const queryMonthlyReportSalonsV2 = createAsyncThunk(
+  "monthlyInvoice/queryMonthlyReportSalonsV2",
+  async (params, { rejectWithValue }) =>
+    postV2("/admin/app/getMonthlyReportSalonsV2", params, "Failed to fetch monthly report", rejectWithValue)
+);
+
+
 const monthlyInvoiceSlice = createSlice({
   name: "monthlyInvoice",
   initialState: {
@@ -84,6 +121,14 @@ const monthlyInvoiceSlice = createSlice({
     detailsError: null,
 
     pdfLoading: false,
+
+    // V2
+    summaryV2: null,
+    summaryV2Loading: false,
+    summaryV2Error: null,
+    salonsV2: { rows: [], total: 0 },
+    salonsV2Loading: false,
+    salonsV2Error: null,
   },
   reducers: {
     clearMonthlyInvoiceDetails: (state) => {
@@ -132,6 +177,35 @@ const monthlyInvoiceSlice = createSlice({
       })
       .addCase(downloadMonthlyInvoicePDF.rejected, (state) => {
         state.pdfLoading = false;
+      })
+
+      .addCase(fetchMonthlyReportSummaryV2.pending, (state) => {
+        state.summaryV2Loading = true;
+        state.summaryV2Error = null;
+      })
+      .addCase(fetchMonthlyReportSummaryV2.fulfilled, (state, action) => {
+        state.summaryV2Loading = false;
+        state.summaryV2 = action.payload;
+      })
+      .addCase(fetchMonthlyReportSummaryV2.rejected, (state, action) => {
+        state.summaryV2Loading = false;
+        state.summaryV2Error = action.payload;
+      })
+
+      .addCase(fetchMonthlyReportSalonsV2.pending, (state) => {
+        state.salonsV2Loading = true;
+        state.salonsV2Error = null;
+      })
+      .addCase(fetchMonthlyReportSalonsV2.fulfilled, (state, action) => {
+        state.salonsV2Loading = false;
+        state.salonsV2 = {
+          rows: Array.isArray(action.payload?.rows) ? action.payload.rows : [],
+          total: Number(action.payload?.total) || 0,
+        };
+      })
+      .addCase(fetchMonthlyReportSalonsV2.rejected, (state, action) => {
+        state.salonsV2Loading = false;
+        state.salonsV2Error = action.payload;
       });
   },
 });

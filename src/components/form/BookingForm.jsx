@@ -142,17 +142,9 @@ const downloadPDF = async () => {
   );
 
 
-  // Total service amount calculation
-  const totalServiceAmount = Number(
-    bookingView.total_amount || 0
-  );
-
-  // GST amount
-  const gstAmount = Number(bookingView.gst_amount || 0);
-  // Subtotal amount
-  const subTotalAmount = Number(
-    bookingView.payable_amount || 0
-  );
+  // Billing amounts all come from what the booking stored (see
+  // getBookingsDetailsById), not from the services' current prices.
+  const rupees = (v) => `₹${Number(v || 0).toFixed(2)}`;
 
   const updateStatus = (status) => {
     dispatch(updateBookingStatus({
@@ -384,10 +376,14 @@ const downloadPDF = async () => {
                     </span>
 
                     <div className="text-right text-sm font-medium text-gray-900">
-                      ₹{item.service_amount}
-                      <span className="mx-1 text-red-500">− ₹{item.service_subtotal}</span>
-                      <span className="mx-1 text-gray-400">=</span>
-                      ₹{item.service_discount_amount}
+                      {item.item_discount > 0 && (
+                        <>
+                          {rupees(item.list_amount)}
+                          <span className="mx-1 text-red-500">− {rupees(item.item_discount)}</span>
+                          <span className="mx-1 text-gray-400">=</span>
+                        </>
+                      )}
+                      {rupees(item.charged_amount)}
                     </div>
 
                   </div>
@@ -400,23 +396,24 @@ const downloadPDF = async () => {
 
             <div className="border-t mt-1">
               <div className="px-4 py-2 flex justify-between text-sm">
-                <span className="text-gray-500">Total</span>
-                <span>₹{totalServiceAmount}</span>
-              </div>
-
-              <div className="px-4 py-2 flex justify-between text-sm">
-                <span className="text-gray-600">GST ({bookingView.gst_rate}%)</span>
-                <span>₹{bookingView.gst_amount}</span>
-              </div>
-              <div className="px-4 py-2 flex justify-between text-sm">
-                <span className="text-gray-600">Sub Total</span>
-                <span>₹{bookingView.payable_amount}</span>
+                <span className="text-gray-500">Services Total</span>
+                <span>{rupees(bookingView.items_total)}</span>
               </div>
               <div className="px-4 py-2 flex justify-between text-sm">
                 <span className="text-gray-500">Coupon Used</span>
-                <span className="text-red-500">
-                  − ₹0
-                </span>
+                <span className="text-red-500">− {rupees(bookingView.coupon_discount)}</span>
+              </div>
+              <div className="px-4 py-2 flex justify-between text-sm">
+                <span className="text-gray-600">Sub Total</span>
+                <span>{rupees(bookingView.taxable_amount)}</span>
+              </div>
+              <div className="px-4 py-2 flex justify-between text-sm">
+                <span className="text-gray-600">GST ({bookingView.gst_rate}%)</span>
+                <span>{rupees(bookingView.gst_amount)}</span>
+              </div>
+              <div className="px-4 py-2 flex justify-between text-sm">
+                <span className="text-gray-600">Platform Fee</span>
+                <span>{rupees(bookingView.platform_fee)}</span>
               </div>
 
             </div>
@@ -424,7 +421,7 @@ const downloadPDF = async () => {
             {/* Total */}
             <div className="bg-gray-900 text-white px-4 py-3 flex justify-between font-semibold">
               <span>Payable Amount</span>
-              <span>₹{bookingView.subtotal_amount}</span>
+              <span>{rupees(bookingView.payable_amount)}</span>
             </div>
 
           </div>

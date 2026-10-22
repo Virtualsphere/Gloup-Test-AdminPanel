@@ -42,8 +42,17 @@ import {
   Tag,
   Ticket,
   User,
+  Wallet,
+  X,
 } from "lucide-react";
-import { getAllUsersList, getUserDetail, updateUserStatus } from "../../redux/slices/allUsersSlice";
+import {
+  fetchUserActivityV2,
+  fetchUserOffersV2,
+  getAllUsersList,
+  getUserProfileV2,
+  sendUserNotification,
+  updateUserStatus,
+} from "../../redux/slices/allUsersSlice";
 import { rupees, titleCase } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { buildUserProfile, normalizeUser, spendSeries } from "../../utils/userModel";
@@ -56,15 +65,17 @@ import { Card, Chip } from "../v2/ui";
 // "User Details" 360° profile, built 1:1 from the approved mockup on a fixed
 // DESIGN_WIDTH canvas that ScaledCanvas scales to the available width.
 //
-// Data: getUserDetail (allUsersSlice), turned into the view model by
-// buildUserProfile() in utils/userModel.js. Every card here - summary counts,
-// top services, spending chart, preferences - is derived from that.
+// Data: /getUserProfileV2 (any user status; bookings keep their real status
+// and the amount paid), turned into the view model by buildUserProfile() in
+// utils/userModel.js. Recent Activity + Communication History come from
+// /getUserActivityV2, the Offers tab from /getUserOffersV2, and Send Message
+// pushes a notification through /send-targeted-notification.
 //
 // The active tab lives in the URL (?tab=bookings) so it survives a reload and
 // can be linked to.
 //
-// User Scores, Recent Activity and Communication History have no backend
-// source yet, so they render empty states rather than invented numbers.
+// User Scores, Behaviour and Notes have no backend source (scores need agreed
+// formulas, notes need a table), so they render empty states.
 //
 // Without an :id in the URL (the sidebar link) the page shows a user picker.
 // ---------------------------------------------------------------------------
@@ -100,7 +111,25 @@ const STATUS_META = {
   upcoming: { label: "Upcoming", chip: "bg-violet-50 text-violet-600" },
   completed: { label: "Completed", chip: "bg-emerald-50 text-emerald-600" },
   cancelled: { label: "Cancelled", chip: "bg-rose-50 text-rose-600" },
-  no_show: { label: "No Show", chip: "bg-amber-50 text-amber-600" },
+  refunded: { label: "Refunded", chip: "bg-violet-50 text-violet-600" },
+  // Day passed but never marked completed - can't tell a no-show from a
+  // salon that didn't close the booking.
+  not_completed: { label: "Not Completed", chip: "bg-amber-50 text-amber-600" },
+};
+
+// Timeline event icons (getUserActivityV2 `type`).
+const EVENT_META = {
+  login: { icon: User, color: "#3B82F6" },
+  booking: { icon: CalendarCheck, color: "#16A34A" },
+  cancellation: { icon: CalendarDays, color: "#DC2626" },
+  refund: { icon: CircleDollarSign, color: "#7C3AED" },
+  checkout_failed: { icon: Clock, color: "#D97706" },
+  review: { icon: Heart, color: "#EC4899" },
+  refund_request: { icon: CircleDollarSign, color: "#D97706" },
+  wallet_credit: { icon: Wallet, color: "#16A34A" },
+  wallet_debit: { icon: Wallet, color: "#DC2626" },
+  notification: { icon: MessageSquare, color: "#6D4AE0" },
+  account: { icon: Info, color: "#64748B" },
 };
 
 const USER_STATUS_TONES = {
@@ -335,7 +364,8 @@ const ProfileCard = ({ profile }) => {
     ["User ID", `#${profile.id}`],
     ["Member Since", profile.memberSince ? profile.memberSince.format("MMM D, YYYY") : "—"],
     ["Last Login", profile.lastLogin ? profile.lastLogin.format("MMM D, YYYY hh:mm A") : "—"],
-    ["Referral Source", profile.referral ? titleCase(profile.referral) : "—"],
+    ["Referral Source", profile.referral || "—"],
+    ["Wallet Balance", profile.wallet == null ? "—" : rupees(profile.wallet)],
   ];
 
   return (
@@ -455,7 +485,7 @@ const BookingSummaryCard = ({ profile, onViewAll }) => {
     },
     { label: "Completed", value: profile.counts.completed, color: GREEN, tint: "#F0FDF4" },
     { label: "Cancelled", value: profile.counts.cancelled, color: "#DC2626", tint: "#FEF2F2" },
-    { label: "No Shows", value: profile.counts.noShow, color: "#D97706", tint: "#FFFBEB" },
+    { label: "Not Completed", value: profile.counts.notCompleted, color: "#D97706", tint: "#FFFBEB" },
     { label: "This Month", value: profile.counts.thisMonth, color: VIOLET, tint: "#F5F3FF" },
   ];
 
@@ -544,7 +574,10 @@ const TopServicesCard = ({ services }) => {
 };
 
 const BookingRow = ({ booking }) => {
-  const meta = STATUS_META[booking.status] || STATUS_META.completed;
+  const meta =
+    (booking.rawStatus === "refunded" && STATUS_META.refunded) ||
+    STATUS_META[booking.status] ||
+    STATUS_META.completed;
   const when = [
     booking.date ? booking.date.format("ddd, MMM DD, YYYY") : null,
     booking.from && booking.to ? `${booking.from.format("h:mm A")} - ${booking.to.format("h:mm A")}` : null,
@@ -558,7 +591,10 @@ const BookingRow = ({ booking }) => {
       <div className="min-w-0 flex-1 leading-tight">
         <p className={`truncate font-bold text-slate-900 ${T.xs}`}>{booking.salon}</p>
         <p className={`mt-1 truncate text-slate-600 ${T.tiny}`}>{when || "—"}</p>
-        <p className={`mt-1 truncate text-slate-500 ${T.tiny}`}>{booking.services.join(" + ") || "—"}</p>
+        <p className={`mt-1 truncate text-slate-500 ${T.tiny}`}>
+          {booking.services.join(" + ") || "—"}
+          {booking.coupon ? `  •  Coupon ${booking.coupon}` : ""}
+        </p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1.5">
         <span className={`font-bold text-emerald-600 ${T.xs}`}>{rupees(booking.amount)}</span>
@@ -680,19 +716,299 @@ const PreferencesCard = ({ preferences }) => (
   </Card>
 );
 
-const RecentActivityCard = () => (
-  <Card>
-    <CardHeader title="Recent Activity" />
-    <Empty icon={Activity}>App activity (opens, searches, salon views, offer checks) isn't tracked yet.</Empty>
-  </Card>
+const fmtWhen = (value) => {
+  const d = value ? moment(value) : null;
+  return d && d.isValid() ? d.format("MMM D, YYYY  hh:mm A") : "—";
+};
+
+// One row of the timeline / communication / offers lists.
+const EventRow = ({ icon, color, title, description, at, amount }) => (
+  <li className="flex items-start gap-3 border-b border-[#F1F3F8] py-2.5 last:border-0">
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: `${color}14` }}>
+      <Glyph as={icon} size={14} style={{ color }} />
+    </span>
+    <div className="min-w-0 flex-1 leading-tight">
+      <p className={`truncate font-semibold capitalize text-slate-800 ${T.xxs}`}>{title}</p>
+      {description && <p className={`mt-0.5 truncate text-slate-500 ${T.tiny}`}>{description}</p>}
+      {at && <p className={`mt-0.5 text-slate-400 ${T.tiny}`}>{fmtWhen(at)}</p>}
+    </div>
+    {amount != null && (
+      <span className={`shrink-0 font-semibold text-slate-800 ${T.xxs}`}>{rupees(amount)}</span>
+    )}
+  </li>
 );
 
-const CommunicationCard = () => (
-  <Card>
-    <CardHeader title="Communication History" action={<OutlineLink disabled>View All</OutlineLink>} />
-    <Empty icon={MessageSquare}>Push, WhatsApp and SMS history per user isn't available yet.</Empty>
-  </Card>
-);
+const LIST_PREVIEW = 8;
+
+// Logins, bookings, cancellations, reviews, refunds, wallet, pushes, account
+// changes. Searches / salon views aren't recorded, so they can't appear.
+const RecentActivityCard = ({ activity, limit = LIST_PREVIEW }) => {
+  const [showAll, setShowAll] = useState(false);
+  const events = activity?.events || [];
+  const visible = showAll ? events : events.slice(0, limit);
+  return (
+    <Card>
+      <CardHeader
+        title="Recent Activity"
+        action={
+          events.length > limit && (
+            <OutlineLink onClick={() => setShowAll((v) => !v)}>{showAll ? "Show Less" : "View All"}</OutlineLink>
+          )
+        }
+      />
+      {activity?.failed ? (
+        <Empty icon={Activity}>Couldn&apos;t load activity.</Empty>
+      ) : !activity ? (
+        <Empty icon={Activity}>Loading activity…</Empty>
+      ) : visible.length === 0 ? (
+        <Empty icon={Activity}>No recorded activity yet.</Empty>
+      ) : (
+        <ul className="px-4 pb-2">
+          {visible.map((event) => {
+            const meta = EVENT_META[event.type] || EVENT_META.account;
+            return (
+              <EventRow
+                key={`${event.type}-${event.ref_id}-${event.at}`}
+                icon={meta.icon}
+                color={meta.color}
+                title={event.title}
+                description={event.description}
+                at={event.at}
+                amount={event.amount}
+              />
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+};
+
+// Push notifications sent to this user (WhatsApp / SMS aren't logged per user).
+const CommunicationCard = ({ activity, limit = LIST_PREVIEW }) => {
+  const [showAll, setShowAll] = useState(false);
+  const items = activity?.communication || [];
+  const visible = showAll ? items : items.slice(0, limit);
+  return (
+    <Card>
+      <CardHeader
+        title="Communication History"
+        action={
+          items.length > limit && (
+            <OutlineLink onClick={() => setShowAll((v) => !v)}>{showAll ? "Show Less" : "View All"}</OutlineLink>
+          )
+        }
+      />
+      {activity?.failed ? (
+        <Empty icon={MessageSquare}>Couldn&apos;t load notifications.</Empty>
+      ) : !activity ? (
+        <Empty icon={MessageSquare}>Loading…</Empty>
+      ) : visible.length === 0 ? (
+        <Empty icon={MessageSquare}>No push notifications sent to this user yet.</Empty>
+      ) : (
+        <ul className="px-4 pb-2">
+          {visible.map((item) => (
+            <EventRow
+              key={item.id}
+              icon={MessageSquare}
+              color={VIOLET}
+              title={item.title}
+              description={item.description ? `Push · ${item.description}` : "Push"}
+              at={item.at}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+};
+
+// Coupons redeemed on paid bookings + wallet credits/debits.
+const OffersTab = ({ offers }) => {
+  if (offers?.failed) return <Card><Empty icon={Ticket}>Couldn&apos;t load offers.</Empty></Card>;
+  if (!offers) return <Card><Empty icon={Ticket}>Loading offers…</Empty></Card>;
+
+  const coupons = offers.coupon_bookings || [];
+  const others = offers.other_coupons || [];
+  const wallet = offers.wallet || {};
+  const couponLabel = (c) =>
+    c.discount_value == null
+      ? ""
+      : c.discount_type === "percentage"
+        ? `${c.discount_value}% off`
+        : `${rupees(c.discount_value)} off`;
+
+  return (
+    <div className={`grid ${BOTTOM_COLS} ${GAP}`}>
+      <Card>
+        <CardHeader title="Coupons Used" />
+        {coupons.length === 0 && others.length === 0 ? (
+          <Empty icon={Ticket}>This user hasn&apos;t redeemed any coupons.</Empty>
+        ) : (
+          <ul className="px-4 pb-2">
+            {coupons.map((c) => (
+              <EventRow
+                key={`b-${c.appointment_id}`}
+                icon={Ticket}
+                color={GREEN}
+                title={`${c.code || `Coupon #${c.coupon_id}`}${couponLabel(c) ? ` · ${couponLabel(c)}` : ""}`}
+                description={`Booking #${c.appointment_id}${c.status ? ` · ${titleCase(c.status)}` : ""}`}
+                at={c.used_at}
+                amount={c.booking_savings}
+              />
+            ))}
+            {others.map((c) => (
+              <EventRow
+                key={`u-${c.coupon_id}`}
+                icon={Ticket}
+                color="#94A3B8"
+                title={`${c.code || `Coupon #${c.coupon_id}`}${couponLabel(c) ? ` · ${couponLabel(c)}` : ""}`}
+                description={`Redeemed ${c.times_used}× (no paid booking attached)`}
+              />
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader title="Wallet" />
+        <div className="grid grid-cols-3 gap-2.5 px-4 pb-2">
+          {[
+            ["Balance", wallet.balance],
+            ["Total Credited", wallet.total_credited],
+            ["Total Debited", wallet.total_debited],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-[#E6E8F0] px-3 py-2.5">
+              <p className={`truncate text-slate-500 ${T.tiny}`}>{label}</p>
+              <p className={`mt-1 font-bold text-slate-900 ${T.sm}`}>{rupees(value)}</p>
+            </div>
+          ))}
+        </div>
+        {(wallet.transactions || []).length === 0 ? (
+          <Empty icon={Wallet}>No wallet transactions.</Empty>
+        ) : (
+          <ul className="px-4 pb-2">
+            {wallet.transactions.map((t) => (
+              <EventRow
+                key={t.id}
+                icon={Wallet}
+                color={t.type === "debit" ? "#DC2626" : GREEN}
+                title={t.type === "debit" ? "Debited" : "Credited"}
+                description={t.description}
+                at={t.date}
+                amount={t.amount}
+              />
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+// Push notification composer - rendered outside ScaledCanvas (a fixed overlay
+// inside the transformed canvas would be positioned and scaled relative to it).
+const SendMessageModal = ({ profile, onClose }) => {
+  const dispatch = useDispatch();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && !sending && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, sending]);
+
+  const send = async () => {
+    setSending(true);
+    const toastId = "user-push-toast";
+    try {
+      await dispatch(
+        sendUserNotification({ id: profile.id, title: title.trim(), description: description.trim() })
+      ).unwrap();
+      toast.success(`Notification sent to ${profile.name}`, { id: toastId });
+      onClose(true);
+    } catch (err) {
+      toast.error(String(err || "Failed to send notification"), { id: toastId });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const canSend = title.trim() && description.trim() && !sending;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={() => !sending && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Send push notification"
+        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-extrabold text-slate-900">Send push notification</h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              To {profile.name} (#{profile.id}) on their devices.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={sending}
+            aria-label="Close"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <label className="mt-4 block text-sm font-semibold text-slate-700">
+          Title
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={100}
+            className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-violet-200"
+          />
+        </label>
+        <label className="mt-3 block text-sm font-semibold text-slate-700">
+          Message
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            maxLength={500}
+            className="mt-1 block w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-violet-200"
+          />
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={sending}
+            className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={send}
+            disabled={!canSend}
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            style={{ background: VIOLET }}
+          >
+            {sending ? "Sending…" : "Send"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // No :id - pick a user
@@ -778,21 +1094,40 @@ const UserDetailsV2 = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const detail = useSelector((state) => state.allUsers.userDetail);
-  const loading = useSelector((state) => state.allUsers.loading);
-  const error = useSelector((state) => state.allUsers.error);
+  const detail = useSelector((state) => state.allUsers.userProfileV2);
+  const loading = useSelector((state) => state.allUsers.userProfileV2Loading);
+  const error = useSelector((state) => state.allUsers.userProfileV2Error);
+  const [activity, setActivity] = useState(null);
+  const [offers, setOffers] = useState(null);
+  const [composing, setComposing] = useState(false);
 
   // Opening another user's URL carries no ?tab, so it lands on Overview.
   const requestedTab = searchParams.get("tab");
   const tab = TABS.some((t) => t.key === requestedTab) ? requestedTab : "overview";
   const setTab = (key) => setSearchParams(key === "overview" ? {} : { tab: key }, { replace: true });
 
+  const loadActivity = () => {
+    setActivity(null);
+    dispatch(fetchUserActivityV2({ id: Number(id), limit: 100 }))
+      .unwrap()
+      .then(setActivity)
+      .catch(() => setActivity({ failed: true }));
+  };
+
   useEffect(() => {
-    if (id) dispatch(getUserDetail({ id: Number(id) }));
+    if (!id) return;
+    dispatch(getUserProfileV2(Number(id)));
+    loadActivity();
+    setOffers(null);
+    dispatch(fetchUserOffersV2(Number(id)))
+      .unwrap()
+      .then(setOffers)
+      .catch(() => setOffers({ failed: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, id]);
 
   // The slice keeps the last user fetched - ignore it until it's this one.
-  const loaded = id != null && String(detail?.userdetails?.id) === String(id);
+  const loaded = id != null && String(detail?.user?.id) === String(id);
   const profile = useMemo(() => (loaded ? buildUserProfile(detail) : null), [loaded, detail]);
 
   const goBack = () => (window.history.length > 1 ? navigate(-1) : navigate("/users-v2"));
@@ -802,7 +1137,8 @@ const UserDetailsV2 = () => {
     const result = await dispatch(updateUserStatus({ id: profile.id, status }));
     if (updateUserStatus.fulfilled.match(result)) {
       toast.success(`User marked ${titleCase(status)}`, { id: toastId });
-      dispatch(getUserDetail({ id: Number(id) }));
+      dispatch(getUserProfileV2(Number(id)));
+      loadActivity();
     } else {
       toast.error(result.payload || "Failed to update user status", { id: toastId });
     }
@@ -837,8 +1173,8 @@ const UserDetailsV2 = () => {
   const preferences = <PreferencesCard preferences={profile.preferences} />;
   const timeline = (
     <div className={`grid ${BOTTOM_COLS} ${GAP}`}>
-      <RecentActivityCard />
-      <CommunicationCard />
+      <RecentActivityCard activity={activity} />
+      <CommunicationCard activity={activity} />
     </div>
   );
 
@@ -877,6 +1213,8 @@ const UserDetailsV2 = () => {
     body = <div className="w-[560px]">{preferences}</div>;
   } else if (tab === "timeline") {
     body = timeline;
+  } else if (tab === "offers") {
+    body = <OffersTab offers={offers} />;
   } else {
     const label = TABS.find((t) => t.key === tab).label;
     body = (
@@ -895,7 +1233,13 @@ const UserDetailsV2 = () => {
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* Page actions -------------------------------------------------- */}
         <div className="flex justify-end gap-3">
-          <Dropdown label="Send Message" icon={MessageSquare} className="text-white" style={{ background: VIOLET }} disabled />
+          <Dropdown
+            label="Send Message"
+            icon={MessageSquare}
+            className="text-white"
+            style={{ background: VIOLET }}
+            items={[{ label: "Push notification", onClick: () => setComposing(true) }]}
+          />
           <Dropdown label="Send Offer" icon={Ticket} className="text-white" style={{ background: "#22A55B" }} disabled />
           <Dropdown
             label="More Actions"
@@ -937,6 +1281,16 @@ const UserDetailsV2 = () => {
 
         {body}
       </ScaledCanvas>
+
+      {composing && (
+        <SendMessageModal
+          profile={profile}
+          onClose={(sent) => {
+            setComposing(false);
+            if (sent) loadActivity();
+          }}
+        />
+      )}
     </>
   );
 };
