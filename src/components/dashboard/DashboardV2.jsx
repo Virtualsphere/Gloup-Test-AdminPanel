@@ -28,12 +28,15 @@ import {
   ShoppingCart,
   Slash,
   Store,
+  Target,
   Users,
   Wallet,
   X,
 } from "lucide-react";
+import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
+import { HeaderBell, HeaderSelect } from "../v2/ui";
 import {
   getDashboardV2Alerts,
   getDashboardV2Metrics,
@@ -251,6 +254,22 @@ const fmtInr = (v) =>
 const fmtPct = (v) => (v == null ? DASH : `${v.toFixed(2)}%`);
 const fmtCompact = (v) =>
   v == null ? DASH : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : `${v}`;
+// Axis ticks: ₹0, ₹20K, ₹1.25L.
+const inrTick = (v) =>
+  v >= 100000 ? `₹${+(v / 100000).toFixed(2)}L` : v >= 1000 ? `₹${+(v / 1000).toFixed(1)}K` : `₹${v}`;
+// Axis ticks for counts: 0, 10K.
+const countTick = (v) => (v >= 1000 ? `${+(v / 1000).toFixed(1)}K` : `${v}`);
+// An axis that ends on a round number: the smallest 1/2/2.5/5 x 10^n step that
+// puts about `count` gridlines under `max`, and the ticks up to the next step.
+// recharts keeps a hand-made domain maximum as its last tick, so a bare
+// `max * 1.25` would label the top of the axis "1336".
+const niceScale = (max, count = 5) => {
+  const raw = Math.max(max, 1) / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  const top = Math.ceil(max / step) * step;
+  return { top, ticks: Array.from({ length: Math.round(top / step) + 1 }, (_, i) => +(i * step).toFixed(6)) };
+};
 const fmtSigned = (v, fmt) => (v < 0 ? `-${fmt(Math.abs(v))}` : `+${fmt(v)}`);
 
 const inr = (v) => `₹${Number(v).toLocaleString("en-IN")}`;
@@ -351,11 +370,16 @@ const STATUS_STYLES = {
   "N/A": "bg-slate-50 text-slate-400",
 };
 
-const STATUS_DOT = {
-  GOOD: BRAND,
-  ATTENTION: AMBER,
-  STABLE: "#94A3B8",
-  "N/A": "#CBD5E1",
+// The small tile in front of each scorecard metric. The status itself is
+// carried by the pill in the Status column.
+const SCORE_ICON = {
+  "Bookings Growth": { icon: CalendarCheck, color: BLUE, tint: "#E6EFFF" },
+  "Revenue Growth": { icon: IndianRupee, color: BLUE, tint: "#E6EFFF" },
+  "CAC efficiency (per booking)": { icon: Target, color: GREEN, tint: "#E1F7EC" },
+  "Cancellation Rate": { icon: CheckCircle2, color: GREEN, tint: "#E1F7EC" },
+  "User Growth": { icon: Users, color: BLUE, tint: "#E6EFFF" },
+  "Partner Growth": { icon: Store, color: "#E08700", tint: "#FFF2DC" },
+  "Subscription Growth": { icon: Gift, color: RED, tint: "#FEE4E2" },
 };
 
 const StatusPill = ({ status }) => (
@@ -760,7 +784,11 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
     revenue: pick(key, "revenue"),
   }));
   const revenueMax = Math.max(0, ...bookingsRevenue.map((d) => d.revenue || 0)) || 1;
-  const bwBookings = sumOver(bw.current, "bookings");
+  // Headroom above the tallest bar keeps its value label clear of the revenue line.
+  const bookingsScale = niceScale(
+    Math.max(4, Math.max(0, ...bookingsRevenue.map((d) => d.bookings || 0)) * 1.25),
+    6
+  );  const bwBookings = sumOver(bw.current, "bookings");
   const bwRevenue = sumOver(bw.current, "revenue");
 
   // Acquisition card - its own filter.
@@ -787,7 +815,6 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
     };
   });
   const cancelMax = Math.max(0, ...cancellations.map((d) => d.count || 0)) || 1;
-  const rateMax = Math.max(0, ...cancellations.map((d) => d.rate || 0)) || 1;
 
   const comparisonRows = (a, b) => {
     const row = (metric, va, vb, fmt, lowerIsBetter = false) => {
@@ -881,83 +908,86 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
 
   return (
     <>
-    <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
-        {/* ---------------------------------------------------------------- */}
-        {/* Page header + filter bar                                        */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className={`font-extrabold tracking-tight text-slate-900 ${T.h1}`}>{title}</h1>
-            <p className={`mt-0.5 text-slate-500 ${T.md}`}>
-              {loaded ? "Real-time overview of GloUp platform performance" : "Loading dashboard…"}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowRangePicker((open) => !open)}
-                className={`flex items-center gap-2 whitespace-nowrap rounded-xl border bg-white px-3 py-2 font-medium text-slate-700 hover:border-slate-300 ${T.md} ${period === CUSTOM_PERIOD ? "border-[#5B21F0]" : "border-slate-200"
-                  }`}
-              >
-                {rangeLabel}
-                <CalendarDays size={13} className="shrink-0 text-slate-400" />
-              </button>
-              {showRangePicker && (
-                <DateRangePicker
-                  initial={curRange}
-                  today={today}
-                  onApply={applyCustomRange}
-                  onClose={() => setShowRangePicker(false)}
-                />
-              )}
-            </div>
-
-            <Select
-              value={period}
-              onChange={selectPeriod}
-              options={period === CUSTOM_PERIOD ? [...PERIODS, CUSTOM_PERIOD] : PERIODS}
-            />
-
-            <div className="flex items-center gap-2">
-              <span
-                className={`h-2.5 w-2.5 shrink-0 rounded-full ${REFRESH_MS[refreshInterval] ? "bg-emerald-500" : "bg-slate-300"
-                  }`}
-              />
-              <div className="leading-tight">
-                <p className={`whitespace-nowrap font-semibold text-slate-700 ${T.base}`}>
-                  Auto refresh
-                </p>
-                <div className="relative">
-                  <select
-                    value={refreshInterval}
-                    onChange={(e) => setRefreshInterval(e.target.value)}
-                    className={`appearance-none bg-transparent pr-3 text-slate-500 focus:outline-none ${T.sm}`}
-                  >
-                    {Object.keys(REFRESH_MS).map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={10}
-                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowHowItWorks(true)}
-              className={`flex items-center gap-1.5 whitespace-nowrap font-medium text-slate-600 hover:text-slate-900 ${T.md}`}
-            >
-              <Info size={14} className="shrink-0 text-slate-400" />
-              How it works?
-            </button>
-          </div>
+    <PageHeaderPortal>
+      <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
+        <div className="min-w-0 leading-tight">
+          <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">{title}</h1>
+          <p className="mt-0.5 truncate text-[11px] text-slate-500">
+            {loaded ? "Real-time overview of GloUp platform performance" : "Loading dashboard…"}
+          </p>
         </div>
 
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="relative hidden md:block">
+            <button
+              type="button"
+              onClick={() => setShowRangePicker((open) => !open)}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300 ${
+                period === CUSTOM_PERIOD ? "border-[#5B21F0]" : "border-gray-200"
+              }`}
+            >
+              {rangeLabel}
+              <CalendarDays size={14} className="shrink-0 text-slate-500" />
+            </button>
+            {showRangePicker && (
+              <DateRangePicker
+                initial={curRange}
+                today={today}
+                onApply={applyCustomRange}
+                onClose={() => setShowRangePicker(false)}
+              />
+            )}
+          </div>
+
+          <HeaderSelect
+            label="Period"
+            value={period}
+            onChange={selectPeriod}
+            options={period === CUSTOM_PERIOD ? [...PERIODS, CUSTOM_PERIOD] : PERIODS}
+          />
+
+          <span className="hidden items-center gap-2 xl:flex">
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${REFRESH_MS[refreshInterval] ? "bg-emerald-500" : "bg-slate-300"}`}
+            />
+            <span className="leading-tight">
+              <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-700">Auto refresh</span>
+              <span className="relative block">
+                <select
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(e.target.value)}
+                  aria-label="Auto refresh interval"
+                  className="cursor-pointer appearance-none bg-transparent pr-3.5 text-[10px] text-slate-500 focus:outline-none"
+                >
+                  {Object.keys(REFRESH_MS).map((o) => (
+                    <option key={o}>{o}</option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={10}
+                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+              </span>
+            </span>
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setShowHowItWorks(true)}
+            aria-label="How it works"
+            title="How it works"
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-slate-600 hover:text-slate-900"
+          >
+            <Info size={14} className="shrink-0 text-slate-400" />
+            <span className="hidden xl:inline">How it works?</span>
+          </button>
+
+          <HeaderBell count={12} color={RED} />
+        </div>
+      </div>
+    </PageHeaderPortal>
+
+    <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {failed.length > 0 && (
           <div
             className={`rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 font-medium text-rose-600 ${T.base}`}
@@ -1028,14 +1058,18 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                 </tr>
               </thead>
               <tbody>
-                {scorecard.map((row) => (
+                {scorecard.map((row) => {
+                  const { icon: RowIcon, color, tint } = SCORE_ICON[row.metric] || { icon: Info, color: "#64748B", tint: "#F1F5F9" };
+                  return (
                   <tr key={row.metric}>
                     <td className={`py-2 pr-2 ${T.base}`}>
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-1.5">
                         <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ background: STATUS_DOT[row.status] }}
-                        />
+                          className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-md"
+                          style={{ background: tint }}
+                        >
+                          <RowIcon size={11} style={{ color }} />
+                        </span>
                         <span className="font-medium text-slate-700">{row.metric}</span>
                       </span>
                     </td>
@@ -1055,7 +1089,8 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                     {/* 10px keeps "Beyond the +10% band" on one line in this column. */}
                     <td className={`whitespace-nowrap py-2 text-slate-400 ${T.xs}`}>{row.logic}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 
@@ -1094,9 +1129,9 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={6} />
                   <YAxis
                     yAxisId="left"
-                    domain={[0, (dataMax) => Math.max(4, Math.ceil(dataMax * 1.25))]}
+                    domain={[0, bookingsScale.top]}
+                    ticks={bookingsScale.ticks}
                     allowDecimals={false}
-                    tickCount={6}
                     tickLine={false}
                     axisLine={false}
                     tick={AXIS}
@@ -1225,9 +1260,18 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
 
             <div className="mt-1 h-[186px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={acquisitionSpend} margin={{ top: 22, right: 8, bottom: 0, left: 8 }}>
+                <BarChart data={acquisitionSpend} margin={{ top: 22, right: 8, bottom: 0, left: -4 }}>
+                  <CartesianGrid stroke="#EEF1F6" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={6} />
-                  <YAxis hide domain={[0, (dataMax) => Math.max(1, dataMax * 1.2)]} />
+                  <YAxis
+                    domain={[0, "auto"]}
+                    tickCount={5}
+                    tickFormatter={inrTick}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={AXIS}
+                    width={48}
+                  />
                   <Tooltip
                     {...TOOLTIP}
                     cursor={{ fill: "rgba(91,33,240,0.05)" }}
@@ -1271,9 +1315,19 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                 value={fmtCompact(cur.total_users)}
                 delta={toDelta(pct.users)}
               >
-                <LineChart data={growthSeries("total_users")} margin={{ top: 8, right: 10, bottom: 0, left: 10 }}>
+                <LineChart data={growthSeries("total_users")} margin={{ top: 8, right: 10, bottom: 0, left: -4 }}>
+                  <CartesianGrid stroke="#EEF1F6" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={4} />
-                  <YAxis hide domain={[(min) => Math.floor(min * 0.95), (max) => Math.ceil(max * 1.05)]} />
+                  <YAxis
+                    domain={[0, "auto"]}
+                    tickCount={5}
+                    allowDecimals={false}
+                    tickFormatter={countTick}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={AXIS}
+                    width={34}
+                  />
                   <Tooltip {...TOOLTIP} formatter={(v) => Number(v).toLocaleString("en-IN")} />
                   <Line
                     type="linear"
@@ -1292,9 +1346,18 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                 value={fmtInt(cur.total_partners)}
                 delta={toDelta(pct.partners)}
               >
-                <BarChart data={growthSeries("total_partners")} margin={{ top: 8, right: 10, bottom: 0, left: 10 }}>
+                <BarChart data={growthSeries("total_partners")} margin={{ top: 8, right: 10, bottom: 0, left: -4 }}>
+                  <CartesianGrid stroke="#EEF1F6" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={4} />
-                  <YAxis hide />
+                  <YAxis
+                    tickCount={5}
+                    allowDecimals={false}
+                    tickFormatter={countTick}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={AXIS}
+                    width={34}
+                  />
                   <Tooltip {...TOOLTIP} cursor={{ fill: "rgba(240,68,56,0.05)" }} />
                   <Bar
                     dataKey="value"
@@ -1314,10 +1377,19 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
               >
                 <BarChart
                   data={growthSeries("active_subscriptions")}
-                  margin={{ top: 8, right: 10, bottom: 0, left: 10 }}
+                  margin={{ top: 8, right: 10, bottom: 0, left: -4 }}
                 >
+                  <CartesianGrid stroke="#EEF1F6" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={4} />
-                  <YAxis hide />
+                  <YAxis
+                    tickCount={5}
+                    allowDecimals={false}
+                    tickFormatter={countTick}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={AXIS}
+                    width={34}
+                  />
                   <Tooltip {...TOOLTIP} cursor={{ fill: "rgba(18,183,106,0.05)" }} />
                   <Bar
                     dataKey="value"
@@ -1349,14 +1421,35 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={cancellations}
-                  margin={{ top: 18, right: 10, bottom: 0, left: 10 }}
+                  margin={{ top: 18, right: 0, bottom: 0, left: -12 }}
                 >
+                  <CartesianGrid yAxisId="left" stroke="#EEF1F6" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tick={AXIS} dy={6} />
                   {/* Same idea as the bookings chart: headroom on the bar axis
                       plus a tighter rate axis keeps the rate line clear of the
                       bars instead of running behind them. */}
-                  <YAxis yAxisId="left" domain={[0, cancelMax * 1.55]} hide />
-                  <YAxis yAxisId="right" orientation="right" domain={[0, rateMax * 1.1]} hide />
+                  <YAxis
+                    yAxisId="left"
+                    domain={[0, cancelMax * 1.55]}
+                    tickCount={5}
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={AXIS}
+                    width={42}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    domain={[0, "auto"]}
+                    tickCount={4}
+                    allowDecimals={false}
+                    tickFormatter={(v) => `${v}%`}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={AXIS}
+                    width={42}
+                  />
                   <Tooltip
                     {...TOOLTIP}
                     cursor={{ fill: "rgba(236,72,153,0.05)" }}

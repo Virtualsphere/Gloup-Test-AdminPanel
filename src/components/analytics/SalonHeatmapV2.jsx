@@ -45,11 +45,7 @@ import { Card, Delta, HeaderSelect, KpiTile as BaseKpiTile, Select as BaseSelect
 
 const DESIGN_WIDTH = 1520;
 
-const BRAND = "#6D4AE0";
 const GREEN = "#22C55E";
-const ORANGE = "#F59E0B";
-const BLUE = "#3B82F6";
-const ROSE = "#F0445F";
 
 // Map | ranking panel, as measured from the mockup.
 const MAP_COLS = "grid-cols-[961fr_331fr]";
@@ -71,12 +67,15 @@ const COMPARE = "vs Jun 01 – Jun 30, 2026";
 // Static demo data
 // ---------------------------------------------------------------------------
 
+// Solid gradient badges with a white glyph, as drawn in the mockup.
+const badge = (from, to) => `linear-gradient(135deg, ${from}, ${to})`;
+
 const kpis = [
-  { label: "Total Bookings", value: "12,842", delta: "18.6%", caption: COMPARE, icon: CalendarClock, color: BRAND, tint: "#EEEAFD" },
-  { label: "Active Salons", value: "300", caption: <Delta value="12 new salons" up size={T.sm} />, icon: Store, color: GREEN, tint: "#E1F6E7" },
-  { label: "Total Customers", value: "8,721", caption: <Delta value="16.2%" up size={T.sm} />, icon: UserRound, color: ORANGE, tint: "#FFEFD6" },
-  { label: "Total Revenue", value: "₹18,72,450", caption: <Delta value="22.8%" up size={T.sm} />, icon: CircleDollarSign, color: BLUE, tint: "#E1ECFE" },
-  { label: "Avg. Booking Value", value: "₹146", caption: <Delta value="6.1%" up size={T.sm} />, icon: ReceiptIndianRupee, color: ROSE, tint: "#FDE5EC" },
+  { label: "Total Bookings", value: "12,842", delta: "18.6%", caption: COMPARE, icon: CalendarClock, tint: badge("#8B7CF8", "#6D4AE0") },
+  { label: "Active Salons", value: "300", caption: <Delta value="12 new salons" up size={T.sm} />, icon: Store, tint: badge("#8AD95F", "#4FBE4A") },
+  { label: "Total Customers", value: "8,721", caption: <Delta value="16.2%" up size={T.sm} />, icon: UserRound, tint: badge("#FFB347", "#F58A1F") },
+  { label: "Total Revenue", value: "₹18,72,450", caption: <Delta value="22.8%" up size={T.sm} />, icon: CircleDollarSign, tint: badge("#4F8DF7", "#2B62E8") },
+  { label: "Avg. Booking Value", value: "₹146", caption: <Delta value="6.1%" up size={T.sm} />, icon: ReceiptIndianRupee, tint: badge("#FF7A9C", "#F0527E") },
 ];
 
 // `aov` is the area's average booking value, which turns the booking count
@@ -178,7 +177,7 @@ const HEAT_RINGS = [
   { scale: 0.4, color: "#FB923C", opacity: 0.52 },
   { scale: 0.22, color: "#EF4444", opacity: 0.66 },
 ];
-const HEAT_RADIUS = 4800; // metres, for the busiest area
+const HEAT_RADIUS = 8500; // metres, for the busiest area
 
 // Where the callout sits relative to its hotspot, and the point of the callout
 // the canvas-scale shrink anchors to (so it stays put against the hotspot).
@@ -365,8 +364,9 @@ const LiveHeatMap = ({ metric }) => {
 const KpiTile = (props) => (
   <BaseKpiTile
     sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.sm }}
-    iconClass="h-[52px] w-[52px] rounded-xl"
+    iconClass="h-[52px] w-[52px] rounded-xl shadow-md shadow-black/10"
     iconSize={24}
+    iconColor="#fff"
     up
     className="px-5 py-5"
     {...props}
@@ -457,8 +457,8 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
         {/* Row 1 - KPI tiles                                                */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid grid-cols-5 ${GAP}`}>
-          {kpis.map(({ icon, color, tint, ...kpi }) => (
-            <KpiTile key={kpi.label} {...kpi} icon={icon} iconColor={color} iconTint={tint} />
+          {kpis.map(({ icon, tint, ...kpi }) => (
+            <KpiTile key={kpi.label} {...kpi} icon={icon} iconTint={tint} />
           ))}
         </div>
 

@@ -14,7 +14,9 @@ import {
   Send,
   X,
 } from "lucide-react";
+import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
+import { HeaderBell, HeaderSelect } from "../v2/ui";
 import {
   exportAnalyticsUninstalledV2,
   fetchAnalyticsGravityV2,
@@ -768,52 +770,47 @@ const AnalyticsIntelligenceV2 = () => {
 
   return (
     <>
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
-        {/* ------------------------------------------------------------------ */}
-        {/* Page header + filter bar                                            */}
-        {/* ------------------------------------------------------------------ */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className={`font-extrabold tracking-tight text-slate-900 ${T.h1}`}>
+      <PageHeaderPortal>
+        <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
+          <div className="min-w-0 leading-tight">
+            <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">
               Analytics Intelligence
             </h1>
-            <p className={`mt-0.5 text-slate-500 ${T.md}`}>
-              Deep insights to grow GloUp smarter
-            </p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-500">Deep insights to grow GloUp smarter</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative" ref={rangeRef}>
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            <div className="relative hidden md:block" ref={rangeRef}>
               <button
                 type="button"
                 onClick={openRange}
-                className={`flex items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 font-medium text-slate-700 ${T.md}`}
+                className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300"
               >
                 {fmtRange(range.from, range.to)}
-                <CalendarDays size={13} className="shrink-0 text-slate-400" />
+                <CalendarDays size={14} className="shrink-0 text-slate-500" />
               </button>
               {rangeOpen && (
                 <div className="absolute right-0 top-full z-20 mt-2 w-[260px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
-                  <p className={`font-bold text-slate-800 ${T.md}`}>Custom range</p>
+                  <p className="text-[13px] font-bold text-slate-800">Custom range</p>
                   {[
                     ["from", "From"],
                     ["to", "To"],
                   ].map(([key, label]) => (
-                    <label key={key} className={`mt-2 block text-slate-500 ${T.base}`}>
+                    <label key={key} className="mt-2 block text-[12px] text-slate-500">
                       {label}
                       <input
                         type="date"
                         value={draft[key]}
                         max={moment().format("YYYY-MM-DD")}
                         onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                        className={`mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-slate-800 focus:outline-none ${T.md}`}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] text-slate-800 focus:outline-none"
                       />
                     </label>
                   ))}
                   <button
                     type="button"
                     onClick={applyRange}
-                    className={`mt-3 w-full rounded-lg py-2 font-bold text-white ${T.md}`}
+                    className="mt-3 w-full rounded-lg py-2 text-[13px] font-bold text-white"
                     style={{ backgroundColor: BRAND }}
                   >
                     Apply
@@ -822,49 +819,39 @@ const AnalyticsIntelligenceV2 = () => {
               )}
             </div>
 
-            <div className="relative">
-              <select
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-                className={`appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-7 font-medium text-slate-700 focus:outline-none ${T.md}`}
-              >
-                {PERIODS.map((p) => (
-                  <option key={p.key} value={p.key}>
-                    {p.label}
-                  </option>
-                ))}
-                {period === "custom" && <option value="custom">Custom</option>}
-              </select>
-              <ChevronDown
-                size={13}
-                className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-            </div>
+            <HeaderSelect
+              label="Period"
+              value={period}
+              onChange={setPeriod}
+              options={[
+                ...PERIODS.map((p) => ({ value: p.key, label: p.label })),
+                ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []),
+              ]}
+            />
 
             <button
               type="button"
               onClick={() => setCompare((prev) => !prev)}
               title="Show the change vs the previous period of the same length"
-              className={`whitespace-nowrap rounded-xl border px-3.5 py-2 font-medium transition-colors ${T.md} ${
+              className={`hidden shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors lg:block ${
                 compare
                   ? "border-transparent bg-[#5B21F0] text-white"
-                  : "border-slate-200 bg-white text-slate-700"
+                  : "border-gray-200 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
               Compare
             </button>
 
-            <div className="flex items-center gap-2">
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${refreshMs ? "bg-emerald-500" : "bg-slate-300"}`} />
-              <div className="leading-tight">
-                <p className={`whitespace-nowrap font-semibold text-slate-700 ${T.base}`}>
-                  Auto refresh
-                </p>
-                <div className="relative">
+            <span className="hidden items-center gap-2 xl:flex">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${refreshMs ? "bg-emerald-500" : "bg-slate-300"}`} />
+              <span className="leading-tight">
+                <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-700">Auto refresh</span>
+                <span className="relative block">
                   <select
                     value={refreshMs}
                     onChange={(e) => setRefreshMs(Number(e.target.value))}
-                    className={`appearance-none bg-transparent pr-3 text-slate-500 focus:outline-none ${T.sm}`}
+                    aria-label="Auto refresh interval"
+                    className="cursor-pointer appearance-none bg-transparent pr-3.5 text-[10px] text-slate-500 focus:outline-none"
                   >
                     {REFRESH_OPTIONS.map((o) => (
                       <option key={o.label} value={o.ms}>
@@ -876,12 +863,16 @@ const AnalyticsIntelligenceV2 = () => {
                     size={10}
                     className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"
                   />
-                </div>
-              </div>
-            </div>
+                </span>
+              </span>
+            </span>
+
+            <HeaderBell count={12} color="#F04438" />
           </div>
         </div>
+      </PageHeaderPortal>
 
+      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {errors.length > 0 && (
           <div className={`flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 ${T.md}`}>
             <AlertTriangle size={16} className="shrink-0" />

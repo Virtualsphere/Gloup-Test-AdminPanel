@@ -383,13 +383,13 @@ const TrendTooltip = ({ active, payload, label }) => {
 };
 
 // Tiny trend line for the repeat-rate table. Fixed points, drawn as one
-// polyline stretched to the cell.
+// polyline stretched to the cell width. The height uses a fixed 0-11 scale
+// rather than each line's own min-max, so the wiggle stays as shallow as the
+// mockup's instead of filling the whole row.
 const MiniLine = ({ points, color }) => {
-  const max = Math.max(...points);
-  const min = Math.min(...points);
   const step = 100 / (points.length - 1);
   const path = points
-    .map((p, i) => `${(i * step).toFixed(1)},${(100 - ((p - min) / (max - min || 1)) * 100).toFixed(1)}`)
+    .map((p, i) => `${(i * step).toFixed(1)},${(100 - (p / 11) * 100).toFixed(1)}`)
     .join(" ");
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[18px] w-full" aria-hidden="true">
@@ -705,7 +705,7 @@ const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => 
                       </span>
                     </td>
                     <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.rate}</td>
-                    <td className="w-[40%] pl-6">
+                    <td className="w-[30%] pl-6">
                       <MiniLine points={row.points} color={row.color} />
                     </td>
                   </tr>
