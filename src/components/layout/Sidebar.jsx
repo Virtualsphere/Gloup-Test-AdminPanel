@@ -18,7 +18,6 @@ import {
   Gauge,
   MessageSquareText,
   Users,
-<<<<<<< HEAD
   UserRound,
   Activity,
   MapPinned,
@@ -32,8 +31,6 @@ import {
   CalendarClock,
   Store,
   Shapes,
-=======
->>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -91,7 +88,6 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/reviews-ratings-v2", icon: <Star size={18} />, text: "Reviews & Ratings V2" },
     { path: "/marketing-sms-v2", icon: <MessageSquareText size={18} />, text: "Marketing SMS V2" },
     { path: "/users-v2", icon: <Users size={18} />, text: "Users V2" },
-<<<<<<< HEAD
     { path: "/user-details-v2", icon: <UserRound size={18} />, text: "User Profile V2" },
     { path: "/user-analytics-v2", icon: <Activity size={18} />, text: "User Analytics V2" },
     { path: "/deep-user-insights-v2", icon: <MapPinned size={18} />, text: "Deep User Insights V2" },
@@ -105,8 +101,6 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/booking-intelligence-v2", icon: <CalendarClock size={18} />, text: "Booking Intelligence V2" },
     { path: "/partner-details-v2", icon: <Store size={18} />, text: "Partner Details V2" },
     { path: "/salon-category-intelligence-v2", icon: <Shapes size={18} />, text: "Salon Category V2" },
-=======
->>>>>>> 8f019bffa453ec8e658bed956a7b17ce0bbe5d46
   ];
 
   return (
