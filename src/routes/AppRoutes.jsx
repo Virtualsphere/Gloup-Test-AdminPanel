@@ -49,6 +49,18 @@ const ReviewsRatingsV2 = lazy(() => import("../components/data/ReviewsRatingsV2"
 const MarketingSMSV2 = lazy(() => import("../components/create/MarketingSMSV2"));
 const UsersV2 = lazy(() => import("../components/data/UsersV2"));
 const UserDetailsV2 = lazy(() => import("../components/details/UserDetailsV2"));
+const UserAnalyticsV2 = lazy(() => import("../components/analytics/UserAnalyticsV2"));
+const DeepUserInsightsV2 = lazy(() => import("../components/analytics/DeepUserInsightsV2"));
+const GrowthDashboardV2 = lazy(() => import("../components/dashboard/GrowthDashboardV2"));
+const ClickInteractionV2 = lazy(() => import("../components/analytics/ClickInteractionV2"));
+const UserAnalyticsOverviewV2 = lazy(() => import("../components/analytics/UserAnalyticsOverviewV2"));
+const ServiceIntelligenceV2 = lazy(() => import("../components/analytics/ServiceIntelligenceV2"));
+const BehaviorAnalyticsV2 = lazy(() => import("../components/analytics/BehaviorAnalyticsV2"));
+const UserAnalytics360V2 = lazy(() => import("../components/analytics/UserAnalytics360V2"));
+const SalonHeatmapV2 = lazy(() => import("../components/analytics/SalonHeatmapV2"));
+const BookingIntelligenceV2 = lazy(() => import("../components/analytics/BookingIntelligenceV2"));
+const PartnerDetailsV2 = lazy(() => import("../components/details/PartnerDetailsV2"));
+const SalonCategoryIntelligenceV2 = lazy(() => import("../components/analytics/SalonCategoryIntelligenceV2"));
 
 const AppRoutes = () => {
   return (
@@ -73,6 +85,18 @@ const AppRoutes = () => {
         <Route path="/users-v2" element={<UsersV2 title="Users" />} />
         <Route path="/user-details-v2" element={<UserDetailsV2 />} />
         <Route path="/user-details-v2/:id" element={<UserDetailsV2 />} />
+        <Route path="/user-analytics-v2" element={<UserAnalyticsV2 title="User Analytics Dashboard" />} />
+        <Route path="/deep-user-insights-v2" element={<DeepUserInsightsV2 title="Deep User Insights" />} />
+        <Route path="/growth-dashboard-v2" element={<GrowthDashboardV2 title="Dashboard" />} />
+        <Route path="/click-interaction-v2" element={<ClickInteractionV2 title="User Click & Interaction Analytics" />} />
+        <Route path="/user-analytics-overview-v2" element={<UserAnalyticsOverviewV2 title="User Analytics" />} />
+        <Route path="/service-intelligence-v2" element={<ServiceIntelligenceV2 title="Service Intelligence Dashboard" />} />
+        <Route path="/behavior-analytics-v2" element={<BehaviorAnalyticsV2 title="Advanced Behavior Analytics" />} />
+        <Route path="/user-analytics-360-v2" element={<UserAnalytics360V2 title="User Analytics 360°" />} />
+        <Route path="/salon-heatmap-v2" element={<SalonHeatmapV2 title="Salon Analytics - Heatmap" />} />
+        <Route path="/booking-intelligence-v2" element={<BookingIntelligenceV2 title="Booking Intelligence" />} />
+        <Route path="/partner-details-v2" element={<PartnerDetailsV2 title="Partner Details" />} />
+        <Route path="/salon-category-intelligence-v2" element={<SalonCategoryIntelligenceV2 title="Salon Category Intelligence" />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin title="Admin" />} />
         <Route path="/allusers" element={<AllUsers title="Users"/>} />

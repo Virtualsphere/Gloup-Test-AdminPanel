@@ -19,6 +19,18 @@ import {
   MessageSquareText,
   Users,
   UserRound,
+  Activity,
+  MapPinned,
+  TrendingUp,
+  MousePointerClick,
+  ChartColumn,
+  Scissors,
+  Brain,
+  Orbit,
+  Flame,
+  CalendarClock,
+  Store,
+  Shapes,
 } from "lucide-react";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -63,9 +75,11 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/gender-probability", icon: <PieChart size={18} />, text: "Gender Probability" },
     { path: "/category-discount", icon: <Percent size={18} />, text: "Category Discount" },
 
+    { section: "Report Dashboard" },
+    { path: "/analytics-intelligence-v2", icon: <LayoutDashboard size={18} />, text: "Analytics Intelligence V2" },
+
     // New / in-progress pages live below this divider.
     { section: "New Pages" },
-    { path: "/analytics-intelligence-v2", icon: <LayoutDashboard size={18} />, text: "Analytics Intelligence V2" },
     { path: "/dashboard-v2", icon: <Gauge size={18} />, text: "Dashboard V2" },
     { path: "/bookings-by-order-date-v2", icon: <CalendarCheck size={18} />, text: "Bookings by Order Date V2" },
     { path: "/invoice-payouts-v2", icon: <Receipt size={18} />, text: "Invoices & Payouts V2" },
@@ -75,6 +89,18 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/marketing-sms-v2", icon: <MessageSquareText size={18} />, text: "Marketing SMS V2" },
     { path: "/users-v2", icon: <Users size={18} />, text: "Users V2" },
     { path: "/user-details-v2", icon: <UserRound size={18} />, text: "User Profile V2" },
+    { path: "/user-analytics-v2", icon: <Activity size={18} />, text: "User Analytics V2" },
+    { path: "/deep-user-insights-v2", icon: <MapPinned size={18} />, text: "Deep User Insights V2" },
+    { path: "/growth-dashboard-v2", icon: <TrendingUp size={18} />, text: "Growth Dashboard V2" },
+    { path: "/click-interaction-v2", icon: <MousePointerClick size={18} />, text: "Click & Interaction V2" },
+    { path: "/user-analytics-overview-v2", icon: <ChartColumn size={18} />, text: "User Analytics Overview V2" },
+    { path: "/service-intelligence-v2", icon: <Scissors size={18} />, text: "Service Intelligence V2" },
+    { path: "/behavior-analytics-v2", icon: <Brain size={18} />, text: "Behavior Analytics V2" },
+    { path: "/user-analytics-360-v2", icon: <Orbit size={18} />, text: "User Analytics 360 V2" },
+    { path: "/salon-heatmap-v2", icon: <Flame size={18} />, text: "Salon Heatmap V2" },
+    { path: "/booking-intelligence-v2", icon: <CalendarClock size={18} />, text: "Booking Intelligence V2" },
+    { path: "/partner-details-v2", icon: <Store size={18} />, text: "Partner Details V2" },
+    { path: "/salon-category-intelligence-v2", icon: <Shapes size={18} />, text: "Salon Category V2" },
   ];
 
   return (
