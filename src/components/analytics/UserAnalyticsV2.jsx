@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import moment from "moment";
+import toast from "react-hot-toast";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   ArrowRight,
@@ -14,8 +17,10 @@ import {
   TrendingDown,
   TriangleAlert,
   UserCheck,
+  UserPlus,
   Users,
 } from "lucide-react";
+import { fetchUserAnalyticsOverviewV2, fetchUserRetentionV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
@@ -37,14 +42,20 @@ import {
 } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "User Analytics Dashboard" mockup, on a
-// fixed DESIGN_WIDTH canvas that ScaledCanvas scales to the available width
-// (see there for why bigger px sizes in T read smaller on screen).
+// The approved "User Analytics Dashboard" mockup, on a fixed DESIGN_WIDTH
+// canvas that ScaledCanvas scales to the available width (see there for why
+// bigger px sizes in T read smaller on screen).
 //
-// UI only - every number below is static demo data matching the mockup. There
-// is no backend source yet for downloads, logins, DAU/MAU, sessions, screen
-// time, retention cohorts or uninstalls: the app has to start reporting usage
-// events first. The header pickers hold local state only.
+// Data: getUserAnalyticsOverviewV2 + getUserRetentionV2 (analyticsSlice).
+// - App activity (unique users, DAU/MAU, sessions, heatmaps, platform) comes
+//   from the app heartbeat, recorded since `activity_since`; salon views and
+//   coupon applies since `events_since`. Before that those cards say so
+//   instead of showing numbers.
+// - Signups, logins, checkout, bookings, uninstalls and booking retention read
+//   tables that already had data.
+// - Not tracked, so dropped from the mockup: app downloads (KPI and funnel
+//   step 1 are sign-ups instead), searches, offer clicks and the cart (the
+//   funnel's "Add to Cart" is "Checkout Started").
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -54,6 +65,7 @@ const GREEN = "#22C55E";
 const BLUE = "#3B82F6";
 const ORANGE = "#F59E0B";
 const PINK = "#EC4899";
+const SLATE = "#CBD5E1";
 
 // Measured card widths from the mockup, used directly as grid fr units. The
 // mockup leaves the right third of the funnel row empty; the funnel card spans
@@ -77,207 +89,90 @@ const T = {
 
 const GAP = "gap-3";
 const AXIS = { ...CHART_AXIS, fontSize: 10 };
-const COMPARE = "vs May 14 – May 20";
+const DASH = "–";
 
-// ---------------------------------------------------------------------------
-// Static demo data
-// ---------------------------------------------------------------------------
-
-const kpis = [
+const PERIODS = [
+  { value: "last_7", label: "Last 7 Days", range: () => [moment().subtract(6, "days"), moment()] },
+  { value: "this_week", label: "This Week", range: () => [moment().startOf("isoWeek"), moment()] },
   {
-    label: "Total Downloads",
-    value: "2,43,580",
-    delta: "18.6%",
-    icon: Download,
-    color: VIOLET,
-    tint: "#EEEBFD",
-    spark: spark([8, 9, 8.6, 9.8, 9.2, 10.4, 9.9, 10.9, 10.3, 11.4, 10.8, 12, 11.4, 12.6, 12.1, 13.6, 13]),
+    value: "last_week",
+    label: "Last Week",
+    range: () => [moment().subtract(1, "week").startOf("isoWeek"), moment().subtract(1, "week").endOf("isoWeek")],
   },
+  { value: "last_30", label: "Last 30 Days", range: () => [moment().subtract(29, "days"), moment()] },
+  { value: "this_month", label: "This Month", range: () => [moment().startOf("month"), moment()] },
   {
-    label: "Total Logins",
-    value: "1,82,314",
-    delta: "16.4%",
-    icon: LogIn,
-    color: GREEN,
-    tint: "#DCFCE7",
-    spark: spark([9, 9.8, 9.4, 10.6, 10.1, 9.7, 10.9, 10.4, 11.2, 10.8, 11.9, 11.3, 12.2, 11.8, 12.9, 13.6, 12.8]),
+    value: "last_month",
+    label: "Last Month",
+    range: () => [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")],
   },
-  {
-    label: "Unique Users",
-    value: "1,36,729",
-    delta: "17.2%",
-    icon: Users,
-    color: BLUE,
-    tint: "#DBEAFE",
-    spark: spark([8.4, 9.2, 8.8, 9.6, 9.3, 10.1, 9.8, 10.6, 10.2, 11, 10.5, 11.3, 11, 12.1, 11.6, 12.8, 13.4]),
-  },
-  {
-    label: "1st Time Bookings",
-    value: "25,000",
-    delta: "18.6%",
-    icon: ShoppingCart,
-    color: ORANGE,
-    tint: "#FEF3C7",
-    spark: spark([9.2, 9.6, 9.1, 10.2, 9.7, 9.4, 10.5, 10.1, 10.9, 10.4, 11.3, 10.8, 11.7, 11.2, 12.4, 12, 13.2]),
-  },
-  {
-    label: "DAU",
-    value: "28,450",
-    delta: "12.7%",
-    icon: UserCheck,
-    color: PINK,
-    tint: "#FCE7F3",
-    spark: spark([9.1, 9.8, 9.3, 10.4, 9.6, 10.9, 10.2, 11.1, 10.5, 11.6, 10.9, 12, 11.4, 12.6, 11.9, 13.3, 12.7]),
-  },
-  {
-    label: "MAU",
-    value: "1,36,729",
-    delta: "17.2%",
-    icon: CalendarRange,
-    color: VIOLET,
-    tint: "#EEEBFD",
-    spark: spark([8.7, 9.5, 9, 10.1, 9.6, 10.5, 10, 11.1, 10.6, 11.5, 11, 12.1, 11.5, 12.8, 12.2, 13.5, 12.9]),
-  },
+  { value: "last_90", label: "Last 90 Days", range: () => [moment().subtract(89, "days"), moment()] },
 ];
-
-// Bar heights are as drawn in the mockup (compressed so the last stage stays
-// visible), not proportional to the counts.
-const funnel = [
-  { label: "Downloads", value: "2,43,580", bar: 100 },
-  { label: "Logins", value: "1,82,314", bar: 88 },
-  { label: "Salon Clicks", value: "1,05,876", bar: 77 },
-  { label: "Add to Cart", value: "59,420", bar: 63 },
-  { label: "1st Booking", value: "25,000", bar: 46 },
-  { label: "Completed Booking", value: "22,680", bar: 28 },
+const PLATFORMS = [
+  { value: "all", label: "All Platforms" },
+  { value: "android", label: "Android" },
+  { value: "ios", label: "iOS" },
+  { value: "web", label: "Web" },
+  { value: "app", label: "App (platform not sent)" },
 ];
-const funnelSteps = ["74.8%", "58.1%", "56.1%", "42.1%", "90.7%"];
-
-const DAYS = ["May 21", "May 22", "May 23", "May 24", "May 25", "May 26", "May 27"];
-
-const activityTrend = DAYS.map((day, i) => ({
-  day,
-  dau: [10200, 13100, 15000, 16900, 19100, 21600, 24300][i],
-  mau: [27800, 30100, 32200, 34600, 37300, 41000, 45200][i],
-}));
-
-const platforms = [
-  { name: "Android", value: 91245, label: "91,245", pct: "66.7%", color: GREEN },
-  { name: "iOS", value: 41019, label: "41,019", pct: "30.0%", color: BLUE },
-  { name: "Web", value: 4465, label: "4,465", pct: "3.3%", color: ORANGE },
+const PLATFORM_SLICES = {
+  android: { name: "Android", color: GREEN },
+  ios: { name: "iOS", color: BLUE },
+  web: { name: "Web", color: ORANGE },
+  app: { name: "App (platform not sent)", color: VIOLET },
+  unknown: { name: "Unknown", color: SLATE },
+};
+const COHORT_MODES = [
+  { value: "signup", label: "By Sign-up Cohort" },
+  { value: "first_booking", label: "By First Booking Cohort" },
 ];
-
-const newVsReturning = [
-  { name: "New Users", value: 56342, label: "56,342", pct: "41.2%", color: VIOLET },
-  { name: "Returning Users", value: 80387, label: "80,387", pct: "58.8%", color: GREEN },
-];
-
-const uninstallTrend = DAYS.map((day, i) => ({
-  day,
-  rate: [5.9, 6.0, 6.1, 6.1, 6.2, 5.9, 6.23][i],
-}));
-
-const sessionTrend = DAYS.map((day, i) => ({
-  day,
-  minutes: [2.15, 2.22, 2.28, 2.32, 2.35, 2.33, 2.57][i],
-}));
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_PARTS = ["12 AM", "4 AM", "8 AM", "12 PM", "4 PM", "8 PM"];
-
-// Share of the busiest slot, rows = DAY_PARTS, columns = WEEKDAYS.
-const engagement = [
-  [0.18, 0.16, 0.18, 0.2, 0.24, 0.3, 0.28],
-  [0.08, 0.06, 0.08, 0.08, 0.1, 0.14, 0.12],
-  [0.34, 0.36, 0.38, 0.36, 0.4, 0.3, 0.26],
-  [0.52, 0.56, 0.6, 0.58, 0.72, 0.78, 0.7],
-  [0.64, 0.66, 0.7, 0.68, 0.84, 1, 0.94],
-  [0.58, 0.6, 0.62, 0.6, 0.74, 0.8, 0.72],
-];
-
-// Average session length as a share of the 3+ minute top bucket.
-const screenTime = [
-  [0.2, 0.18, 0.2, 0.22, 0.26, 0.34, 0.32],
-  [0.1, 0.08, 0.1, 0.1, 0.12, 0.16, 0.16],
-  [0.38, 0.4, 0.42, 0.4, 0.44, 0.48, 0.46],
-  [0.6, 0.62, 0.66, 0.64, 0.74, 0.88, 0.86],
-  [0.66, 0.7, 0.72, 0.7, 0.8, 1, 0.96],
-  [0.56, 0.58, 0.6, 0.58, 0.68, 0.84, 0.8],
-];
+// Screen-time cells are coloured against this top bucket (3+ minutes).
+const SCREEN_TIME_TOP_SECONDS = 180;
 
 const ENGAGEMENT_RAMP = ["#F1EEFE", "#C9BEFA", "#8B74F0", "#4C2FE0"];
 const SCREEN_TIME_RAMP = ["#ECFDF3", "#A7E9C1", "#4CC38A", "#16A34A"];
 
-const topActions = [
-  { action: "Search Salon", users: "1,12,340", pct: 82.1 },
-  { action: "View Salon Details", users: "98,512", pct: 72.0 },
-  { action: "Click Offer", users: "76,320", pct: 55.8 },
-  { action: "Add to Cart", users: "59,420", pct: 43.4 },
-  { action: "Apply Coupon", users: "38,245", pct: 27.9 },
-  { action: "Make Payment", users: "24,980", pct: 18.2 },
-];
+// ---------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------
 
-// `good` is false where the rise is bad news (drawn red in the mockup).
-const keyMetrics = [
-  { metric: "Downloads", thisWeek: "2,43,580", lastWeek: "2,05,320", change: "18.6%" },
-  { metric: "Logins", thisWeek: "1,82,314", lastWeek: "1,56,809", change: "16.4%" },
-  { metric: "Salon Clicks", thisWeek: "1,05,876", lastWeek: "89,210", change: "18.7%" },
-  { metric: "Add to Cart", thisWeek: "59,420", lastWeek: "51,230", change: "16.0%" },
-  { metric: "1st Bookings", thisWeek: "25,000", lastWeek: "21,100", change: "18.5%" },
-  { metric: "Completed Bookings", thisWeek: "22,680", lastWeek: "19,240", change: "17.9%" },
-  { metric: "DAU", thisWeek: "28,450", lastWeek: "25,230", change: "12.7%" },
-  { metric: "MAU", thisWeek: "1,36,729", lastWeek: "1,16,707", change: "17.2%" },
-  { metric: "Avg. Session Duration", thisWeek: "2m 34s", lastWeek: "2m 17s", change: "12.6%" },
-  { metric: "Uninstall Rate", thisWeek: "6.23%", lastWeek: "5.63%", change: "0.6%", good: false },
-];
+const isNum = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+const fmtInt = (v) => (isNum(v) ? Number(v).toLocaleString("en-IN") : DASH);
+const fmtDecimal = (v) =>
+  isNum(v) ? Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 }) : DASH;
+const fmtPct = (v, digits = 1) => (isNum(v) ? `${Number(v).toFixed(digits)}%` : DASH);
+const fmtDuration = (seconds) => {
+  if (!isNum(seconds)) return DASH;
+  const s = Math.round(Number(seconds));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+};
+const fmtDay = (d) => (d ? moment(d).format("MMM D") : DASH);
+const fmtRange = (from, to) => (from && to ? `${fmtDay(from)} – ${fmtDay(to)}` : DASH);
+const pctOf = (part, whole) => (isNum(part) && isNum(whole) && Number(whole) ? (part / whole) * 100 : null);
 
-const RETENTION_DAYS = ["Day 1", "Day 7", "Day 14", "Day 30", "Day 60", "Day 90"];
-const COHORT_MODES = ["By Sign-up Cohort", "By First Booking Cohort"];
+// Change vs the previous window: relative %, or percentage points when the
+// metric is itself a rate. null when there's nothing to compare.
+const change = (cur, prev, { points = false, inverse = false } = {}) => {
+  if (!isNum(cur) || !isNum(prev)) return null;
+  const diff = points ? cur - prev : prev ? ((cur - prev) / prev) * 100 : null;
+  if (diff === null) return null;
+  const up = diff >= 0;
+  return {
+    value: `${Math.abs(diff).toFixed(points ? 2 : 1)}${points ? " pts" : "%"}`,
+    up,
+    good: inverse ? !up : up,
+  };
+};
 
-const retention = [
-  { cohort: "May 19 – May 25", days: ["42.6%", "22.1%", "15.3%", "8.7%", "–", "–"] },
-  { cohort: "May 12 – May 18", days: ["41.2%", "21.3%", "14.6%", "8.1%", "4.2%", "–"] },
-  { cohort: "May 5 – May 11", days: ["39.8%", "20.4%", "13.6%", "7.6%", "4.1%", "2.2%"] },
-  { cohort: "Apr 28 – May 4", days: ["38.7%", "19.6%", "12.9%", "7.1%", "3.8%", "2.0%"] },
-  { cohort: "Apr 21 – Apr 27", days: ["37.1%", "18.8%", "12.1%", "6.6%", "3.5%", "1.7%"] },
-];
-
-const dropOffs = [
-  { step: "After Login", note: "didn't search salon", pct: 24.4 },
-  { step: "After Salon List", note: "didn't open details", pct: 21.1 },
-  { step: "After Salon Details", note: "didn't add to cart", pct: 18.6 },
-  { step: "After Add to Cart", note: "didn't checkout", pct: 15.2 },
-  { step: "During Checkout", note: "payment failed/exit", pct: 9.8 },
-  { step: "After Payment", note: "booking not completed", pct: 5.3 },
-];
-const maxDropOff = Math.max(...dropOffs.map((row) => row.pct));
-
-const insights = [
-  { id: "downloads", icon: Download, text: <>App downloads increased by 18.6% this week.</> },
-  {
-    id: "drop-off",
-    icon: TrendingDown,
-    text: (
-      <>
-        Major drop-off happening <b className="font-bold">after Salon Details</b>.
-      </>
-    ),
-  },
-  {
-    id: "screen-time",
-    icon: Clock,
-    text: (
-      <>
-        Screen time is highest on <b className="font-bold">Saturday &amp; Sunday</b>.
-      </>
-    ),
-  },
-  { id: "retention", icon: Repeat2, text: <>Retention on Day 7 improved by 1.7%.</> },
-  { id: "uninstall", icon: TriangleAlert, text: <>Uninstall rate slightly increased, monitor trends.</> },
-];
-
-const DATE_RANGES = ["May 21 – May 27, 2026", "May 14 – May 20, 2026", "Apr 28 – May 27, 2026"];
-const PLATFORMS = [{ value: "all", label: "Platforms" }, "Android", "iOS", "Web"];
-const CITIES = ["Chennai", "All Cities"];
+// Sparkline points from a series column, skipping untracked days.
+const sparkOf = (series, key) => {
+  const values = (series || []).map((row) => row[key]).filter(isNum);
+  return values.length > 1 ? spark(values) : undefined;
+};
 
 // ---------------------------------------------------------------------------
 // Building blocks
@@ -294,8 +189,6 @@ const KpiTile = (props) => (
     sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.xs }}
     iconClass="h-10 w-10 rounded-xl"
     sparkHeight={36}
-    caption={COMPARE}
-    up
     {...props}
   />
 );
@@ -311,7 +204,7 @@ const Donut = (props) => (
   />
 );
 
-const HeatGrid = ({ values, ramp, unit }) => (
+const HeatGrid = ({ values, ramp, title }) => (
   <BaseHeatGrid
     values={values}
     ramp={ramp}
@@ -322,8 +215,15 @@ const HeatGrid = ({ values, ramp, unit }) => (
     cellHeight={12}
     gap="4px 3px"
     radius={2}
-    title={(r, c) => `${WEEKDAYS[c]} ${DAY_PARTS[r]} · ${Math.round(values[r][c] * 100)}% ${unit}`}
+    title={title}
   />
+);
+
+// Centred grey note for a card with nothing to show yet.
+const EmptyNote = ({ children, className = "" }) => (
+  <div className={`grid flex-1 place-items-center px-3 py-4 text-center text-slate-400 ${T.xs} ${className}`}>
+    <p>{children}</p>
+  </div>
 );
 
 // Legend row for the two donut cards: dot, name, then "count (pct)" below.
@@ -335,7 +235,7 @@ const DonutLegend = ({ data }) => (
         <span className={`min-w-0 leading-snug ${T.xs}`}>
           <span className="block truncate font-medium text-slate-700">{slice.name}</span>
           <span className="block whitespace-nowrap text-slate-500">
-            {slice.label} ({slice.pct})
+            {fmtInt(slice.value)} ({fmtPct(slice.pct)})
           </span>
         </span>
       </li>
@@ -344,23 +244,23 @@ const DonutLegend = ({ data }) => (
 );
 
 // Small line chart shared by the activity, uninstall and session cards.
-const TrendChart = ({ data, lines, domain, ticks, tickFormatter, formatter, height }) => (
+const TrendChart = ({ data, lines, tickFormatter, formatter, height, allowDecimals = false }) => (
   <div className="w-full" style={{ height }}>
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 8, right: 10, bottom: 0, left: -6 }}>
         <XAxis
-          dataKey="day"
+          dataKey="label"
           tickLine={false}
           axisLine={false}
           tick={AXIS}
           dy={6}
-          interval={0}
+          interval="preserveStartEnd"
+          minTickGap={12}
           padding={{ left: 8, right: 8 }}
         />
         <YAxis
-          domain={domain}
-          ticks={ticks}
-          interval={0}
+          domain={[0, "auto"]}
+          allowDecimals={allowDecimals}
           tickFormatter={tickFormatter}
           tickLine={false}
           axisLine={false}
@@ -376,8 +276,9 @@ const TrendChart = ({ data, lines, domain, ticks, tickFormatter, formatter, heig
             name={line.name}
             stroke={line.color}
             strokeWidth={1.8}
-            dot={{ r: 3, fill: line.color, strokeWidth: 0 }}
+            dot={data.length <= 31 ? { r: 3, fill: line.color, strokeWidth: 0 } : false}
             activeDot={{ r: 4.5 }}
+            connectNulls={false}
             isAnimationActive={false}
           />
         ))}
@@ -386,54 +287,44 @@ const TrendChart = ({ data, lines, domain, ticks, tickFormatter, formatter, heig
   </div>
 );
 
-const thousands = (v) => (v >= 1000 ? `${v / 1000}K` : `${v}`);
-
-const exportKeyMetrics = () =>
-  downloadCsv(
-    "user-analytics-key-metrics.csv",
-    ["Metric", "This Week", "Last Week", "Change"],
-    // Every change on the card is an increase.
-    keyMetrics.map((row) => [row.metric, row.thisWeek, row.lastWeek, `+${row.change}`])
-  );
+const thousands = (v) => (v >= 1000 ? `${Number((v / 1000).toFixed(1))}K` : `${v}`);
 
 // Title and header controls live in the app bar, not the canvas.
-const PageHeader = ({ title, range, setRange, platform, setPlatform, city, setCity }) => (
+const PageHeader = ({ title, subtitle, updated, filters, onExport }) => (
   <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0 leading-tight">
         <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-          Track user growth, engagement, behavior &amp; retention
-        </p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">{subtitle}</p>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        <LiveStamp updated="10:30 AM" className="hidden 2xl:flex" />
+        {updated && <LiveStamp updated={updated} className="hidden 2xl:flex" />}
         <HeaderSelect
           icon={CalendarDays}
           label="Date range"
-          value={range}
-          onChange={setRange}
-          options={DATE_RANGES}
+          value={filters.period}
+          onChange={filters.setPeriod}
+          options={PERIODS}
           className="hidden lg:flex"
         />
         <HeaderSelect
           icon={MonitorSmartphone}
           label="Platform"
-          value={platform}
-          onChange={setPlatform}
+          value={filters.platform}
+          onChange={filters.setPlatform}
           options={PLATFORMS}
           className="hidden xl:flex"
         />
         <HeaderSelect
           icon={MapPin}
           label="City"
-          value={city}
-          onChange={setCity}
-          options={CITIES}
+          value={filters.city}
+          onChange={filters.setCity}
+          options={filters.cityOptions}
           className="hidden xl:flex"
         />
-        <HeaderButton icon={Download} label="Export report" color={VIOLET} onClick={exportKeyMetrics}>
+        <HeaderButton icon={Download} label="Export report" color={VIOLET} onClick={onExport}>
           <span className="hidden md:inline">Export Report</span>
         </HeaderButton>
       </div>
@@ -446,21 +337,257 @@ const PageHeader = ({ title, range, setRange, platform, setPlatform, city, setCi
 // ---------------------------------------------------------------------------
 
 const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
-  const [range, setRange] = useState(DATE_RANGES[0]);
+  const dispatch = useDispatch();
+  const { userOverview, userRetention } = useSelector((state) => state.analytics);
+  const [period, setPeriod] = useState(PERIODS[0].value);
   const [platform, setPlatform] = useState("all");
-  const [city, setCity] = useState(CITIES[0]);
-  const [cohortMode, setCohortMode] = useState(COHORT_MODES[0]);
+  const [city, setCity] = useState("all");
+  const [cohortMode, setCohortMode] = useState(COHORT_MODES[0].value);
+  const [updated, setUpdated] = useState(null);
+
+  const range = useMemo(() => {
+    const [from, to] = (PERIODS.find((p) => p.value === period) || PERIODS[0]).range();
+    return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
+  }, [period]);
+
+  useEffect(() => {
+    const body = { from: range.from, to: range.to };
+    if (platform !== "all") body.platform = platform;
+    if (city !== "all") body.city = city;
+    dispatch(fetchUserAnalyticsOverviewV2(body))
+      .unwrap()
+      .then(() => setUpdated(moment().format("h:mm A")))
+      .catch((message) => toast.error(message || "Failed to load user analytics", { id: "user-analytics-v2" }));
+  }, [dispatch, range.from, range.to, platform, city]);
+
+  useEffect(() => {
+    dispatch(fetchUserRetentionV2({ mode: cohortMode }))
+      .unwrap()
+      .catch((message) => toast.error(message || "Failed to load retention", { id: "user-retention-v2" }));
+  }, [dispatch, cohortMode]);
+
+  const data = userOverview.data;
+  const loading = userOverview.loading && !data;
+  const m = data?.metrics || {};
+  const pm = data?.previous_metrics || {};
+  const series = useMemo(
+    () => (data?.series || []).map((row) => ({ ...row, label: fmtDay(row.day) })),
+    [data]
+  );
+  const compare = data ? `vs ${fmtRange(data.previous.from, data.previous.to)}` : "";
+  const activitySince = data?.activity_since;
+  const shown = (v, fmt = fmtInt) => (loading ? "…" : fmt(v));
+
+  // Caption for cards fed by the heartbeat: what's missing, or since when.
+  const activityNote = !data
+    ? ""
+    : !activitySince
+      ? "No app activity recorded yet"
+      : m.activity_partial
+        ? `Tracked since ${fmtDay(activitySince)}`
+        : compare;
+
+  // Logins are dated by session start, which older sessions don't carry.
+  const loginsNote = !data
+    ? ""
+    : !data.logins_since
+      ? "Not tracked yet"
+      : m.logins_partial
+        ? `Tracked since ${fmtDay(data.logins_since)}`
+        : compare;
+
+  const cityOptions = useMemo(
+    () => [{ value: "all", label: "All Cities" }, ...(data?.cities || []).map((c) => ({ value: c, label: c }))],
+    [data]
+  );
+
+  // ---- KPI tiles ----------------------------------------------------------
+  const kpi = (label, key, icon, color, tint, sparkKey, opts = {}) => {
+    const delta = change(m[key], pm[key]);
+    return {
+      label,
+      value: shown(m[key], opts.format),
+      delta: delta?.value,
+      up: delta?.up,
+      good: delta?.good,
+      caption: opts.activity ? activityNote : opts.logins ? loginsNote : compare,
+      icon,
+      color,
+      tint,
+      spark: sparkOf(series, sparkKey),
+    };
+  };
+  const kpis = [
+    kpi("New Sign-ups", "signups", UserPlus, VIOLET, "#EEEBFD", "signups"),
+    kpi("Total Logins", "logins", LogIn, GREEN, "#DCFCE7", "logins", { logins: true }),
+    kpi("Unique Users", "unique_users", Users, BLUE, "#DBEAFE", "dau", { activity: true }),
+    kpi("1st Time Bookings", "first_bookings", ShoppingCart, ORANGE, "#FEF3C7", "first_bookings"),
+    kpi("DAU (avg.)", "dau", UserCheck, PINK, "#FCE7F3", "dau", { activity: true, format: fmtDecimal }),
+    kpi("MAU", "mau", CalendarRange, VIOLET, "#EEEBFD", "mau", { activity: true }),
+  ];
+
+  // ---- Funnel -------------------------------------------------------------
+  // Bars on a square-root scale so the last stages stay visible (the mockup
+  // compresses them the same way).
+  const funnel = data?.funnel || [];
+  const funnelMax = Math.max(0, ...funnel.map((s) => (isNum(s.users) ? s.users : 0)));
+  const funnelSteps = funnel.slice(1).map((stage, i) => pctOf(stage.users, funnel[i].users));
+  const overallConversion = funnel.length ? pctOf(funnel[funnel.length - 1].users, funnel[0].users) : null;
+
+  // ---- Donuts ---------------------------------------------------------------
+  const platformData = (data?.platforms || []).map((row) => ({
+    ...(PLATFORM_SLICES[row.key] || PLATFORM_SLICES.unknown),
+    value: row.users,
+  }));
+  const platformTotal = platformData.reduce((t, s) => t + s.value, 0);
+  platformData.forEach((s) => (s.pct = pctOf(s.value, platformTotal)));
+
+  const nvr = data?.new_vs_returning;
+  const newVsReturning = nvr
+    ? [
+        { name: "New Customers", value: nvr.new, color: VIOLET, pct: pctOf(nvr.new, nvr.customers) },
+        { name: "Returning Customers", value: nvr.returning, color: GREEN, pct: pctOf(nvr.returning, nvr.customers) },
+      ]
+    : [];
+
+  // ---- Heatmaps -------------------------------------------------------------
+  const heat = data?.heatmap;
+  const heatMax = heat ? Math.max(0, ...heat.users.flat()) : 0;
+  const engagement = heat ? heat.users.map((row) => row.map((v) => (heatMax ? v / heatMax : 0))) : null;
+  const screenTime = heat
+    ? heat.avg_seconds.map((row) => row.map((v) => (isNum(v) ? Math.min(1, v / SCREEN_TIME_TOP_SECONDS) : 0)))
+    : null;
+  const hasHeat = heatMax > 0;
+
+  // ---- Top actions / drop-offs ---------------------------------------------
+  const topActions = data?.top_actions || [];
+  const actionMax = Math.max(0, ...topActions.map((a) => (isNum(a.users) ? a.users : 0)));
+  const dropOffs = data?.drop_offs || [];
+  const maxDropOff = Math.max(0, ...dropOffs.map((row) => (isNum(row.pct) ? row.pct : 0)));
+
+  // ---- Key metrics ----------------------------------------------------------
+  const keyMetrics = [
+    { metric: "Sign-ups", key: "signups" },
+    { metric: "Logins", key: "logins" },
+    { metric: "Salon Views (users)", key: "salon_viewers" },
+    { metric: "Checkout Started", key: "checkout_users" },
+    { metric: "1st Bookings", key: "first_bookings" },
+    { metric: "1st Bookings Completed", key: "first_completed" },
+    { metric: "DAU (avg.)", key: "dau", format: fmtDecimal },
+    { metric: "MAU", key: "mau" },
+    { metric: "Avg. Session Duration", key: "avg_session_seconds", format: fmtDuration },
+    { metric: "Uninstall Rate", key: "uninstall_rate", format: (v) => fmtPct(v, 2), points: true, inverse: true },
+  ].map((row) => {
+    const format = row.format || fmtInt;
+    return {
+      ...row,
+      thisPeriod: format(m[row.key]),
+      lastPeriod: format(pm[row.key]),
+      change: change(m[row.key], pm[row.key], row),
+    };
+  });
+
+  const exportKeyMetrics = () => {
+    if (!data) return;
+    downloadCsv(
+      `user-analytics-${data.from}_${data.to}.csv`,
+      ["Metric", `This Period (${data.from} to ${data.to})`, `Last Period (${data.previous.from} to ${data.previous.to})`, "Change"],
+      keyMetrics.map((row) => [
+        row.metric,
+        row.thisPeriod,
+        row.lastPeriod,
+        row.change ? `${row.change.up ? "+" : "-"}${row.change.value}` : DASH,
+      ])
+    );
+  };
+
+  // ---- Retention ------------------------------------------------------------
+  const retention = userRetention.data?.mode === cohortMode ? userRetention.data : null;
+  const retentionSubtitle =
+    cohortMode === "signup"
+      ? userRetention.data?.activity_since
+        ? `% who came back (app or booking) N+ days after sign-up`
+        : "% who placed a booking N+ days after sign-up (app activity not recorded yet)"
+      : "% who booked again N+ days after their first booking";
+
+  // ---- Insights -------------------------------------------------------------
+  const insights = [];
+  const signupChange = change(m.signups, pm.signups);
+  if (signupChange) {
+    insights.push({
+      id: "signups",
+      icon: UserPlus,
+      text: <>New sign-ups {signupChange.up ? "increased" : "decreased"} by {signupChange.value} vs the previous period.</>,
+    });
+  }
+  const worstDrop = dropOffs.filter((d) => isNum(d.pct)).sort((a, b) => b.pct - a.pct)[0];
+  if (worstDrop && worstDrop.pct > 0) {
+    insights.push({
+      id: "drop-off",
+      icon: TrendingDown,
+      text: (
+        <>
+          Biggest drop-off: <b className="font-bold">{worstDrop.label}</b> ({fmtPct(worstDrop.pct)}).
+        </>
+      ),
+    });
+  }
+  if (hasHeat) {
+    let best = null;
+    heat.avg_seconds.forEach((row, r) =>
+      row.forEach((v, c) => {
+        if (isNum(v) && heat.users[r][c] > 0 && (!best || v > best.v)) best = { v, r, c };
+      })
+    );
+    if (best) {
+      insights.push({
+        id: "screen-time",
+        icon: Clock,
+        text: (
+          <>
+            Longest sessions on <b className="font-bold">{WEEKDAY_NAMES[best.c]}s, {DAY_PARTS[best.r]}</b> ({fmtDuration(best.v)}).
+          </>
+        ),
+      });
+    }
+  } else if (data) {
+    insights.push({
+      id: "activity",
+      icon: Clock,
+      text: activitySince ? <>App activity tracked since {fmtDay(activitySince)}.</> : <>App activity will appear once the app update is live.</>,
+    });
+  }
+  const day7 = (retention?.cohorts || []).map((c) => c.retention[1]).filter(isNum);
+  if (day7.length >= 2) {
+    const diff = day7[0] - day7[1];
+    insights.push({
+      id: "retention",
+      icon: Repeat2,
+      text: <>Day 7 retention {diff >= 0 ? "improved" : "fell"} by {Math.abs(diff).toFixed(1)} pts ({fmtPct(day7[0])}).</>,
+    });
+  }
+  const uninstallChange = change(m.uninstall_rate, pm.uninstall_rate, { points: true, inverse: true });
+  if (uninstallChange && m.uninstall_rate > 0) {
+    insights.push({
+      id: "uninstall",
+      icon: TriangleAlert,
+      text: <>Uninstall rate {uninstallChange.up ? "rose" : "fell"} to {fmtPct(m.uninstall_rate, 2)}.</>,
+    });
+  }
+
+  const subtitle =
+    city !== "all" || platform !== "all"
+      ? "City narrows bookings & salon views · Platform narrows app activity & logins"
+      : "Track user growth, engagement, behavior & retention";
 
   return (
     <>
       <PageHeader
         title={title}
-        range={range}
-        setRange={setRange}
-        platform={platform}
-        setPlatform={setPlatform}
-        city={city}
-        setCity={setCity}
+        subtitle={subtitle}
+        updated={updated}
+        filters={{ period, setPeriod, platform, setPlatform, city, setCity, cityOptions }}
+        onExport={exportKeyMetrics}
       />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
@@ -468,16 +595,16 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
         {/* Row 1 - KPI tiles                                                */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid grid-cols-6 ${GAP}`}>
-          {kpis.map(({ icon, color, tint, spark: trend, ...kpi }) => (
+          {kpis.map(({ icon, color, tint, spark: trend, ...tile }) => (
             <KpiTile
-              key={kpi.label}
-              {...kpi}
+              key={tile.label}
+              {...tile}
               icon={icon}
               iconColor={color}
               iconTint={tint}
               spark={trend}
               sparkColor={color}
-              sparkId={`ua-kpi-${kpi.label.replace(/\W/g, "")}`}
+              sparkId={`ua-kpi-${tile.label.replace(/\W/g, "")}`}
             />
           ))}
         </div>
@@ -487,38 +614,50 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
         {/* ---------------------------------------------------------------- */}
         <Card className="px-5 pb-2 pt-4">
           <div className="flex items-start justify-between gap-4">
-            <CardHeader title="User Funnel Overview" />
+            <CardHeader
+              title="User Funnel Overview"
+              subtitle="Unique users per step in the period · 1st Booking = first-ever booking"
+            />
             <div className="shrink-0 text-right leading-tight">
               <p className={`text-slate-500 ${T.micro}`}>Conversion Rate (Overall)</p>
-              <p className={`mt-1 font-extrabold text-slate-900 ${T.md}`}>10.28%</p>
+              <p className={`mt-1 font-extrabold text-slate-900 ${T.md}`}>{shown(overallConversion, fmtPct)}</p>
             </div>
           </div>
 
           <div className="relative mt-1 grid grid-cols-6">
-            {funnel.map((stage) => (
-              <div key={stage.label} className="flex min-w-0 flex-col items-center">
-                <p className={`truncate text-slate-500 ${T.micro}`}>{stage.label}</p>
-                <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.md}`}>
-                  {stage.value}
-                </p>
-                <div className="mt-3 flex h-[108px] w-full items-end justify-center">
-                  <span
-                    className="block w-[46px] rounded-t-[3px]"
-                    style={{ height: `${stage.bar}%`, background: VIOLET }}
-                    title={`${stage.label}: ${stage.value}`}
-                  />
+            {(funnel.length ? funnel : Array.from({ length: 6 }, (_, i) => ({ key: i, label: "", users: null }))).map(
+              (stage) => (
+                <div key={stage.key} className="flex min-w-0 flex-col items-center">
+                  <p className={`truncate text-slate-500 ${T.micro}`}>{stage.label || " "}</p>
+                  <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.md}`}>{shown(stage.users)}</p>
+                  <div className="mt-3 flex h-[108px] w-full items-end justify-center">
+                    <span
+                      className="block w-[46px] rounded-t-[3px]"
+                      style={{
+                        height: `${isNum(stage.users) && funnelMax ? Math.max(3, Math.sqrt(stage.users / funnelMax) * 100) : 0}%`,
+                        background: VIOLET,
+                      }}
+                      title={
+                        isNum(stage.users)
+                          ? `${stage.label}: ${fmtInt(stage.users)}`
+                          : stage.key === "salon_views"
+                            ? "Salon views are recorded once the update is live"
+                            : undefined
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
 
             {/* Step conversion, centred on the boundary between two stages. */}
             {funnelSteps.map((step, i) => (
               <span
-                key={step + i}
+                key={funnel[i + 1].key}
                 className={`absolute bottom-[38px] flex -translate-x-1/2 items-center gap-1 whitespace-nowrap text-slate-600 ${T.xs}`}
                 style={{ left: `${((i + 1) / funnel.length) * 100}%` }}
               >
-                {step}
+                {fmtPct(step)}
                 <ArrowRight size={11} className="shrink-0 text-slate-400" />
               </span>
             ))}
@@ -533,56 +672,72 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
             <CardHeader title="User Activity Trend" />
             <div className="mt-2 flex items-center gap-5 pl-1">
               <LegendDot line color={VIOLET} label="DAU" size={T.micro} />
-              <LegendDot line color={GREEN} label="MAU" size={T.micro} />
+              <LegendDot line color={GREEN} label="MAU (30 days)" size={T.micro} />
             </div>
-            <div className="mt-1">
-              <TrendChart
-                data={activityTrend}
-                height={100}
-                domain={[0, 50000]}
-                ticks={[0, 10000, 20000, 30000, 40000, 50000]}
-                tickFormatter={thousands}
-                formatter={(value) => Number(value).toLocaleString("en-IN")}
-                lines={[
-                  { key: "dau", name: "DAU", color: VIOLET },
-                  { key: "mau", name: "MAU", color: GREEN },
-                ]}
-              />
-            </div>
+            {activitySince ? (
+              <div className="mt-1">
+                <TrendChart
+                  data={series}
+                  height={100}
+                  tickFormatter={thousands}
+                  formatter={(value) => Number(value).toLocaleString("en-IN")}
+                  lines={[
+                    { key: "dau", name: "DAU", color: VIOLET },
+                    { key: "mau", name: "MAU", color: GREEN },
+                  ]}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No app activity recorded yet"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader title="Users by Platform" />
-            <div className="mt-3 flex flex-1 items-center gap-5">
-              <Donut data={platforms} center="1,36,729" caption="Total Users" />
-              <DonutLegend data={platforms} />
-            </div>
+            {platformTotal ? (
+              <div className="mt-3 flex flex-1 items-center gap-5">
+                <Donut data={platformData} center={fmtInt(platformTotal)} caption="Active Users" />
+                <DonutLegend data={platformData} />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : activityNote || "No app activity in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader title="New vs Returning Users" />
-            <div className="mt-3 flex flex-1 items-center gap-6">
-              <Donut data={newVsReturning} center="1,36,729" caption="Total Users" />
-              <DonutLegend data={newVsReturning} />
-            </div>
+            {nvr?.customers ? (
+              <div className="mt-3 flex flex-1 items-center gap-6">
+                <Donut data={newVsReturning} center={fmtInt(nvr.customers)} caption="Booking Customers" />
+                <DonutLegend data={newVsReturning} />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader title="Uninstall Rate" />
+            <CardHeader
+              title="Uninstall Rate"
+              subtitle={data ? `Detected on push sends · of ${fmtInt(data.uninstall.base)} users with a push token` : undefined}
+            />
             <div className="mt-2 flex items-baseline gap-2.5">
-              <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>6.23%</span>
-              <Delta value="0.6%" up good={false} size={T.sm} />
-              <span className={`truncate text-slate-400 ${T.micro}`}>{COMPARE}</span>
+              <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>
+                {shown(m.uninstall_rate, (v) => fmtPct(v, 2))}
+              </span>
+              {uninstallChange && (
+                <Delta value={uninstallChange.value} up={uninstallChange.up} good={uninstallChange.good} size={T.sm} />
+              )}
+              <span className={`truncate text-slate-400 ${T.micro}`}>{compare}</span>
             </div>
             <div className="mt-1">
               <TrendChart
-                data={uninstallTrend}
-                height={92}
-                domain={[0, 9]}
-                ticks={[0, 3, 6, 9]}
+                data={series}
+                height={80}
+                allowDecimals
                 tickFormatter={(v) => `${v}%`}
                 formatter={(value) => `${value}%`}
-                lines={[{ key: "rate", name: "Uninstall Rate", color: VIOLET }]}
+                lines={[{ key: "uninstall_rate", name: "Uninstall Rate", color: VIOLET }]}
               />
             </div>
           </Card>
@@ -593,19 +748,23 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW4_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader title="User Engagement Heatmap" info />
-            <div className="mt-3">
-              <HeatGrid values={engagement} ramp={ENGAGEMENT_RAMP} unit="of peak activity" />
-            </div>
-            <div className="mt-auto pt-3">
-              <RampLegend
-                ramp={ENGAGEMENT_RAMP}
-                from="Less Active"
-                to="More Active"
-                size={T.micro}
-                steps={7}
-              />
-            </div>
+            <CardHeader title="User Engagement Heatmap" subtitle="Active users by session start (IST)" />
+            {hasHeat ? (
+              <>
+                <div className="mt-3">
+                  <HeatGrid
+                    values={engagement}
+                    ramp={ENGAGEMENT_RAMP}
+                    title={(r, c) => `${WEEKDAYS[c]} ${DAY_PARTS[r]} · ${fmtInt(heat.users[r][c])} active users`}
+                  />
+                </div>
+                <div className="mt-auto pt-3">
+                  <RampLegend ramp={ENGAGEMENT_RAMP} from="Less Active" to="More Active" size={T.micro} steps={7} />
+                </div>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : activityNote || "No app activity in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
@@ -616,53 +775,78 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
                   <span className={`font-medium text-slate-500 ${T.micro}`}>(Avg. Session Duration)</span>
                 </>
               }
-              info
+              subtitle="By session start (IST)"
             />
-            <div className="mt-3">
-              <HeatGrid values={screenTime} ramp={SCREEN_TIME_RAMP} unit="of the 3+ min bucket" />
-            </div>
-            <div className="mt-auto pt-3">
-              <RampLegend ramp={SCREEN_TIME_RAMP} from="0 sec" to="3+ min" size={T.micro} width={150} />
-            </div>
+            {hasHeat ? (
+              <>
+                <div className="mt-3">
+                  <HeatGrid
+                    values={screenTime}
+                    ramp={SCREEN_TIME_RAMP}
+                    title={(r, c) => `${WEEKDAYS[c]} ${DAY_PARTS[r]} · ${fmtDuration(heat.avg_seconds[r][c])} avg. session`}
+                  />
+                </div>
+                <div className="mt-auto pt-3">
+                  <RampLegend ramp={SCREEN_TIME_RAMP} from="0 sec" to="3+ min" size={T.micro} width={150} />
+                </div>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : activityNote || "No app activity in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader title="Average Session Duration" />
             <div className="mt-2 flex items-baseline justify-between gap-2">
-              <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>2m 34s</span>
-              <span className={`truncate text-slate-400 ${T.micro}`}>{COMPARE}</span>
+              <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>
+                {shown(m.avg_session_seconds, fmtDuration)}
+              </span>
+              <span className={`truncate text-slate-400 ${T.micro}`}>{activityNote}</span>
             </div>
-            <div className="mt-auto pt-1">
-              <TrendChart
-                data={sessionTrend}
-                height={92}
-                domain={[0, 4]}
-                ticks={[0, 1, 2, 3, 4]}
-                tickFormatter={(v) => `${v} min`}
-                formatter={(value) => `${value} min`}
-                lines={[{ key: "minutes", name: "Avg. Session", color: VIOLET }]}
-              />
-            </div>
+            {activitySince ? (
+              <div className="mt-auto pt-1">
+                <TrendChart
+                  data={series.map((row) => ({
+                    ...row,
+                    minutes: isNum(row.avg_session_seconds) ? Number((row.avg_session_seconds / 60).toFixed(2)) : null,
+                  }))}
+                  height={92}
+                  allowDecimals
+                  tickFormatter={(v) => `${v} min`}
+                  formatter={(value) => `${value} min`}
+                  lines={[{ key: "minutes", name: "Avg. Session", color: VIOLET }]}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No app activity recorded yet"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader
               title="Top User Actions"
-              right={<span className={`text-slate-500 ${T.micro}`}>Users</span>}
+              right={<span className={`text-slate-500 ${T.micro}`}>Users (% of active)</span>}
             />
             <ul className="mt-3 flex flex-1 flex-col justify-around gap-2">
               {topActions.map((row, i) => (
-                <li key={row.action} className={`flex items-center gap-2 ${T.xs}`}>
+                <li key={row.key} className={`flex items-center gap-2 ${T.xs}`}>
                   <span className="w-4 shrink-0 text-slate-500">{i + 1}.</span>
-                  <span className="w-[112px] shrink-0 truncate text-slate-700">{row.action}</span>
+                  <span className="w-[112px] shrink-0 truncate text-slate-700">{row.label}</span>
                   <span className="min-w-0 flex-1">
-                    <Meter pct={row.pct} color={VIOLET} height={3} track="transparent" />
+                    <Meter
+                      pct={isNum(row.pct) ? row.pct : (pctOf(row.users, actionMax) ?? 0)}
+                      color={VIOLET}
+                      height={3}
+                      track="transparent"
+                    />
                   </span>
                   <span className="w-[104px] shrink-0 whitespace-nowrap text-right text-slate-600">
-                    {row.users} ({row.pct.toFixed(1)}%)
+                    {fmtInt(row.users)}
+                    {isNum(row.pct) ? ` (${fmtPct(row.pct)})` : ""}
                   </span>
                 </li>
               ))}
+              {!topActions.length && <EmptyNote>{loading ? "Loading…" : DASH}</EmptyNote>}
             </ul>
           </Card>
         </div>
@@ -672,11 +856,11 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW5_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader title="Key Metrics Summary" info />
+            <CardHeader title="Key Metrics Summary" subtitle={compare ? `This period ${compare}` : undefined} />
             <table className="mt-3 w-full table-auto border-collapse text-left">
               <thead>
                 <tr>
-                  {["Metric", "This Week", "Last Week", "Change"].map((h, i) => (
+                  {["Metric", "This Period", "Last Period", "Change"].map((h, i) => (
                     <th
                       key={h}
                       className={`pb-2 font-medium text-slate-500 ${T.micro} ${i ? "text-right" : ""}`}
@@ -689,17 +873,19 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
               <tbody>
                 {keyMetrics.map((row) => (
                   <tr key={row.metric} className="h-[18px]">
-                    <td className={`whitespace-nowrap py-0 pr-2 text-slate-700 ${T.xs}`}>
-                      {row.metric}
-                    </td>
+                    <td className={`whitespace-nowrap py-0 pr-2 text-slate-700 ${T.xs}`}>{row.metric}</td>
                     <td className={`whitespace-nowrap py-0 pr-2 text-right text-slate-700 ${T.xs}`}>
-                      {row.thisWeek}
+                      {loading ? "…" : row.thisPeriod}
                     </td>
                     <td className={`whitespace-nowrap py-0 pr-2 text-right text-slate-500 ${T.xs}`}>
-                      {row.lastWeek}
+                      {loading ? "…" : row.lastPeriod}
                     </td>
                     <td className={`py-0 text-right ${T.xs}`}>
-                      <Delta value={row.change} up good={row.good !== false} size={T.xs} iconSize={10} />
+                      {row.change ? (
+                        <Delta value={row.change.value} up={row.change.up} good={row.change.good} size={T.xs} iconSize={10} />
+                      ) : (
+                        <span className="text-slate-400">{DASH}</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -710,8 +896,7 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
           <Card className="p-4">
             <CardHeader
               title="User Retention Cohort"
-              info
-              subtitle="% of users who came back and used the app"
+              subtitle={retentionSubtitle}
               right={
                 <Select
                   value={cohortMode}
@@ -725,7 +910,7 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
             <table className="mt-3 w-full table-auto border-collapse text-left">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {["Cohort", ...RETENTION_DAYS].map((h, i) => (
+                  {["Cohort", ...(retention?.days || [1, 7, 14, 30, 60, 90]).map((d) => `Day ${d}`)].map((h, i) => (
                     <th
                       key={h}
                       className={`pb-2.5 font-medium text-slate-500 ${T.micro} ${i ? "text-center" : ""}`}
@@ -736,47 +921,55 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
                 </tr>
               </thead>
               <tbody>
-                {retention.map((row) => (
-                  <tr key={row.cohort}>
-                    <td className={`whitespace-nowrap py-[7px] pr-2 text-slate-700 ${T.xs}`}>
-                      {row.cohort}
+                {(retention?.cohorts || []).map((row) => (
+                  <tr key={row.from}>
+                    <td className={`whitespace-nowrap py-[7px] pr-2 text-slate-700 ${T.xs}`} title={`${fmtInt(row.users)} users`}>
+                      {fmtRange(row.from, row.to)}
                     </td>
-                    {row.days.map((value, i) => (
+                    {row.retention.map((value, i) => (
                       <td
-                        key={RETENTION_DAYS[i]}
+                        key={retention.days[i]}
                         className={`whitespace-nowrap py-[7px] text-center ${T.xs} ${
-                          value === "–" ? "text-slate-400" : "text-slate-700"
+                          isNum(value) ? "text-slate-700" : "text-slate-400"
                         }`}
                       >
-                        {value}
+                        {fmtPct(value)}
                       </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
+            {!retention && (
+              <EmptyNote>{userRetention.loading ? "Loading…" : userRetention.error || DASH}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader title="User Drop-off Points" info subtitle="Where users leave the app" />
+            <CardHeader title="User Drop-off Points" subtitle="Where users leave the booking flow" />
             <p className={`mt-2 text-right text-slate-500 ${T.micro}`}>Drop-off rate</p>
             <ul className="mt-1.5 flex flex-1 flex-col justify-around gap-2">
               {dropOffs.map((row) => (
-                <li key={row.step} className={`flex items-center gap-3 ${T.xs}`}>
+                <li
+                  key={row.key}
+                  className={`flex items-center gap-3 ${T.xs}`}
+                  title={isNum(row.of) ? `${fmtInt(row.dropped)} of ${fmtInt(row.of)}` : "Recorded once the update is live"}
+                >
                   <span className="w-[196px] shrink-0 truncate text-slate-700">
-                    {row.step} <span className="text-slate-500">({row.note})</span>
+                    {row.label} <span className="text-slate-500">({row.note})</span>
                   </span>
                   <span className="min-w-0 flex-1">
                     <Meter
-                      pct={(row.pct / maxDropOff) * 100}
+                      pct={isNum(row.pct) && maxDropOff ? (row.pct / maxDropOff) * 100 : 0}
                       color={VIOLET}
                       height={3}
                       track="transparent"
                     />
                   </span>
-                  <span className="w-[38px] shrink-0 text-right text-slate-600">{row.pct}%</span>
+                  <span className="w-[38px] shrink-0 text-right text-slate-600">{fmtPct(row.pct)}</span>
                 </li>
               ))}
+              {!dropOffs.length && <EmptyNote>{loading ? "Loading…" : DASH}</EmptyNote>}
             </ul>
           </Card>
 
@@ -797,13 +990,18 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
                   </li>
                 );
               })}
+              {!insights.length && (
+                <li className={`text-white/80 ${T.xs}`}>{loading ? "Loading…" : "Not enough data for insights yet."}</li>
+              )}
             </ul>
             <button
               type="button"
-              className={`mt-2.5 flex w-full items-center gap-2 rounded-lg bg-white/15 px-4 py-2 font-semibold transition-colors hover:bg-white/25 ${T.sm}`}
+              onClick={exportKeyMetrics}
+              disabled={!data}
+              className={`mt-2.5 flex w-full items-center gap-2 rounded-lg bg-white/15 px-4 py-2 font-semibold transition-colors hover:bg-white/25 disabled:opacity-60 ${T.sm}`}
             >
-              View Full Insights Report
-              <ArrowRight size={14} className="shrink-0" />
+              Download Metrics Report
+              <Download size={14} className="ml-auto shrink-0" />
             </button>
           </div>
         </div>

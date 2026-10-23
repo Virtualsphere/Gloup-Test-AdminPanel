@@ -35,6 +35,52 @@ export const fetchAnalyticsUninstalledV2 = createAsyncThunk(
   post("/admin/app/getAnalyticsUninstalledV2", "Failed to fetch uninstalled users")
 );
 
+// User Analytics V2. Overview also takes { city, platform }; retention takes
+// { mode: "signup" | "first_booking", to, weeks }.
+export const fetchUserAnalyticsOverviewV2 = createAsyncThunk(
+  "analytics/fetchUserOverviewV2",
+  post("/admin/app/getUserAnalyticsOverviewV2", "Failed to fetch user analytics")
+);
+
+export const fetchUserRetentionV2 = createAsyncThunk(
+  "analytics/fetchUserRetentionV2",
+  post("/admin/app/getUserRetentionV2", "Failed to fetch user retention")
+);
+
+// Deep User Insights V2: { from, to, city }. The far-travelling users list
+// behind "View All" isn't kept in state - the dialog holds it.
+export const fetchDeepUserInsightsV2 = createAsyncThunk(
+  "analytics/fetchDeepUserInsightsV2",
+  post("/admin/app/getDeepUserInsightsV2", "Failed to fetch deep user insights")
+);
+
+export const fetchFarTravellingUsersV2 = createAsyncThunk(
+  "analytics/fetchFarTravellingUsersV2",
+  async (body = {}, thunkApi) =>
+    post("/admin/app/getDeepUserInsightsV2", "Failed to fetch far travelling users")(
+      { ...body, include_far_users: true },
+      thunkApi
+    )
+);
+
+// Growth Dashboard V2: { date, from, to }. The "View" dialogs fetch one list
+// at a time ({ ..., include_list }) and keep it themselves.
+export const fetchGrowthDashboardV2 = createAsyncThunk(
+  "analytics/fetchGrowthDashboardV2",
+  post("/admin/app/getGrowthDashboardV2", "Failed to fetch growth dashboard")
+);
+
+export const fetchGrowthListV2 = createAsyncThunk(
+  "analytics/fetchGrowthListV2",
+  post("/admin/app/getGrowthDashboardV2", "Failed to fetch the list")
+);
+
+// Push + in-app notification to many users: { user_ids, title, description }.
+export const sendBulkUserPushV2 = createAsyncThunk(
+  "analytics/sendBulkUserPushV2",
+  post("/admin/app/sendBulkUserPushV2", "Failed to send push notifications")
+);
+
 // The contact list behind the uninstalled card (not stored in state - the
 // caller turns it straight into an Excel download).
 export const exportAnalyticsUninstalledV2 = createAsyncThunk(
@@ -51,6 +97,10 @@ const SECTIONS = {
   switching: fetchAnalyticsSwitchingV2,
   gravity: fetchAnalyticsGravityV2,
   uninstalled: fetchAnalyticsUninstalledV2,
+  userOverview: fetchUserAnalyticsOverviewV2,
+  userRetention: fetchUserRetentionV2,
+  deepInsights: fetchDeepUserInsightsV2,
+  growth: fetchGrowthDashboardV2,
 };
 
 const emptySection = () => ({ data: null, loading: false, error: null });

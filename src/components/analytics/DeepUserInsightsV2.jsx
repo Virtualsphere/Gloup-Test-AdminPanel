@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import moment from "moment";
+import { toast } from "react-hot-toast";
 import {
   Label,
   ReferenceLine,
@@ -12,8 +16,6 @@ import {
 } from "recharts";
 import { CircleF, GoogleMap, OverlayViewF, useLoadScript } from "@react-google-maps/api";
 import {
-  Building2,
-  CalendarDays,
   Car,
   Clock,
   Download,
@@ -26,12 +28,15 @@ import {
   Minus,
   Percent,
   Plus,
+  Repeat2,
   Star,
   Tag,
   UserRound,
   Users,
 } from "lucide-react";
+import { fetchDeepUserInsightsV2, fetchFarTravellingUsersV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv, rupees } from "../../utils/format";
+import { downloadXlsx } from "../../utils/excelExport";
 import { GOOGLE_MAPS_LOADER } from "../../utils/googleMaps";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas, { Unscaled } from "../v2/ScaledCanvas";
@@ -40,6 +45,7 @@ import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, initials, rampColor } fro
 import {
   Card,
   CardHeader as BaseCardHeader,
+  DateRangeButton,
   Delta,
   Donut as BaseDonut,
   HeaderButton,
@@ -47,6 +53,7 @@ import {
   HeatGrid as BaseHeatGrid,
   InsightTile,
   KpiTile as BaseKpiTile,
+  ListDialog,
   Meter,
   RampLegend,
   Segmented as BaseSegmented,
@@ -54,17 +61,19 @@ import {
 } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Deep User Insights" mockup, on a fixed
-// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
-// there for why bigger px sizes in T read smaller on screen).
+// The approved "Deep User Insights" mockup, on a fixed DESIGN_WIDTH canvas
+// that ScaledCanvas scales to the available width (see there for why bigger
+// px sizes in T read smaller on screen).
 //
-// UI only for now - every number is static demo data matching the mockup. No
-// backend source exists yet for how far users travel to a salon; it needs the
-// user's home location (or booking-time location) alongside each store's.
-// The one live element is the heat map's Google Map: its base map is real,
-// the hotspots drawn on it are the demo bookings below. The map renders inside
-// <Unscaled> so dragging and zooming track the cursor despite the canvas
-// scaling, and it shares GOOGLE_MAPS_LOADER with MapPicker.
+// Data: getDeepUserInsightsV2 (analyticsSlice `deepInsights`). Distance is
+// the straight line from where the customer was when booking (the app's
+// POST /v2/location, snapshotted onto each booking) to the salon; bookings
+// from before location capture have none and are left out of distance
+// numbers. Travel time is an estimate (3 min per km). "Why users travel" is
+// inferred from each far booking. The heat map shows where customers booked
+// from, or - until bookings carry a location - where the booked salons are.
+// The map renders inside <Unscaled> so dragging and zooming track the cursor
+// despite the canvas scaling, and shares GOOGLE_MAPS_LOADER with MapPicker.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -94,165 +103,78 @@ const T = {
 };
 
 const GAP = "gap-3";
-const SELECT_BASIS = ["By Bookings", "By Users"];
-
-// ---------------------------------------------------------------------------
-// Static demo data
-// ---------------------------------------------------------------------------
-
-const COMPARE = "vs May 14 – May 20, 2026";
-
-// `good` colours the delta independently of its direction: users travelling
-// further for longer is drawn as bad news.
-const kpis = [
-  { label: "Total Users", value: "56,782", delta: "18.6%", good: true, icon: Users, color: BRAND, tint: "#EEEAFD" },
-  { label: "Avg. Distance Travelled", value: "5.6 km", delta: "8.2%", good: false, icon: MapPin, color: ROSE, tint: "#FDE7EE" },
-  { label: "Avg. Travel Time", value: "18.4 min", delta: "6.7%", good: false, icon: Clock, color: ORANGE, tint: "#FFF0DA" },
-  { label: "Users Travelling > 10 km", value: "12,846", delta: "14.3%", good: true, icon: Car, color: BLUE, tint: "#E3EEFF" },
-  { label: "Bookings from >10km", value: "22.7%", delta: "3.6%", good: true, icon: IndianRupee, color: "#16A34A", tint: "#DDF5E7" },
-  { label: "Repeat Users (30D)", value: "42.6%", delta: "3.4%", good: true, icon: Heart, color: ROSE, tint: "#FDE7EE", filled: true },
+const DASH = "–";
+const BASIS = [
+  { value: "bookings", label: "By Bookings" },
+  { value: "users", label: "By Users" },
 ];
 
-// Bookings per area. The five with a `label` (the side the callout sits on) are
-// the callouts in the mockup; the rest just give the heat some spread.
-const HOTSPOTS = [
-  { area: "T. Nagar", lat: 13.0418, lng: 80.2341, bookings: 4982, label: "right" },
-  { area: "Velachery", lat: 12.9815, lng: 80.2209, bookings: 3876, label: "left" },
-  { area: "Anna Nagar", lat: 13.085, lng: 80.2101, bookings: 3245, label: "right" },
-  { area: "OMR", lat: 12.9611, lng: 80.2431, bookings: 2341, label: "right" },
-  { area: "Porur", lat: 13.0358, lng: 80.1565, bookings: 2105, label: "left" },
-  { area: "Adyar", lat: 13.0067, lng: 80.257, bookings: 1920 },
-  { area: "Guindy", lat: 13.0067, lng: 80.2206, bookings: 1760 },
-  { area: "Mylapore", lat: 13.0368, lng: 80.2676, bookings: 1610 },
-  { area: "Kodambakkam", lat: 13.0509, lng: 80.225, bookings: 1480 },
-  { area: "Egmore", lat: 13.0732, lng: 80.2609, bookings: 1260 },
-  { area: "Tambaram", lat: 12.9249, lng: 80.1, bookings: 1120 },
-  { area: "Sholinganallur", lat: 12.901, lng: 80.2279, bookings: 1040 },
-  { area: "Ambattur", lat: 13.1143, lng: 80.1548, bookings: 930 },
-  { area: "Chromepet", lat: 12.9516, lng: 80.1462, bookings: 820 },
-];
-const HOTSPOT_TOTAL = HOTSPOTS.reduce((sum, spot) => sum + spot.bookings, 0);
-const TOP_HOTSPOTS = [...HOTSPOTS].sort((a, b) => b.bookings - a.bookings).slice(0, 8);
-
-const distanceBuckets = [
-  { name: "0 – 2 km", value: 10612, pct: "18.7%", color: BRAND },
-  { name: "2 – 5 km", value: 18402, pct: "32.4%", color: BLUE },
-  { name: "5 – 10 km", value: 14826, pct: "26.1%", color: GREEN },
-  { name: "10 – 20 km", value: 8692, pct: "15.3%", color: ORANGE },
-  { name: "20+ km", value: 4250, pct: "7.5%", color: RED },
+// Header period presets -> { from, to } as YYYY-MM-DD.
+const PERIODS = [
+  { key: "last_7", label: "Last 7 Days", range: () => [moment().subtract(6, "days"), moment()] },
+  { key: "this_week", label: "This Week", range: () => [moment().startOf("isoWeek"), moment()] },
+  { key: "last_30", label: "Last 30 Days", range: () => [moment().subtract(29, "days"), moment()] },
+  { key: "this_month", label: "This Month", range: () => [moment().startOf("month"), moment()] },
+  {
+    key: "last_month",
+    label: "Last Month",
+    range: () => [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")],
+  },
+  { key: "last_90", label: "Last 90 Days", range: () => [moment().subtract(89, "days"), moment()] },
 ];
 
-const travelTime = [
-  { label: "0 – 10 min", pct: 24.6 },
-  { label: "10 – 20 min", pct: 38.7 },
-  { label: "20 – 30 min", pct: 21.5 },
-  { label: "30 – 45 min", pct: 10.2 },
-  { label: "45+ min", pct: 5.0 },
+const BUCKET_COLORS = [BRAND, BLUE, GREEN, ORANGE, RED];
+const AVATAR_TINTS = [
+  { tint: "#FDE7EE", color: ROSE },
+  { tint: "#E3EEFF", color: BLUE },
+  { tint: "#DDF5E7", color: "#16A34A" },
+  { tint: "#FFF0DA", color: "#D97706" },
+  { tint: "#EEEAFD", color: BRAND },
 ];
-const maxTravelTime = Math.max(...travelTime.map((row) => row.pct));
+const REASON_STYLE = {
+  regular: { icon: Repeat2, color: ROSE, tint: "#FDE7EE" },
+  stylist: { icon: UserRound, color: "#64748B", tint: "#EEF1F6", barColor: "#A99BF0" },
+  price: { icon: Tag, color: "#F97316", tint: "#FFEDD5" },
+  rating: { icon: Star, color: GREEN, tint: "#DCFCE7" },
+  other: { icon: Ellipsis, color: BRAND, tint: "#EEEAFD" },
+};
 
-// `bar` is the fill as drawn in the mockup (not strictly proportional).
-const reasons = [
-  { label: "Better Price / Offers", pct: "42.6%", bar: 69, icon: Tag, color: "#F97316", tint: "#FFEDD5" },
-  { label: "Better Salon Ratings", pct: "28.3%", bar: 55, icon: Star, color: GREEN, tint: "#DCFCE7" },
-  { label: "Preferred Stylist", pct: "15.7%", bar: 32, icon: UserRound, color: "#64748B", tint: "#EEF1F6", barColor: "#A99BF0" },
-  { label: "Nearby Workplace", pct: "7.2%", bar: 24, icon: Building2, color: BRAND, tint: "#EEEAFD" },
-  { label: "Other Reasons", pct: "6.2%", bar: 22, icon: Ellipsis, color: BRAND, tint: "#EEEAFD" },
-];
-
-// Fixed pseudo-random cloud so the scatter is identical on every render: a
-// seeded generator, denser at short distances, rising roughly linearly.
-const scatterPoints = (() => {
-  let seed = 11;
-  const rand = () => {
-    seed = (seed * 16807) % 2147483647;
-    return seed / 2147483647;
-  };
-  return Array.from({ length: 64 }, () => {
-    const x = +(0.6 + rand() ** 1.2 * 27.4).toFixed(1);
-    const y = Math.round(70 + x * 33 + (rand() - 0.5) * 170);
-    return { x, y: Math.min(990, Math.max(40, y)) };
-  });
-})();
-
-const farUsers = [
-  { name: "Riya S.", distance: 24.7, minutes: 52, bookings: 23, spent: 18760, tint: "#FDE7EE", color: ROSE },
-  { name: "Arun K.", distance: 22.1, minutes: 45, bookings: 17, spent: 12450, tint: "#E3EEFF", color: BLUE },
-  { name: "Meera V.", distance: 21.3, minutes: 48, bookings: 19, spent: 14230, tint: "#DDF5E7", color: "#16A34A" },
-  { name: "Karthik J.", distance: 20.8, minutes: 41, bookings: 21, spent: 16980, tint: "#FFF0DA", color: "#D97706" },
-  { name: "Priyanka M.", distance: 20.2, minutes: 43, bookings: 16, spent: 11560, tint: "#EEEAFD", color: BRAND },
-];
-
-const FREQUENCY_COLS = ["1 Time", "2 - 3 Times", "4 - 6 Times", "7+ Times"];
 const FREQUENCY_RAMP = ["#F0EEFD", "#A998F2"];
-const frequency = [
-  { range: "0 – 2 km", values: [62, 24, 10, 4] },
-  { range: "2 – 5 km", values: [48, 28, 16, 8] },
-  { range: "5 – 10 km", values: [37, 27, 21, 15] },
-  { range: "10 – 20 km", values: [28, 25, 22, 25] },
-  { range: "20+ km", values: [22, 21, 20, 37] },
-];
-// Only the 7+ column carries a value-driven tint in the mockup; the rest stay
-// at one light wash.
-const frequencyTint = (value, col) => rampColor(FREQUENCY_RAMP, col === 3 ? value / 45 : 0.1);
-
-const TIME_SLOTS = ["8 AM", "10 AM", "12 PM", "2 PM", "4 PM", "6 PM", "8 PM", "10 PM"];
-const DISTANCE_ROWS = distanceBuckets.map((bucket) => bucket.name);
 const TIME_RAMP = ["#FDE8F1", "#F8B4D4", "#E56AC0", "#9B4DE0", "#4B46E5", "#3B63E8"];
-// Evening-heavy, and more so the further the trip.
-const timePreference = [0.72, 0.84, 0.96, 1.04, 1.1].map((boost) =>
-  [0.1, 0.18, 0.3, 0.44, 0.62, 0.82, 0.95, 0.5].map((v) => Math.min(1, +(v * boost).toFixed(2)))
-);
 
-// `returning` is the share on the right-hand label; the rest are new users.
-const newVsReturning = [
-  { range: "0 – 2 km", returning: 57, users: 10612 },
-  { range: "2 – 5 km", returning: 62, users: 18402 },
-  { range: "5 – 10 km", returning: 65, users: 14826 },
-  { range: "10 – 20 km", returning: 68, users: 8692 },
-  { range: "20+ km", returning: 72, users: 4250 },
-];
+// ---------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------
 
-const insights = [
-  {
-    icon: MapPin,
-    color: BRAND,
-    tint: "#F3F0FE",
-    title: "Users are willing to travel!",
-    text: "22.7% of bookings come from users travelling more than 10 km.",
-  },
-  {
-    icon: Percent,
-    color: "#16A34A",
-    tint: "#EEF9F2",
-    title: "High Value from Far Users",
-    text: "Users travelling 20+ km have 37% higher repeat rate and 28% higher AOV.",
-  },
-  {
-    icon: Clock,
-    color: "#D97706",
-    tint: "#FEF6EA",
-    title: "Peak Travel Time",
-    text: "Most users travel in the evening (4 PM – 9 PM). Optimize offers & slots.",
-  },
-  {
-    icon: Heart,
-    color: ROSE,
-    tint: "#FDF0F3",
-    title: "Loyal Users Travel More",
-    text: "72% of 20km+ users are repeat bookers. Focus on retention.",
-  },
-];
+const isNum = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+const fmtInt = (v) => (isNum(v) ? Number(v).toLocaleString("en-IN") : DASH);
+const fmtKm = (v) => (isNum(v) ? `${Number(v).toFixed(1)} km` : DASH);
+const fmtMin = (v) => (isNum(v) ? `${Number(v).toFixed(1)} min` : DASH);
+const fmtPct = (v) => (isNum(v) ? `${Number(v).toFixed(1)}%` : DASH);
+const pctOf = (part, whole) => (isNum(part) && isNum(whole) && Number(whole) ? (part / whole) * 100 : null);
+const fmtDay = (d) => (d ? moment(d).format("MMM D") : DASH);
+const fmtRange = (from, to) => (from && to ? `${fmtDay(from)} – ${moment(to).format("MMM D, YYYY")}` : DASH);
+const hourLabel = (hour) => {
+  const h = hour % 24;
+  return `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
+};
 
-const DATE_RANGES = ["May 21 – May 27, 2026", "May 14 – May 20, 2026", "Apr 28 – May 27, 2026"];
-const CITIES = ["Chennai", "All Cities"];
+// Change vs the previous window: relative %, or percentage points for rates.
+// `inverse`: a rise is bad news (travelling further / longer).
+const change = (cur, prev, { points = false, inverse = false } = {}) => {
+  if (!isNum(cur) || !isNum(prev)) return null;
+  const diff = points ? cur - prev : prev ? ((cur - prev) / prev) * 100 : null;
+  if (diff === null) return null;
+  const up = diff >= 0;
+  return { value: `${Math.abs(diff).toFixed(1)}${points ? " pts" : "%"}`, up, good: inverse ? !up : up };
+};
 
 // ---------------------------------------------------------------------------
 // Map
 // ---------------------------------------------------------------------------
 
 const MAP_CONTAINER = { width: "100%", height: "100%" };
-// Midpoint of the five callout areas.
+// Chennai, used until there are hotspots to frame.
 const MAP_CENTER = { lat: 13.023, lng: 80.2 };
 // A muted base so the heat colours carry the map.
 const MAP_STYLES = [
@@ -285,13 +207,28 @@ const HEAT_RINGS = [
   { scale: 0.4, color: "#FB923C", opacity: 0.42 },
   { scale: 0.22, color: "#EF4444", opacity: 0.52 },
 ];
-const heatRadius = (bookings) => 48 * Math.sqrt(bookings); // metres
+// Radius in metres, relative to the busiest hotspot.
+const MAX_HEAT_RADIUS = 2600;
+const MIN_HEAT_RADIUS = 450;
+const heatRadius = (bookings, max) =>
+  max ? Math.max(MIN_HEAT_RADIUS, MAX_HEAT_RADIUS * Math.sqrt(bookings / max)) : MIN_HEAT_RADIUS;
+const CALLOUTS = 5;
 
-// Zoom 11 frames the callout areas end to end; a shorter map (small screens
-// shrink it) steps back to 10 so they all stay in view.
-const frameMap = (map) => {
-  map.setCenter(MAP_CENTER);
-  map.setZoom(map.getDiv().clientHeight >= 200 ? 11 : 10);
+// Fit every hotspot, or fall back to Chennai when there are none.
+const frameMap = (map, spots) => {
+  if (!spots.length) {
+    map.setCenter(MAP_CENTER);
+    map.setZoom(map.getDiv().clientHeight >= 200 ? 11 : 10);
+    return;
+  }
+  if (spots.length === 1) {
+    map.setCenter({ lat: spots[0].lat, lng: spots[0].lng });
+    map.setZoom(13);
+    return;
+  }
+  const bounds = new window.google.maps.LatLngBounds();
+  spots.forEach((spot) => bounds.extend({ lat: spot.lat, lng: spot.lng }));
+  map.fitBounds(bounds, 40);
 };
 
 const MapUnavailable = ({ children }) => (
@@ -302,7 +239,7 @@ const MapUnavailable = ({ children }) => (
   </div>
 );
 
-// White callout above a hotspot. It is drawn at true screen pixels inside
+// White callout beside a hotspot. It is drawn at true screen pixels inside
 // <Unscaled>, so it is scaled by the canvas factor to match the page's type.
 const Callout = ({ area, bookings, side, scale }) => (
   <div
@@ -310,17 +247,17 @@ const Callout = ({ area, bookings, side, scale }) => (
     style={{ transform: `scale(${scale})`, transformOrigin: side === "left" ? "100% 50%" : "0% 50%" }}
   >
     <div className="whitespace-nowrap text-[11px] text-slate-500">{area}</div>
-    <div className="whitespace-nowrap text-[12px] font-bold text-slate-900">
-      {bookings.toLocaleString("en-IN")}
-    </div>
+    <div className="whitespace-nowrap text-[12px] font-bold text-slate-900">{bookings.toLocaleString("en-IN")}</div>
   </div>
 );
 
-const LiveHeatMap = () => {
+const LiveHeatMap = ({ spots }) => {
   const scale = useCanvasScale();
   const { isLoaded, loadError } = useLoadScript(GOOGLE_MAPS_LOADER);
   const [authFailed, setAuthFailed] = useState(false);
   const [map, setMap] = useState(null);
+  const maxBookings = spots.length ? spots[0].bookings : 0;
+  const spotsKey = spots.map((s) => `${s.lat},${s.lng},${s.bookings}`).join("|");
 
   // Maps reports a rejected key / referrer through this global rather than
   // through the script loader.
@@ -335,22 +272,21 @@ const LiveHeatMap = () => {
     };
   }, []);
 
-  const onLoad = useCallback((instance) => {
-    setMap(instance);
-    frameMap(instance);
-  }, []);
+  const onLoad = useCallback((instance) => setMap(instance), []);
   const onUnmount = useCallback(() => setMap(null), []);
 
-  // The map's pixel size follows the canvas scale, so re-frame the hotspots
-  // once the new size has settled.
+  // Re-frame when the hotspots change, and once the map's pixel size has
+  // settled after a canvas re-scale.
   useEffect(() => {
     if (!map) return undefined;
     const id = setTimeout(() => {
       window.google.maps.event.trigger(map, "resize");
-      frameMap(map);
+      frameMap(map, spots);
     }, 200);
     return () => clearTimeout(id);
-  }, [map, scale]);
+    // spotsKey stands in for `spots`, which is a new array every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, scale, spotsKey]);
 
   if (loadError || authFailed) {
     return (
@@ -362,61 +298,40 @@ const LiveHeatMap = () => {
   if (!isLoaded) return <div className="absolute inset-0 animate-pulse bg-slate-100" />;
 
   const zoomBy = (step) => map && map.setZoom((map.getZoom() || 11) + step);
-  const control =
-    "grid h-8 w-8 place-items-center text-slate-600 transition-colors hover:bg-slate-50";
+  const control = "grid h-8 w-8 place-items-center text-slate-600 transition-colors hover:bg-slate-50";
 
   return (
     <>
       <Unscaled>
-        <GoogleMap
-          mapContainerStyle={MAP_CONTAINER}
-          center={MAP_CENTER}
-          zoom={11}
-          options={MAP_OPTIONS}
-          onLoad={onLoad}
-          onUnmount={onUnmount}
-        >
-          {HOTSPOTS.map((spot) =>
+        <GoogleMap mapContainerStyle={MAP_CONTAINER} center={MAP_CENTER} zoom={11} options={MAP_OPTIONS} onLoad={onLoad} onUnmount={onUnmount}>
+          {spots.map((spot) =>
             HEAT_RINGS.map((ring) => (
               <CircleF
-                key={`${spot.area}-${ring.scale}`}
+                key={`${spot.lat},${spot.lng}-${ring.scale}`}
                 center={{ lat: spot.lat, lng: spot.lng }}
-                radius={heatRadius(spot.bookings) * ring.scale}
-                options={{
-                  strokeWeight: 0,
-                  fillColor: ring.color,
-                  fillOpacity: ring.opacity,
-                  clickable: false,
-                }}
+                radius={heatRadius(spot.bookings, maxBookings) * ring.scale}
+                options={{ strokeWeight: 0, fillColor: ring.color, fillOpacity: ring.opacity, clickable: false }}
               />
             ))
           )}
 
-          {HOTSPOTS.filter((spot) => spot.label).map((spot) => (
+          {spots.slice(0, CALLOUTS).map((spot, i) => (
             <OverlayViewF
-              key={spot.area}
+              key={`${spot.lat},${spot.lng}`}
               position={{ lat: spot.lat, lng: spot.lng }}
               mapPaneName="overlayMouseTarget"
-              getPixelPositionOffset={(width, height) => ({
-                x: spot.label === "left" ? -width - 10 : 10,
-                y: -height / 2,
-              })}
+              getPixelPositionOffset={(width, height) => ({ x: i % 2 ? -width - 10 : 10, y: -height / 2 })}
             >
-              <Callout area={spot.area} bookings={spot.bookings} side={spot.label} scale={scale} />
+              <Callout area={spot.area || "Unknown area"} bookings={spot.bookings} side={i % 2 ? "left" : "right"} scale={scale} />
             </OverlayViewF>
           ))}
         </GoogleMap>
       </Unscaled>
 
       {/* Legend and zoom controls live in canvas space, over the map. */}
-      <div
-        className={`absolute bottom-7 left-3 flex items-center gap-2 rounded-lg bg-white/95 px-2.5 py-1.5 text-slate-600 shadow ring-1 ring-black/5 ${T.tiny}`}
-      >
+      <div className={`absolute bottom-7 left-3 flex items-center gap-2 rounded-lg bg-white/95 px-2.5 py-1.5 text-slate-600 shadow ring-1 ring-black/5 ${T.tiny}`}>
         Low
-        <span
-          className="h-1.5 w-[84px] rounded-full"
-          style={{ background: "linear-gradient(90deg,#4ADE80,#FACC15,#FB923C,#EF4444)" }}
-        />
+        <span className="h-1.5 w-[84px] rounded-full" style={{ background: "linear-gradient(90deg,#4ADE80,#FACC15,#FB923C,#EF4444)" }} />
         High
       </div>
 
@@ -427,12 +342,7 @@ const LiveHeatMap = () => {
         <button type="button" className={control} aria-label="Zoom out" onClick={() => zoomBy(-1)}>
           <Minus size={15} />
         </button>
-        <button
-          type="button"
-          className={control}
-          aria-label="Reset map view"
-          onClick={() => map && frameMap(map)}
-        >
+        <button type="button" className={control} aria-label="Reset map view" onClick={() => map && frameMap(map, spots)}>
           <LocateFixed size={15} />
         </button>
       </div>
@@ -446,9 +356,7 @@ const LiveHeatMap = () => {
 
 const CardHeader = (props) => <BaseCardHeader titleSize={T.title} subtitleSize={T.tiny} {...props} />;
 
-const Select = ({ size = T.tiny, ...props }) => (
-  <BaseSelect size={size} className="w-[100px] [&_select]:py-1" {...props} />
-);
+const Select = ({ size = T.tiny, ...props }) => <BaseSelect size={size} className="w-[100px] [&_select]:py-1" {...props} />;
 
 const Segmented = (props) => <BaseSegmented size={T.tiny} {...props} />;
 
@@ -457,8 +365,6 @@ const KpiTile = (props) => (
     sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.tiny }}
     iconClass="h-14 w-14 rounded-full"
     iconSize={26}
-    caption={COMPARE}
-    up
     className="px-4 py-5"
     {...props}
   />
@@ -475,22 +381,27 @@ const Donut = (props) => (
   />
 );
 
-const HeatGrid = (props) => (
-  <BaseHeatGrid labelSize={T.tiny} labelWidth={64} cellHeight={19} gap="2px" radius={2} {...props} />
-);
+const HeatGrid = (props) => <BaseHeatGrid labelSize={T.tiny} labelWidth={64} cellHeight={19} gap="2px" radius={2} {...props} />;
 
 const Avatar = ({ name, tint, color }) => (
-  <span
-    className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
-    style={{ background: tint, color }}
-  >
+  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold" style={{ background: tint, color }}>
     {initials(name)}
   </span>
 );
 
-const HeatMapCard = () => {
+// Centred grey note for a card with nothing to show yet.
+const EmptyNote = ({ children, className = "" }) => (
+  <div className={`grid flex-1 place-items-center px-3 py-6 text-center text-slate-400 ${T.xs} ${className}`}>
+    <p className="max-w-[300px]">{children}</p>
+  </div>
+);
+
+const HeatMapCard = ({ heatmap, loading }) => {
   const [view, setView] = useState("map");
   const hasKey = Boolean(GOOGLE_MAPS_LOADER.googleMapsApiKey);
+  const spots = heatmap?.cells || [];
+  const top = spots.slice(0, 8);
+  const bySalon = heatmap?.basis === "salon";
 
   return (
     <Card>
@@ -499,10 +410,12 @@ const HeatMapCard = () => {
           title={
             <>
               User Heat Map{" "}
-              <span className={`font-medium text-slate-500 ${T.tiny}`}>(Bookings by Location)</span>
+              <span className={`font-medium text-slate-500 ${T.tiny}`}>
+                ({bySalon ? "Bookings by Salon Location" : "Bookings by Location"})
+              </span>
             </>
           }
-          info
+          subtitle={bySalon ? "Customer locations appear once bookings carry them" : "Where customers booked from"}
           right={
             <Segmented
               value={view}
@@ -522,7 +435,7 @@ const HeatMapCard = () => {
           one is a billable load). */}
       <div className="relative mt-3 min-h-[250px] flex-1 overflow-hidden rounded-b-2xl">
         {hasKey ? (
-          <LiveHeatMap />
+          <LiveHeatMap spots={spots} />
         ) : (
           <MapUnavailable>
             No Google Maps key is configured (VITE_GOOGLE_MAPS_KEY). The hotspot breakdown is under List View.
@@ -531,46 +444,50 @@ const HeatMapCard = () => {
 
         {view === "list" && (
           <div className="absolute inset-0 overflow-hidden bg-white px-4 pt-1">
-            <table className="w-full table-auto border-collapse text-left">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  {["Area", "Bookings", "Share"].map((heading, i) => (
-                    <th
-                      key={heading}
-                      className={`pb-2 font-semibold uppercase tracking-wide text-slate-400 ${T.tiny} ${
-                        i === 1 ? "pr-4 text-right" : ""
-                      }`}
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {TOP_HOTSPOTS.map((spot, i) => (
-                  <tr key={spot.area} className="h-[26px]">
-                    <td className={`whitespace-nowrap pr-3 text-slate-700 ${T.xs}`}>
-                      <span className="mr-2 inline-block w-3 text-slate-400">{i + 1}</span>
-                      {spot.area}
-                    </td>
-                    <td className={`whitespace-nowrap pr-4 text-right font-semibold text-slate-800 ${T.xs}`}>
-                      {spot.bookings.toLocaleString("en-IN")}
-                    </td>
-                    <td className="w-[44%]">
-                      <span className="flex items-center gap-2">
-                        <Meter pct={(spot.bookings / TOP_HOTSPOTS[0].bookings) * 100} color={BRAND} height={5} />
-                        <span className={`w-[38px] shrink-0 text-right text-slate-500 ${T.tiny}`}>
-                          {((spot.bookings / HOTSPOT_TOTAL) * 100).toFixed(1)}%
-                        </span>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className={`pt-2 text-slate-400 ${T.tiny}`}>
-              Top {TOP_HOTSPOTS.length} of {HOTSPOTS.length} areas
-            </p>
+            {top.length ? (
+              <>
+                <table className="w-full table-auto border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      {["Area", "Bookings", "Share"].map((heading, i) => (
+                        <th
+                          key={heading}
+                          className={`pb-2 font-semibold uppercase tracking-wide text-slate-400 ${T.tiny} ${i === 1 ? "pr-4 text-right" : ""}`}
+                        >
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {top.map((spot, i) => (
+                      <tr key={`${spot.lat},${spot.lng}`} className="h-[26px]">
+                        <td className={`whitespace-nowrap pr-3 text-slate-700 ${T.xs}`}>
+                          <span className="mr-2 inline-block w-3 text-slate-400">{i + 1}</span>
+                          {spot.area || "Unknown area"}
+                        </td>
+                        <td className={`whitespace-nowrap pr-4 text-right font-semibold text-slate-800 ${T.xs}`}>
+                          {fmtInt(spot.bookings)}
+                        </td>
+                        <td className="w-[44%]">
+                          <span className="flex items-center gap-2">
+                            <Meter pct={(spot.bookings / top[0].bookings) * 100} color={BRAND} height={5} />
+                            <span className={`w-[38px] shrink-0 text-right text-slate-500 ${T.tiny}`}>
+                              {fmtPct(pctOf(spot.bookings, heatmap.total_bookings))}
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className={`pt-2 text-slate-400 ${T.tiny}`}>
+                  Top {top.length} of {spots.length} areas
+                </p>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
           </div>
         )}
       </div>
@@ -578,50 +495,47 @@ const HeatMapCard = () => {
   );
 };
 
-const exportFarUsers = () =>
-  downloadCsv(
-    "deep-user-insights-far-travelling-users.csv",
-    ["User", "Distance (km)", "Travel Time (min)", "Bookings", "Total Spent (INR)"],
-    farUsers.map((u) => [u.name, u.distance, u.minutes, u.bookings, u.spent])
-  );
+const FAR_USER_COLUMNS = [
+  { header: "User", kind: "text", width: 26, get: (r) => r.name || `User #${r.user_id}` },
+  { header: "Phone", kind: "text", width: 16, get: (r) => r.phone },
+  { header: "Avg. Distance (km)", kind: "decimal", width: 18, get: (r) => r.avg_distance_km },
+  { header: "Est. Travel Time (min)", kind: "decimal", width: 20, get: (r) => r.avg_travel_min },
+  { header: "Bookings", kind: "int", width: 11, get: (r) => r.bookings },
+  { header: "Total Spent", kind: "money", width: 14, get: (r) => r.spent },
+];
 
 // Title and header controls live in the app bar, not the canvas.
-const PageHeader = ({ title, range, setRange, city, setCity }) => (
+const PageHeader = ({ title, subtitle, updated, range, period, setPeriod, onCustom, city, setCity, cityOptions, onExport }) => (
   <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0 leading-tight">
         <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-          Understand your users better. Make smarter decisions.
-        </p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">{subtitle}</p>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        {/* Static stamp, like the bell counts: the demo data never refreshes. */}
-        <span className="hidden items-center gap-2 whitespace-nowrap text-[11px] text-slate-500 2xl:flex">
-          Last updated: 10:30 AM
-          <span className="flex items-center gap-1.5 font-medium text-slate-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Live
+        {updated && (
+          <span className="hidden items-center gap-2 whitespace-nowrap text-[11px] text-slate-500 2xl:flex">
+            Last updated: {updated}
+            <span className="flex items-center gap-1.5 font-medium text-slate-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Live
+            </span>
           </span>
-        </span>
+        )}
+        <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="deep-insights-range" className="relative hidden lg:block" />
         <HeaderSelect
-          icon={CalendarDays}
-          label="Date range"
-          value={range}
-          onChange={setRange}
-          options={DATE_RANGES}
+          label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={[
+            ...PERIODS.map((p) => ({ value: p.key, label: p.label })),
+            ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []),
+          ]}
           className="hidden lg:flex"
         />
-        <HeaderSelect
-          icon={MapPin}
-          label="City"
-          value={city}
-          onChange={setCity}
-          options={CITIES}
-          className="hidden xl:flex"
-        />
-        <HeaderButton icon={Download} label="Export report" color={INDIGO} onClick={exportFarUsers}>
+        <HeaderSelect icon={MapPin} label="City" value={city} onChange={setCity} options={cityOptions} className="hidden xl:flex" />
+        <HeaderButton icon={Download} label="Export report" color={INDIGO} onClick={onExport}>
           <span className="hidden md:inline">Export Report</span>
         </HeaderButton>
       </div>
@@ -634,33 +548,244 @@ const PageHeader = ({ title, range, setRange, city, setCity }) => (
 // ---------------------------------------------------------------------------
 
 const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
-  const [range, setRange] = useState(DATE_RANGES[0]);
-  const [city, setCity] = useState(CITIES[0]);
-  const [distanceBasis, setDistanceBasis] = useState(SELECT_BASIS[0]);
-  const [timeBasis, setTimeBasis] = useState(SELECT_BASIS[0]);
-  const [scatterBasis, setScatterBasis] = useState(SELECT_BASIS[0]);
-  const [frequencyBasis, setFrequencyBasis] = useState(SELECT_BASIS[1]);
-  const [preferenceBasis, setPreferenceBasis] = useState(SELECT_BASIS[0]);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { deepInsights } = useSelector((state) => state.analytics);
+  const [period, setPeriod] = useState(PERIODS[0].key);
+  const [custom, setCustom] = useState(null);
+  const [city, setCity] = useState("all");
+  const [distanceBasis, setDistanceBasis] = useState("bookings");
+  const [timeBasis, setTimeBasis] = useState("bookings");
+  const [scatterBasis, setScatterBasis] = useState("bookings");
+  const [frequencyBasis, setFrequencyBasis] = useState("users");
+  const [preferenceBasis, setPreferenceBasis] = useState("bookings");
   const [mixMode, setMixMode] = useState("pct");
+  const [updated, setUpdated] = useState(null);
+  const [farList, setFarList] = useState(null); // { loading, rows } while "View All" is open
+
+  const range = useMemo(() => {
+    if (period === "custom" && custom) return custom;
+    const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[0]).range();
+    return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
+  }, [period, custom]);
+  const body = useMemo(() => {
+    const next = { from: range.from, to: range.to };
+    if (city !== "all") next.city = city;
+    return next;
+  }, [range.from, range.to, city]);
+
+  useEffect(() => {
+    dispatch(fetchDeepUserInsightsV2(body))
+      .unwrap()
+      .then(() => setUpdated(moment().format("h:mm A")))
+      .catch((message) => toast.error(message || "Failed to load deep user insights", { id: "deep-insights-v2" }));
+  }, [dispatch, body]);
+
+  const data = deepInsights.data;
+  const loading = deepInsights.loading && !data;
+  const k = data?.kpis || {};
+  const pk = data?.previous_kpis || {};
+  const located = k.bookings_with_distance || 0;
+  const compare = data ? `vs ${fmtRange(data.previous.from, data.previous.to)}` : "";
+  const shown = (v, fmt) => (loading ? "…" : fmt(v));
+  const noLocation = data && !located;
+  const waitingNote = data?.location_since
+    ? "No located bookings in this period"
+    : "Waiting for location data from the app";
+
+  const cityOptions = useMemo(
+    () => [{ value: "all", label: "All Cities" }, ...(data?.cities || []).map((c) => ({ value: c, label: c }))],
+    [data]
+  );
+  const subtitle = !data
+    ? "Understand your users better. Make smarter decisions."
+    : located
+      ? `Distance from ${fmtInt(located)} of ${fmtInt(k.bookings_total)} bookings · travel time estimated at ${data.travel_minutes_per_km} min/km`
+      : data.location_since
+        ? `Location tracking since ${fmtDay(data.location_since)} - no located bookings in this period`
+        : "Distance cards fill in once the app sends user locations";
+
+  // ---- KPIs -----------------------------------------------------------------
+  const kpi = (label, key, fmt, icon, color, tint, opts = {}) => {
+    const delta = change(k[key], pk[key], opts);
+    return {
+      label,
+      value: shown(k[key], fmt),
+      delta: delta?.value,
+      up: delta?.up,
+      good: delta?.good,
+      caption: opts.distance && noLocation ? waitingNote : compare,
+      icon,
+      color,
+      tint,
+      filled: opts.filled,
+    };
+  };
+  const kpis = [
+    kpi("Total Users", "total_users", fmtInt, Users, BRAND, "#EEEAFD"),
+    kpi("Avg. Distance Travelled", "avg_distance_km", fmtKm, MapPin, ROSE, "#FDE7EE", { distance: true, inverse: true }),
+    kpi("Avg. Travel Time (est.)", "avg_travel_min", fmtMin, Clock, ORANGE, "#FFF0DA", { distance: true, inverse: true }),
+    kpi("Users Travelling > 10 km", "users_over_10km", fmtInt, Car, BLUE, "#E3EEFF", { distance: true }),
+    kpi("Bookings from > 10 km", "bookings_over_10km_pct", fmtPct, IndianRupee, "#16A34A", "#DDF5E7", { distance: true, points: true }),
+    kpi("Repeat Users (30D)", "repeat_users_30d_pct", fmtPct, Heart, ROSE, "#FDE7EE", { points: true, filled: true }),
+  ];
+
+  // ---- Distance / travel time -------------------------------------------------
+  const distanceRows = (data?.distance_buckets || []).map((b, i) => ({
+    name: b.label,
+    value: b[distanceBasis],
+    color: BUCKET_COLORS[i],
+  }));
+  const distanceTotal = distanceRows.reduce((t, r) => t + r.value, 0);
+  const travelRows = (data?.travel_time_buckets || []).map((b) => ({ label: b.label, value: b[timeBasis] }));
+  const travelTotal = travelRows.reduce((t, r) => t + r.value, 0);
+  const travelMax = Math.max(0, ...travelRows.map((r) => pctOf(r.value, travelTotal) || 0));
+  const travelChange = change(k.avg_travel_min, pk.avg_travel_min, { inverse: true });
+
+  // ---- Reasons ------------------------------------------------------------------
+  const reasons = data?.reasons;
+  const reasonRows = (reasons?.rows || []).map((r) => ({ ...r, pct: pctOf(r.bookings, reasons.far_bookings) }));
+  const reasonMax = Math.max(0, ...reasonRows.map((r) => r.pct || 0));
+
+  // ---- Scatter ------------------------------------------------------------------
+  const scatter = data?.scatter?.[scatterBasis];
+  const points = scatter?.points || [];
+  const maxX = points.length ? Math.max(5, Math.ceil(Math.max(...points.map((p) => p.x)) / 5) * 5) : 30;
+  const trend = scatter?.trend;
+
+  // ---- Far users ----------------------------------------------------------------
+  const farUsers = data?.far_users || [];
+  const openFarList = async () => {
+    setFarList({ loading: true, rows: [] });
+    try {
+      const result = await dispatch(fetchFarTravellingUsersV2(body)).unwrap();
+      setFarList({ loading: false, rows: result.far_users || [] });
+    } catch (message) {
+      toast.error(message || "Failed to load far travelling users", { id: "deep-insights-far" });
+      setFarList(null);
+    }
+  };
+
+  // ---- Frequency / time preference / new vs returning ---------------------------
+  const distanceLabels = (data?.distance_rows || []).map((r) => r.label);
+  const frequencyMatrix = data?.frequency?.[frequencyBasis] || [];
+  const frequencyPct = frequencyMatrix.map((row) => {
+    const total = row.reduce((t, v) => t + v, 0);
+    return row.map((v) => pctOf(v, total));
+  });
+  const topColumnMax = Math.max(1, ...frequencyPct.map((row) => row[row.length - 1] || 0));
+  const frequencyTint = (value, col, cols) =>
+    rampColor(FREQUENCY_RAMP, col === cols - 1 ? (value || 0) / topColumnMax : 0.1);
+
+  const timeMatrix = data?.time_preference?.[preferenceBasis] || [];
+  const timeMax = Math.max(0, ...timeMatrix.flat());
+  const timeSlots = (data?.time_preference?.start_hours || []).map(hourLabel);
+  const timeValues = timeMatrix.map((row) => row.map((v) => (timeMax ? v / timeMax : 0)));
+
+  const mixRows = data?.new_vs_returning || [];
+
+  // ---- Insights -----------------------------------------------------------------
+  const insights = [];
+  if (located) {
+    insights.push({
+      icon: MapPin,
+      color: BRAND,
+      tint: "#F3F0FE",
+      title: k.bookings_over_10km_pct >= 15 ? "Users are willing to travel!" : "Most users book nearby",
+      text: `${fmtPct(k.bookings_over_10km_pct)} of located bookings come from users travelling more than 10 km.`,
+    });
+    const topReason = [...reasonRows].filter((r) => r.key !== "other" && r.bookings).sort((a, b) => b.bookings - a.bookings)[0];
+    if (topReason) {
+      insights.push({
+        icon: Percent,
+        color: "#16A34A",
+        tint: "#EEF9F2",
+        title: "Why Far Users Travel",
+        text: `${fmtPct(topReason.pct)} of far bookings (${reasons.far_booking_km}+ km, closer salon available): ${topReason.label.toLowerCase()}.`,
+      });
+    }
+    const slotTotals = timeSlots.map((_, c) => (data?.time_preference?.bookings || []).reduce((t, row) => t + (row[c] || 0), 0));
+    const peak = slotTotals.indexOf(Math.max(...slotTotals));
+    if (peak >= 0 && slotTotals[peak] > 0) {
+      const start = data.time_preference.start_hours[peak];
+      insights.push({
+        icon: Clock,
+        color: "#D97706",
+        tint: "#FEF6EA",
+        title: "Peak Booking Time",
+        text: `Most located bookings are for ${hourLabel(start)} – ${hourLabel(start + 2)} slots. Optimize offers & slots.`,
+      });
+    }
+    const far = mixRows[mixRows.length - 1];
+    const farTotal = far ? far.new + far.returning : 0;
+    if (farTotal) {
+      insights.push({
+        icon: Heart,
+        color: ROSE,
+        tint: "#FDF0F3",
+        title: "Loyalty of Far Users",
+        text: `${fmtPct(pctOf(far.returning, farTotal))} of ${far.label} users are returning customers.`,
+      });
+    }
+  }
+  if (!insights.length && data) {
+    insights.push({
+      icon: MapPinned,
+      color: BRAND,
+      tint: "#F3F0FE",
+      title: "Location data is on its way",
+      text: data.location_since
+        ? `Location tracking started ${fmtDay(data.location_since)}. Insights appear as located bookings come in.`
+        : "Distance insights appear once the app starts sending user locations.",
+    });
+    if (isNum(k.repeat_users_30d_pct)) {
+      insights.push({
+        icon: Heart,
+        color: ROSE,
+        tint: "#FDF0F3",
+        title: "Repeat Users",
+        text: `${fmtPct(k.repeat_users_30d_pct)} of the last 30 days' customers have booked more than once.`,
+      });
+    }
+  }
+
+  const exportReport = () => {
+    if (!data) return;
+    const rows = [
+      ...kpis.map((t) => ["KPI", t.label, t.value]),
+      ...(data.distance_buckets || []).map((b) => ["Distance", b.label, `${b.bookings} bookings / ${b.users} users`]),
+      ...(data.travel_time_buckets || []).map((b) => ["Travel time (est.)", b.label, `${b.bookings} bookings / ${b.users} users`]),
+      ...reasonRows.map((r) => ["Why users travel", r.label, `${r.bookings} (${fmtPct(r.pct)})`]),
+    ];
+    downloadCsv(`deep-user-insights-${data.from}_${data.to}.csv`, ["Section", "Metric", "Value"], rows);
+  };
 
   return (
     <>
-      <PageHeader title={title} range={range} setRange={setRange} city={city} setCity={setCity} />
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        updated={updated}
+        range={range}
+        period={period}
+        setPeriod={setPeriod}
+        onCustom={(from, to) => {
+          setCustom({ from, to });
+          setPeriod("custom");
+        }}
+        city={city}
+        setCity={setCity}
+        cityOptions={cityOptions}
+        onExport={exportReport}
+      />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid grid-cols-6 ${GAP}`}>
-          {kpis.map(({ icon, color, tint, filled, ...kpi }) => (
-            <KpiTile
-              key={kpi.label}
-              {...kpi}
-              icon={icon}
-              iconColor={color}
-              iconTint={tint}
-              iconFill={filled}
-            />
+          {kpis.map(({ icon, color, tint, filled, ...tile }) => (
+            <KpiTile key={tile.label} {...tile} icon={icon} iconColor={color} iconTint={tint} iconFill={filled} />
           ))}
         </div>
 
@@ -668,42 +793,40 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
         {/* Row 2 - Heat map / distance / travel time                        */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW2_COLS} ${GAP}`}>
-          <HeatMapCard />
+          <HeatMapCard heatmap={data?.heatmap} loading={loading} />
 
           <Card className="p-4">
             <CardHeader
               title="Distance Travelled by Users"
-              info
-              right={<Select value={distanceBasis} onChange={setDistanceBasis} options={SELECT_BASIS} />}
+              right={<Select value={distanceBasis} onChange={setDistanceBasis} options={BASIS} />}
             />
 
-            <div className="my-4 flex items-center gap-5">
-              <Donut data={distanceBuckets} center="56,782" caption="Total Users" />
-              <ul className="flex min-w-0 flex-1 flex-col gap-3.5">
-                {distanceBuckets.map((bucket) => (
-                  <li key={bucket.name} className={`flex items-center gap-2 ${T.xs}`}>
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ background: bucket.color }}
-                    />
-                    <span className="min-w-0 flex-1 whitespace-nowrap text-slate-700">{bucket.name}</span>
-                    <span className="w-[42px] shrink-0 text-right text-slate-600">{bucket.pct}</span>
-                    <span className="w-[56px] shrink-0 text-right text-slate-500">
-                      ({bucket.value.toLocaleString("en-IN")})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {distanceTotal ? (
+              <div className="my-4 flex items-center gap-5">
+                <Donut data={distanceRows} center={fmtInt(distanceTotal)} caption={distanceBasis === "users" ? "Total Users" : "Bookings"} />
+                <ul className="flex min-w-0 flex-1 flex-col gap-3.5">
+                  {distanceRows.map((bucket) => (
+                    <li key={bucket.name} className={`flex items-center gap-2 ${T.xs}`}>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: bucket.color }} />
+                      <span className="min-w-0 flex-1 whitespace-nowrap text-slate-700">{bucket.name}</span>
+                      <span className="w-[42px] shrink-0 text-right text-slate-600">{fmtPct(pctOf(bucket.value, distanceTotal))}</span>
+                      <span className="w-[56px] shrink-0 text-right text-slate-500">({fmtInt(bucket.value)})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : waitingNote}</EmptyNote>
+            )}
 
             <div className="mt-auto grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 pt-4">
               <div className="min-w-0 pr-4">
                 <p className={`text-slate-600 ${T.xs}`}>Avg. Distance Travelled</p>
-                <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.stat}`}>5.6 km</p>
+                <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.stat}`}>{shown(k.avg_distance_km, fmtKm)}</p>
               </div>
               <div className="min-w-0 pl-5">
                 <p className={`text-slate-600 ${T.xs}`}>Max Distance</p>
-                <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.stat}`}>28.7 km</p>
+                <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.stat}`}>{shown(k.max_distance_km, fmtKm)}</p>
               </div>
             </div>
           </Card>
@@ -711,34 +834,38 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
           <Card className="p-4">
             <CardHeader
               title="Travel Time Distribution"
-              info
-              right={<Select value={timeBasis} onChange={setTimeBasis} options={SELECT_BASIS} />}
+              subtitle={data ? `Estimated at ${data.travel_minutes_per_km} min per km` : undefined}
+              right={<Select value={timeBasis} onChange={setTimeBasis} options={BASIS} />}
             />
 
-            <ul className="mt-4 flex flex-col gap-[14px]">
-              {travelTime.map((row) => (
-                <li key={row.label} className={`flex items-center gap-3 ${T.xs}`}>
-                  <span className="w-[76px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
-                  <span className="min-w-0 flex-1">
-                    <Meter pct={(row.pct / maxTravelTime) * 100} color={BRAND} height={4} />
-                  </span>
-                  <span className="w-[40px] shrink-0 text-right text-slate-600">{row.pct.toFixed(1)}%</span>
-                </li>
-              ))}
-            </ul>
+            {travelTotal ? (
+              <ul className="mt-4 flex flex-col gap-[14px]">
+                {travelRows.map((row) => {
+                  const pct = pctOf(row.value, travelTotal);
+                  return (
+                    <li key={row.label} className={`flex items-center gap-3 ${T.xs}`} title={`${fmtInt(row.value)} ${timeBasis}`}>
+                      <span className="w-[76px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <Meter pct={travelMax ? (pct / travelMax) * 100 : 0} color={BRAND} height={4} />
+                      </span>
+                      <span className="w-[40px] shrink-0 text-right text-slate-600">{fmtPct(pct)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : waitingNote}</EmptyNote>
+            )}
 
             <div className="mt-auto flex items-center gap-3 rounded-xl border border-[#E8EAF3] bg-[#F6F7FB] px-4 py-3">
-              <span
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-[1.5px]"
-                style={{ borderColor: BRAND, color: BRAND }}
-              >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-[1.5px]" style={{ borderColor: BRAND, color: BRAND }}>
                 <Clock size={17} />
               </span>
               <div className="min-w-0">
-                <p className={`text-slate-500 ${T.tiny}`}>Avg. Travel Time</p>
+                <p className={`text-slate-500 ${T.tiny}`}>Avg. Travel Time (est.)</p>
                 <p className="mt-0.5 flex items-baseline gap-2">
-                  <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>18.4 min</span>
-                  <Delta value="6.7%" up size={T.xs} />
+                  <span className={`font-extrabold tracking-tight text-slate-900 ${T.stat}`}>{shown(k.avg_travel_min, fmtMin)}</span>
+                  {travelChange && <Delta value={travelChange.value} up={travelChange.up} good={travelChange.good} size={T.xs} />}
                 </p>
               </div>
             </div>
@@ -753,107 +880,92 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
             <CardHeader
               title={
                 <>
-                  Why Users Travel?{" "}
-                  <span className={`font-medium text-slate-500 ${T.tiny}`}>(Motivation Insight)</span>
+                  Why Users Travel? <span className={`font-medium text-slate-500 ${T.tiny}`}>(Inferred from bookings)</span>
                 </>
               }
-              info
+              subtitle={
+                reasons
+                  ? `${fmtInt(reasons.far_bookings)} bookings ${reasons.far_booking_km}+ km away with a closer salon available`
+                  : undefined
+              }
             />
-            <ul className="mt-3 flex flex-1 flex-col justify-around gap-2">
-              {reasons.map((row) => {
-                const Icon = row.icon;
-                return (
-                  <li key={row.label} className={`flex items-center gap-3 ${T.xs}`}>
-                    <span
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-md"
-                      style={{ background: row.tint, color: row.color }}
-                    >
-                      <Icon size={13} />
-                    </span>
-                    <span className="w-[140px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
-                    <span className="min-w-0 flex-1">
-                      <Meter pct={row.bar} color={row.barColor || BRAND} height={4} />
-                    </span>
-                    <span className="w-[40px] shrink-0 text-right text-slate-600">{row.pct}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            {reasons?.far_bookings ? (
+              <ul className="mt-3 flex flex-1 flex-col justify-around gap-2">
+                {reasonRows.map((row) => {
+                  const style = REASON_STYLE[row.key] || REASON_STYLE.other;
+                  const Icon = style.icon;
+                  return (
+                    <li key={row.key} className={`flex items-center gap-3 ${T.xs}`} title={`${fmtInt(row.bookings)} bookings`}>
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md" style={{ background: style.tint, color: style.color }}>
+                        <Icon size={13} />
+                      </span>
+                      <span className="w-[140px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <Meter pct={reasonMax ? (row.pct / reasonMax) * 100 : 0} color={style.barColor || BRAND} height={4} />
+                      </span>
+                      <span className="w-[40px] shrink-0 text-right text-slate-600">{fmtPct(row.pct)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : located ? "No far bookings with a closer salon in this period" : waitingNote}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader
-              title="Distance vs Booking Value"
-              info
-              right={<Select value={scatterBasis} onChange={setScatterBasis} options={SELECT_BASIS} />}
-            />
-            <div className="mt-2 min-h-[150px] flex-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 10, right: 14, bottom: 22, left: 6 }}>
-                  <XAxis
-                    type="number"
-                    dataKey="x"
-                    name="Distance"
-                    domain={[0, 30]}
-                    ticks={[0, 5, 10, 15, 20, 25, 30]}
-                    interval={0}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={AXIS}
-                  >
-                    <Label
-                      value="Distance Travelled (km)"
-                      position="insideBottom"
-                      offset={-18}
-                      style={{ fontSize: 11, fill: "#475569" }}
+            <CardHeader title="Distance vs Booking Value" right={<Select value={scatterBasis} onChange={setScatterBasis} options={BASIS} />} />
+            {points.length ? (
+              <div className="mt-2 min-h-[150px] flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 10, right: 14, bottom: 22, left: 6 }}>
+                    <XAxis type="number" dataKey="x" name="Distance" domain={[0, maxX]} tickLine={false} axisLine={false} tick={AXIS}>
+                      <Label value="Distance Travelled (km)" position="insideBottom" offset={-18} style={{ fontSize: 11, fill: "#475569" }} />
+                    </XAxis>
+                    <YAxis
+                      type="number"
+                      dataKey="y"
+                      name={scatterBasis === "users" ? "Avg. booking value" : "Booking value"}
+                      domain={[0, "auto"]}
+                      tickFormatter={(value) => value.toLocaleString("en-IN")}
+                      tickLine={false}
+                      axisLine={false}
+                      tick={AXIS}
+                      width={50}
+                    >
+                      <Label
+                        value={scatterBasis === "users" ? "Avg. Booking Value (₹)" : "Booking Value (₹)"}
+                        angle={-90}
+                        position="insideLeft"
+                        offset={2}
+                        style={{ fontSize: 11, fill: "#475569", textAnchor: "middle" }}
+                      />
+                    </YAxis>
+                    <ZAxis type="number" range={[34, 34]} />
+                    <Tooltip
+                      {...TOOLTIP}
+                      cursor={{ strokeDasharray: "3 3" }}
+                      formatter={(value, name) => (name === "Distance" ? `${value} km` : rupees(value))}
                     />
-                  </XAxis>
-                  <YAxis
-                    type="number"
-                    dataKey="y"
-                    name="Avg. booking value"
-                    domain={[0, 1000]}
-                    ticks={[0, 250, 500, 750, 1000]}
-                    interval={0}
-                    tickFormatter={(value) => value.toLocaleString("en-IN")}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={AXIS}
-                    width={50}
-                  >
-                    <Label
-                      value="Avg. Booking Value (₹)"
-                      angle={-90}
-                      position="insideLeft"
-                      offset={2}
-                      style={{ fontSize: 11, fill: "#475569", textAnchor: "middle" }}
-                    />
-                  </YAxis>
-                  <ZAxis type="number" range={[34, 34]} />
-                  <Tooltip
-                    {...TOOLTIP}
-                    cursor={{ strokeDasharray: "3 3" }}
-                    formatter={(value, name) => (name === "Distance" ? `${value} km` : rupees(value))}
-                  />
-                  <ReferenceLine
-                    segment={[
-                      { x: 0, y: 70 },
-                      { x: 29, y: 1030 },
-                    ]}
-                    stroke={BRAND}
-                    strokeOpacity={0.55}
-                    strokeDasharray="3 4"
-                    ifOverflow="hidden"
-                  />
-                  <Scatter
-                    data={scatterPoints}
-                    fill={BRAND}
-                    fillOpacity={0.85}
-                    isAnimationActive={false}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-            </div>
+                    {trend && (
+                      <ReferenceLine
+                        segment={[
+                          { x: 0, y: Math.max(0, trend.intercept) },
+                          { x: maxX, y: Math.max(0, trend.intercept + trend.slope * maxX) },
+                        ]}
+                        stroke={BRAND}
+                        strokeOpacity={0.55}
+                        strokeDasharray="3 4"
+                        ifOverflow="hidden"
+                      />
+                    )}
+                    <Scatter data={points} fill={BRAND} fillOpacity={0.85} isAnimationActive={false} />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : waitingNote}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
@@ -861,57 +973,60 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
               title={
                 <>
                   Top Far Travelling Users{" "}
-                  <span className={`font-medium text-slate-500 ${T.tiny}`}>(20km+)</span>
+                  <span className={`font-medium text-slate-500 ${T.tiny}`}>({data?.far_user_km ?? 20}km+)</span>
                 </>
               }
-              info
               right={
                 <button
                   type="button"
-                  className={`font-semibold text-blue-600 hover:underline ${T.xs}`}
+                  onClick={openFarList}
+                  disabled={!data?.far_users_total}
+                  className={`font-semibold text-blue-600 hover:underline disabled:cursor-default disabled:text-slate-300 disabled:no-underline ${T.xs}`}
                 >
-                  View All
+                  View All{data?.far_users_total ? ` (${fmtInt(data.far_users_total)})` : ""}
                 </button>
               }
             />
-            <table className="mt-3 w-full table-auto border-collapse text-left">
-              <thead>
-                <tr>
-                  {["User", "Distance", "Travel Time", "Bookings", "Total Spent"].map((heading, i) => (
-                    <th
-                      key={heading}
-                      className={`pb-2 font-medium text-slate-500 ${T.tiny} ${i ? "text-right" : ""}`}
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {farUsers.map((user) => (
-                  <tr key={user.name} className="h-[26px]">
-                    <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
-                      <span className="flex items-center gap-2">
-                        <Avatar {...user} />
-                        {user.name}
-                      </span>
-                    </td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>
-                      {user.distance} km
-                    </td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>
-                      {user.minutes} min
-                    </td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>
-                      {user.bookings}
-                    </td>
-                    <td className={`whitespace-nowrap text-right font-semibold text-slate-800 ${T.xs}`}>
-                      {rupees(user.spent)}
-                    </td>
+            {farUsers.length ? (
+              <table className="mt-3 w-full table-auto border-collapse text-left">
+                <thead>
+                  <tr>
+                    {["User", "Distance", "Travel Time", "Bookings", "Total Spent"].map((heading, i) => (
+                      <th key={heading} className={`pb-2 font-medium text-slate-500 ${T.tiny} ${i ? "text-right" : ""}`}>
+                        {heading}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {farUsers.map((user, i) => {
+                    const name = user.name || `User #${user.user_id}`;
+                    return (
+                      <tr
+                        key={user.user_id}
+                        className="h-[26px] cursor-pointer hover:bg-slate-50"
+                        onClick={() => navigate(`/user-details-v2/${user.user_id}`)}
+                      >
+                        <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
+                          <span className="flex items-center gap-2">
+                            <Avatar name={name} {...AVATAR_TINTS[i % AVATAR_TINTS.length]} />
+                            <span className="max-w-[110px] truncate">{name}</span>
+                          </span>
+                        </td>
+                        <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{fmtKm(user.avg_distance_km)}</td>
+                        <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>
+                          {isNum(user.avg_travel_min) ? `${Math.round(user.avg_travel_min)} min` : DASH}
+                        </td>
+                        <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{fmtInt(user.bookings)}</td>
+                        <td className={`whitespace-nowrap text-right font-semibold text-slate-800 ${T.xs}`}>{rupees(user.spent)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : located ? `No users travelled ${data?.far_user_km ?? 20}+ km in this period` : waitingNote}</EmptyNote>
+            )}
           </Card>
         </div>
 
@@ -920,70 +1035,66 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW34_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader
-              title="Booking Frequency by Distance"
-              info
-              right={<Select value={frequencyBasis} onChange={setFrequencyBasis} options={SELECT_BASIS} />}
-            />
-            <div className="mt-3 grid flex-1 grid-cols-[88px_repeat(4,minmax(0,1fr))] content-between gap-[3px]">
-              <span className={`self-center text-slate-600 ${T.tiny}`}>Distance (km)</span>
-              {FREQUENCY_COLS.map((col) => (
-                <span key={col} className={`self-center text-center text-slate-600 ${T.tiny}`}>
-                  {col}
-                </span>
-              ))}
-
-              {frequency.map((row) => (
-                <div key={row.range} className="contents">
-                  <span className={`self-center whitespace-nowrap text-slate-700 ${T.xs}`}>
-                    {row.range}
+            <CardHeader title="Booking Frequency by Distance" right={<Select value={frequencyBasis} onChange={setFrequencyBasis} options={BASIS} />} />
+            {located ? (
+              <div className="mt-3 grid flex-1 grid-cols-[88px_repeat(4,minmax(0,1fr))] content-between gap-[3px]">
+                <span className={`self-center text-slate-600 ${T.tiny}`}>Distance (km)</span>
+                {(data.frequency.cols || []).map((col) => (
+                  <span key={col.key} className={`self-center text-center text-slate-600 ${T.tiny}`}>
+                    {col.label}
                   </span>
-                  {row.values.map((value, col) => (
-                    <span
-                      key={col}
-                      className={`grid h-[22px] place-items-center rounded-[3px] text-slate-700 ${T.xs}`}
-                      style={{ background: frequencyTint(value, col) }}
-                    >
-                      {value}%
-                    </span>
-                  ))}
-                </div>
-              ))}
-            </div>
+                ))}
+
+                {frequencyPct.map((row, r) => (
+                  <div key={distanceLabels[r]} className="contents">
+                    <span className={`self-center whitespace-nowrap text-slate-700 ${T.xs}`}>{distanceLabels[r]}</span>
+                    {row.map((value, col) => (
+                      <span
+                        key={col}
+                        className={`grid h-[22px] place-items-center rounded-[3px] text-slate-700 ${T.xs}`}
+                        style={{ background: frequencyTint(value, col, row.length) }}
+                        title={`${fmtInt(frequencyMatrix[r][col])} ${frequencyBasis}`}
+                      >
+                        {isNum(value) ? `${Math.round(value)}%` : DASH}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : waitingNote}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader
               title="Time Preference vs Distance"
-              info
-              right={<Select value={preferenceBasis} onChange={setPreferenceBasis} options={SELECT_BASIS} />}
+              subtitle="Booked slot time"
+              right={<Select value={preferenceBasis} onChange={setPreferenceBasis} options={BASIS} />}
             />
-            <div className="mt-3">
-              <HeatGrid
-                values={timePreference}
-                ramp={TIME_RAMP}
-                rowLabels={DISTANCE_ROWS}
-                colLabels={TIME_SLOTS}
-                title={(r, c) =>
-                  `${DISTANCE_ROWS[r]} · ${TIME_SLOTS[c]} · ${Math.round(timePreference[r][c] * 100)}% of peak`
-                }
-              />
-            </div>
-            <div className="mt-auto pt-2.5">
-              <RampLegend
-                ramp={TIME_RAMP}
-                from="Low Preference"
-                to="High Preference"
-                size={T.tiny}
-                width={150}
-              />
-            </div>
+            {timeMax ? (
+              <>
+                <div className="mt-3">
+                  <HeatGrid
+                    values={timeValues}
+                    ramp={TIME_RAMP}
+                    rowLabels={distanceLabels}
+                    colLabels={timeSlots}
+                    title={(r, c) => `${distanceLabels[r]} · ${timeSlots[c]} · ${fmtInt(timeMatrix[r][c])} ${preferenceBasis}`}
+                  />
+                </div>
+                <div className="mt-auto pt-2.5">
+                  <RampLegend ramp={TIME_RAMP} from="Low Preference" to="High Preference" size={T.tiny} width={150} />
+                </div>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : waitingNote}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader
               title="New vs Returning Users by Distance"
-              info
               right={
                 <Segmented
                   value={mixMode}
@@ -1007,28 +1118,38 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
               </span>
             </div>
 
-            <ul className="mt-2 flex flex-1 flex-col justify-around gap-2">
-              {newVsReturning.map((row) => (
-                <li key={row.range} className={`flex items-center gap-3 ${T.xs}`}>
-                  <span className="w-[62px] shrink-0 whitespace-nowrap text-slate-700">{row.range}</span>
-                  <span className="flex min-w-0 flex-1 items-center gap-[3px]">
-                    <span
-                      className="h-[6px] rounded-full"
-                      style={{ width: `${100 - row.returning}%`, background: BRAND }}
-                    />
-                    <span
-                      className="h-[6px] rounded-full"
-                      style={{ width: `${row.returning}%`, background: GREEN }}
-                    />
-                  </span>
-                  <span className="w-[44px] shrink-0 text-right text-slate-600">
-                    {mixMode === "pct"
-                      ? `${row.returning}%`
-                      : Math.round((row.users * row.returning) / 100).toLocaleString("en-IN")}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {located ? (
+              <ul className="mt-2 flex flex-1 flex-col justify-around gap-2">
+                {mixRows.map((row) => {
+                  const total = row.new + row.returning;
+                  const returningPct = pctOf(row.returning, total);
+                  return (
+                    <li
+                      key={row.key}
+                      className={`flex items-center gap-3 ${T.xs}`}
+                      title={`${fmtInt(row.new)} new · ${fmtInt(row.returning)} returning`}
+                    >
+                      <span className="w-[62px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
+                      <span className="flex min-w-0 flex-1 items-center gap-[3px]">
+                        {total ? (
+                          <>
+                            <span className="h-[6px] rounded-full" style={{ width: `${100 - returningPct}%`, background: BRAND }} />
+                            <span className="h-[6px] rounded-full" style={{ width: `${returningPct}%`, background: GREEN }} />
+                          </>
+                        ) : (
+                          <span className="h-[6px] w-full rounded-full bg-slate-100" />
+                        )}
+                      </span>
+                      <span className="w-[44px] shrink-0 text-right text-slate-600">
+                        {!total ? DASH : mixMode === "pct" ? `${Math.round(returningPct)}%` : fmtInt(row.returning)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : waitingNote}</EmptyNote>
+            )}
           </Card>
         </div>
 
@@ -1039,21 +1160,32 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
           <CardHeader title="Key Insights & Recommendations" />
           <div className={`mt-2.5 grid grid-cols-4 ${GAP}`}>
             {insights.map((item) => (
-              <InsightTile
-                key={item.title}
-                icon={item.icon}
-                color={item.color}
-                tint={item.tint}
-                title={item.title}
-                titleSize={T.sm}
-                textSize={T.xs}
-              >
+              <InsightTile key={item.title} icon={item.icon} color={item.color} tint={item.tint} title={item.title} titleSize={T.sm} textSize={T.xs}>
                 {item.text}
               </InsightTile>
             ))}
+            {!insights.length && <p className={`col-span-4 py-3 text-center text-slate-400 ${T.xs}`}>{loading ? "Loading…" : DASH}</p>}
           </div>
         </Card>
       </ScaledCanvas>
+
+      {farList && (
+        <ListDialog
+          title={`Far Travelling Users (${data?.far_user_km ?? 20} km+)`}
+          subtitle={`${fmtRange(range.from, range.to)} · ${fmtInt(farList.rows.length)} users · average distance per user`}
+          columns={FAR_USER_COLUMNS}
+          rows={farList.rows}
+          loading={farList.loading}
+          note="Distance is a straight line from where the customer booked to the salon; travel time is estimated."
+          onRowClick={(row) => navigate(`/user-details-v2/${row.user_id}`)}
+          onExport={() =>
+            downloadXlsx(`far_travelling_users_${range.from}_${range.to}.xlsx`, [
+              { name: "Far users", rows: farList.rows, columns: FAR_USER_COLUMNS },
+            ])
+          }
+          onClose={() => setFarList(null)}
+        />
+      )}
     </>
   );
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -6,17 +6,15 @@ import { toast } from "react-hot-toast";
 import {
   AlertTriangle,
   ArrowRight,
-  CalendarDays,
   ChevronDown,
   Download,
   EyeOff,
   Loader2,
   Send,
-  X,
 } from "lucide-react";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { HeaderBell, HeaderSelect } from "../v2/ui";
+import { DateRangeButton, HeaderBell, HeaderSelect, ListDialog } from "../v2/ui";
 import {
   exportAnalyticsUninstalledV2,
   fetchAnalyticsGravityV2,
@@ -110,7 +108,6 @@ const fmtMoney = (n) => {
 };
 const fmtPct = (n) => (n == null ? DASH : `${Number(n).toFixed(1)}%`);
 const share = (part, whole) => (whole ? (part / whole) * 100 : null);
-const fmtDate = (v) => (v ? moment(v).format("DD MMM YYYY") : DASH);
 const fmtRange = (from, to) => {
   const a = moment(from);
   const b = moment(to);
@@ -314,140 +311,6 @@ const Select = ({ value, onChange, children, className = "" }) => (
   </div>
 );
 
-const useOutsideClose = (open, onClose) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const handle = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
-    };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open, onClose]);
-  return ref;
-};
-
-// ---------------------------------------------------------------------------
-// Full-list dialog ("View all" links). Rendered outside ScaledCanvas, since a
-// transformed ancestor would trap position: fixed. Columns are
-// { header, kind, width, get, render? } - the same list feeds the Excel file.
-// ---------------------------------------------------------------------------
-
-const displayCell = (column, row) => {
-  if (column.render) return column.render(row);
-  const value = column.get(row);
-  switch (column.kind) {
-    case "int":
-      return fmtInt(value);
-    case "money":
-      return fmtMoney(value);
-    case "percent":
-      return fmtPct(value);
-    case "date":
-      return fmtDate(value);
-    default:
-      return value ?? DASH;
-  }
-};
-
-const ListDialog = ({ title, subtitle, columns, rows, loading, note, onExport, onClose }) => {
-  const [exporting, setExporting] = useState(false);
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const runExport = async () => {
-    setExporting(true);
-    try {
-      await onExport();
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="flex max-h-[85vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[16px] font-extrabold text-slate-900">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-[12px] text-slate-500">{subtitle}</p>}
-          </div>
-          {onExport && (
-            <button
-              type="button"
-              onClick={runExport}
-              disabled={exporting || loading || !rows.length}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              Export Excel
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Close"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto px-5 pb-4">
-          {loading ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-[13px] text-slate-400">
-              <Loader2 size={16} className="animate-spin" /> Loading…
-            </div>
-          ) : rows.length ? (
-            <table className="w-full border-collapse text-left text-[13px]">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b border-slate-200">
-                  {columns.map((c) => (
-                    <th
-                      key={c.header}
-                      className={`whitespace-nowrap py-3 pr-3 text-[11px] font-bold uppercase text-slate-400 ${
-                        c.kind && c.kind !== "text" && c.kind !== "date" ? "text-right" : ""
-                      }`}
-                    >
-                      {c.header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, i) => (
-                  <tr key={row.store_id ?? row.user_id ?? i} className="border-b border-slate-50">
-                    {columns.map((c) => (
-                      <td
-                        key={c.header}
-                        className={`whitespace-nowrap py-2.5 pr-3 text-slate-700 ${
-                          c.kind && c.kind !== "text" && c.kind !== "date" ? "text-right tabular-nums" : ""
-                        }`}
-                      >
-                        {displayCell(c, row)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <Empty>Nothing in this period</Empty>
-          )}
-          {note && <p className="mt-3 text-[12px] leading-snug text-slate-400">{note}</p>}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // Column lists for the dialogs and their Excel files.
 const PROFIT_COLUMNS = [
   { header: "Salon", kind: "text", width: 30, get: (r) => r.salon_name, render: (r) => <SalonName row={r} /> },
@@ -509,8 +372,6 @@ const AnalyticsIntelligenceV2 = () => {
 
   const [period, setPeriod] = useState("last_90");
   const [custom, setCustom] = useState(null); // { from, to } when period === "custom"
-  const [rangeOpen, setRangeOpen] = useState(false);
-  const [draft, setDraft] = useState({ from: "", to: "" });
   const [compare, setCompare] = useState(false);
   const [refreshMs, setRefreshMs] = useState(60000);
   const [selectedSalon, setSelectedSalon] = useState("all");
@@ -548,24 +409,9 @@ const AnalyticsIntelligenceV2 = () => {
     return () => clearInterval(id);
   }, [refreshMs, load]);
 
-  const closeRange = useCallback(() => setRangeOpen(false), []);
-  const rangeRef = useOutsideClose(rangeOpen, closeRange);
-  const openRange = () => {
-    setDraft({ from: range.from, to: range.to });
-    setRangeOpen((open) => !open);
-  };
-  const applyRange = () => {
-    if (!draft.from || !draft.to || draft.from > draft.to) {
-      toast.error("Pick a start date on or before the end date", { id: "analytics-v2-range" });
-      return;
-    }
-    if (moment(draft.to).diff(moment(draft.from), "days") > 365) {
-      toast.error("The range can be at most 366 days", { id: "analytics-v2-range" });
-      return;
-    }
-    setCustom({ from: draft.from, to: draft.to });
+  const applyRange = (from, to) => {
+    setCustom({ from, to });
     setPeriod("custom");
-    setRangeOpen(false);
   };
 
   const errors = [profitability, switching, gravity, uninstalled].map((s) => s.error).filter(Boolean);
@@ -780,44 +626,13 @@ const AnalyticsIntelligenceV2 = () => {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-3">
-            <div className="relative hidden md:block" ref={rangeRef}>
-              <button
-                type="button"
-                onClick={openRange}
-                className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300"
-              >
-                {fmtRange(range.from, range.to)}
-                <CalendarDays size={14} className="shrink-0 text-slate-500" />
-              </button>
-              {rangeOpen && (
-                <div className="absolute right-0 top-full z-20 mt-2 w-[260px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
-                  <p className="text-[13px] font-bold text-slate-800">Custom range</p>
-                  {[
-                    ["from", "From"],
-                    ["to", "To"],
-                  ].map(([key, label]) => (
-                    <label key={key} className="mt-2 block text-[12px] text-slate-500">
-                      {label}
-                      <input
-                        type="date"
-                        value={draft[key]}
-                        max={moment().format("YYYY-MM-DD")}
-                        onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] text-slate-800 focus:outline-none"
-                      />
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={applyRange}
-                    className="mt-3 w-full rounded-lg py-2 text-[13px] font-bold text-white"
-                    style={{ backgroundColor: BRAND }}
-                  >
-                    Apply
-                  </button>
-                </div>
-              )}
-            </div>
+            <DateRangeButton
+              from={range.from}
+              to={range.to}
+              onApply={applyRange}
+              color={BRAND}
+              toastId="analytics-v2-range"
+            />
 
             <HeaderSelect
               label="Period"
