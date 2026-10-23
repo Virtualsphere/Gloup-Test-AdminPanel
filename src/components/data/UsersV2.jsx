@@ -580,6 +580,8 @@ const UsersV2 = ({ title = "Users" }) => {
     const installedTrend = last30.map((n) => (running += n));
 
     const booked = s ? s.booked_users : null;
+    // Total bookings, not users: a user with 2 bookings adds 2.
+    const bookings = s ? s.total_bookings ?? null : null;
     const male = s ? s.male_users : null;
     const female = s ? s.female_users : null;
     const thisMonth = s ? s.new_this_month : null;
@@ -614,10 +616,13 @@ const UsersV2 = ({ title = "Users" }) => {
           trend: hasDates ? spark(installedTrend) : null,
         },
         {
-          label: "Total Booked Users",
-          value: fmt(booked),
+          label: "Total Bookings",
+          value: fmt(bookings),
           share: booked == null ? 0 : share(booked),
-          caption: booked == null ? "Loading…" : `${share(booked).toFixed(1)}% of total users`,
+          caption:
+            booked == null
+              ? "Loading…"
+              : `by ${fmt(booked)} users (${share(booked).toFixed(1)}% of total users)`,
           icon: CalendarCheck2,
           color: GREEN,
           tint: "#DCFCE7",
