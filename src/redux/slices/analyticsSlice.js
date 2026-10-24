@@ -81,6 +81,68 @@ export const sendBulkUserPushV2 = createAsyncThunk(
   post("/admin/app/sendBulkUserPushV2", "Failed to send push notifications")
 );
 
+// Service / Booking Intelligence, Salon Heatmap, Salon Category: { from, to, city, ... }.
+export const fetchServiceIntelligenceV2 = createAsyncThunk(
+  "analytics/fetchServiceIntelligenceV2",
+  post("/admin/app/getServiceIntelligenceV2", "Failed to fetch service intelligence")
+);
+export const fetchBookingIntelligenceV2 = createAsyncThunk(
+  "analytics/fetchBookingIntelligenceV2",
+  post("/admin/app/getBookingIntelligenceV2", "Failed to fetch booking intelligence")
+);
+export const fetchSalonHeatmapV2 = createAsyncThunk(
+  "analytics/fetchSalonHeatmapV2",
+  post("/admin/app/getSalonHeatmapV2", "Failed to fetch salon heatmap")
+);
+export const fetchSalonCategoryV2 = createAsyncThunk(
+  "analytics/fetchSalonCategoryV2",
+  post("/admin/app/getSalonCategoryV2", "Failed to fetch salon category intelligence")
+);
+
+// Partner Details V2: { store_id, from, to }; the picker list isn't kept in state.
+export const fetchPartnerOverviewV2 = createAsyncThunk(
+  "analytics/fetchPartnerOverviewV2",
+  post("/admin/app/getPartnerOverviewV2", "Failed to fetch partner overview")
+);
+export const fetchPartnerPickerV2 = createAsyncThunk(
+  "analytics/fetchPartnerPickerV2",
+  post("/admin/app/getPartnerPickerV2", "Failed to fetch salons")
+);
+
+// Push + in-app notification to one salon (existing targeted-notification
+// API): { store_id, title, description }.
+export const sendPartnerNotificationV2 = createAsyncThunk(
+  "analytics/sendPartnerNotificationV2",
+  async ({ store_id, title, description }, thunkApi) =>
+    post("/admin/app/send-targeted-notification", "Failed to send message")(
+      { recipient_type: "partner", recipient_id: store_id, title, description },
+      thunkApi
+    )
+);
+
+// User segments (Overview / 360), live feed, Behavior, Click & Interaction.
+export const fetchUserSegmentsV2 = createAsyncThunk(
+  "analytics/fetchUserSegmentsV2",
+  post("/admin/app/getUserSegmentsV2", "Failed to fetch user segments")
+);
+export const fetchUserLiveFeedV2 = createAsyncThunk(
+  "analytics/fetchUserLiveFeedV2",
+  post("/admin/app/getUserLiveFeedV2", "Failed to fetch live activity")
+);
+export const fetchBehaviorAnalyticsV2 = createAsyncThunk(
+  "analytics/fetchBehaviorAnalyticsV2",
+  post("/admin/app/getBehaviorAnalyticsV2", "Failed to fetch behavior analytics")
+);
+// One opportunity's users ({ ..., include_list }) - kept by the caller.
+export const fetchBehaviorListV2 = createAsyncThunk(
+  "analytics/fetchBehaviorListV2",
+  post("/admin/app/getBehaviorAnalyticsV2", "Failed to fetch the list")
+);
+export const fetchClickInteractionV2 = createAsyncThunk(
+  "analytics/fetchClickInteractionV2",
+  post("/admin/app/getClickInteractionV2", "Failed to fetch click & interaction analytics")
+);
+
 // The contact list behind the uninstalled card (not stored in state - the
 // caller turns it straight into an Excel download).
 export const exportAnalyticsUninstalledV2 = createAsyncThunk(
@@ -101,6 +163,15 @@ const SECTIONS = {
   userRetention: fetchUserRetentionV2,
   deepInsights: fetchDeepUserInsightsV2,
   growth: fetchGrowthDashboardV2,
+  serviceIntel: fetchServiceIntelligenceV2,
+  bookingIntel: fetchBookingIntelligenceV2,
+  salonHeatmap: fetchSalonHeatmapV2,
+  salonCategory: fetchSalonCategoryV2,
+  partnerOverview: fetchPartnerOverviewV2,
+  userSegments: fetchUserSegmentsV2,
+  liveFeed: fetchUserLiveFeedV2,
+  behavior: fetchBehaviorAnalyticsV2,
+  clickInteraction: fetchClickInteractionV2,
 };
 
 const emptySection = () => ({ data: null, loading: false, error: null });

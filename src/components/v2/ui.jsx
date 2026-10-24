@@ -813,3 +813,65 @@ export const ListDialog = ({ title, subtitle, columns, rows, loading, note, onEx
     </div>
   );
 };
+
+// Title + message composer for a bulk push (sendBulkUserPushV2). Render it
+// outside ScaledCanvas. `audience` reads "To 1,234 <audience>".
+export const PushDialog = ({ count, audience = "users", sending, onSend, onClose, color = "#5B3FF0" }) => {
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const n = Number(count || 0).toLocaleString("en-IN");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[16px] font-extrabold text-slate-900">Send Push Notification</h2>
+            <p className="mt-0.5 text-[12px] text-slate-500">
+              To {n} {audience} · also saved as an in-app notification
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <label className="mt-4 block text-[12px] font-semibold text-slate-600">
+          Title
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={80}
+            placeholder="Your slot is still available!"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-normal text-slate-800 focus:outline-none"
+          />
+        </label>
+        <label className="mt-3 block text-[12px] font-semibold text-slate-600">
+          Message
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={3}
+            maxLength={240}
+            placeholder="Complete your booking now before the slot is taken."
+            className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-normal text-slate-800 focus:outline-none"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={sending || !title.trim() || !message.trim() || !count}
+          onClick={() => onSend(title.trim(), message.trim())}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
+          style={{ background: color }}
+        >
+          {sending && <Loader2 size={14} className="animate-spin" />}
+          Send to {n} users
+        </button>
+      </div>
+    </div>
+  );
+};

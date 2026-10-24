@@ -96,6 +96,7 @@ const AppRoutes = () => {
         <Route path="/salon-heatmap-v2" element={<SalonHeatmapV2 title="Salon Analytics - Heatmap" />} />
         <Route path="/booking-intelligence-v2" element={<BookingIntelligenceV2 title="Booking Intelligence" />} />
         <Route path="/partner-details-v2" element={<PartnerDetailsV2 title="Partner Details" />} />
+        <Route path="/partner-details-v2/:id" element={<PartnerDetailsV2 title="Partner Details" />} />
         <Route path="/salon-category-intelligence-v2" element={<SalonCategoryIntelligenceV2 title="Salon Category Intelligence" />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin title="Admin" />} />

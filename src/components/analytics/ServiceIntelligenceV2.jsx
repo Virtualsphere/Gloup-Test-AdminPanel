@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import moment from "moment";
+import { toast } from "react-hot-toast";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   Boxes,
   Brush,
   CalendarCheck,
-  CalendarDays,
   ChartNoAxesCombined,
   Crown,
   Download,
   Droplets,
   Ellipsis,
-  FlaskConical,
   Footprints,
   Gift,
   Hand,
@@ -19,7 +20,6 @@ import {
   Palette,
   ReceiptIndianRupee,
   Scissors,
-  Smile,
   Sparkles,
   Sun,
   Tag,
@@ -29,6 +29,7 @@ import {
   Users,
   Wind,
 } from "lucide-react";
+import { fetchServiceIntelligenceV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
@@ -36,6 +37,7 @@ import { CHART_AXIS as AXIS } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
+  DateRangeButton,
   Donut as BaseDonut,
   HeaderButton,
   HeaderSelect,
@@ -46,20 +48,19 @@ import {
   Meter,
   RampLegend,
   Segmented as BaseSegmented,
-  Select as BaseSelect,
 } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Service Intelligence Dashboard" mockup, on
-// a fixed DESIGN_WIDTH canvas that ScaledCanvas scales to the available width
-// (see there for why bigger px sizes in T read smaller on screen).
+// The approved "Service Intelligence Dashboard" mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 //
-// UI only for now - every number is static demo data matching the mockup. The
-// store-service and booking APIs (see Services.jsx / StoreServices.jsx and
-// bookingSlice) carry the service per booking, so the ranking tables, the
-// category split and the add-on table are the first cards that could be wired;
-// the price / time / repeat-rate cards need aggregation the backend doesn't
-// expose. The date, city, category and "By ..." pickers hold local state only.
+// Data: getServiceIntelligenceV2 (analyticsSlice `serviceIntel`). Served
+// bookings (paid, not cancelled / refunded, from go-live) by service date.
+// Service names are free text per salon, so the API groups them ignoring
+// case and spacing ("Hair cut" = "Haircut"). Men's / Women's rankings split by
+// the customer's gender (the guest's for guest bookings); "Salon category"
+// narrows to men's / women's / unisex salons.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -87,223 +88,104 @@ const T = {
 };
 
 const GAP = "gap-3";
-const COMPARE = "vs May 14 – May 20";
+const DASH = "–";
 
-// ---------------------------------------------------------------------------
-// Static demo data
-// ---------------------------------------------------------------------------
-
-const kpis = [
-  { label: "Total Bookings", value: "25,000", delta: "18.6%", icon: CalendarCheck, color: BRAND, tint: "#EEEAFD" },
-  { label: "Total GMV", value: "₹39,37,100", delta: "22.1%", icon: ReceiptIndianRupee, color: "#16A34A", tint: "#DCFCE7" },
-  { label: "Unique Services Booked", value: "86", delta: "8.7%", icon: Boxes, color: BLUE, tint: "#DBEAFE" },
-  { label: "Avg. Service Price", value: "₹157", delta: "6.9%", icon: Ticket, color: "#F97316", tint: "#FFEDD5" },
-  { label: "Service Add-on Rate", value: "38.7%", delta: "4.2%", icon: Gift, color: "#E11D6A", tint: "#FDE7F0" },
-  { label: "Repeat Service Rate", value: "42.6%", delta: "3.8%", icon: Heart, color: "#E11D48", tint: "#FFE4E6", filled: true },
+const PERIODS = [
+  { key: "last_7", label: "Last 7 Days", range: () => [moment().subtract(6, "days"), moment()] },
+  { key: "last_30", label: "Last 30 Days", range: () => [moment().subtract(29, "days"), moment()] },
+  { key: "this_month", label: "This Month", range: () => [moment().startOf("month"), moment()] },
+  {
+    key: "last_month",
+    label: "Last Month",
+    range: () => [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")],
+  },
+  { key: "last_90", label: "Last 90 Days", range: () => [moment().subtract(89, "days"), moment()] },
 ];
-
-// Glyph and colour per service name; anything unlisted falls back to a grey dots.
-const SERVICE_STYLE = {
-  Haircut: { icon: Scissors, color: "#5B3FF0" },
-  "Beard Trim": { icon: Brush, color: "#2563EB" },
-  "Hair Spa": { icon: Droplets, color: "#2563EB" },
-  Facial: { icon: Sparkles, color: "#16A34A" },
-  "Hair Colour": { icon: Palette, color: "#E11D48" },
-  "De-Tan": { icon: Sun, color: "#EA580C" },
-  Manicure: { icon: Hand, color: "#D97706" },
-  Pedicure: { icon: Footprints, color: "#E11D6A" },
-  "Hair Smoothening": { icon: Wind, color: "#DB2777" },
-  Waxing: { icon: Sparkles, color: "#D97706" },
-  Others: { icon: Ellipsis, color: "#0EA5A4" },
-};
-const FALLBACK_STYLE = { icon: Ellipsis, color: "#64748B" };
-
+const SALON_CATEGORIES = [
+  { value: "all", label: "All Salon Categories" },
+  { value: "men", label: "Men's Salons" },
+  { value: "women", label: "Women's Salons" },
+  { value: "unisex", label: "Unisex Salons" },
+];
 const SEGMENTS = [
   { value: "men", label: "Men's" },
   { value: "women", label: "Women's" },
   { value: "all", label: "All" },
 ];
 
-const MEN = [
-  { name: "Haircut", bookings: 6842, share: "27.4%", gmv: "8,22,800" },
-  { name: "Beard Trim", bookings: 3912, share: "15.6%", gmv: "2,93,400" },
-  { name: "Hair Spa", bookings: 2851, share: "11.4%", gmv: "3,70,300" },
-  { name: "Facial", bookings: 2301, share: "9.2%", gmv: "3,22,100" },
-  { name: "Hair Colour", bookings: 1984, share: "7.9%", gmv: "4,96,000" },
-  { name: "De-Tan", bookings: 1562, share: "6.2%", gmv: "2,03,100" },
-  { name: "Manicure", bookings: 1294, share: "5.2%", gmv: "1,16,460" },
-  { name: "Others", bookings: 2254, share: "9.1%", gmv: "2,13,940" },
+// Glyph and colour by keyword in the service name; anything else gets dots.
+const SERVICE_STYLES = [
+  { re: /beard|shave|trim/i, icon: Brush, color: "#2563EB" },
+  { re: /hair ?cut|cut/i, icon: Scissors, color: "#5B3FF0" },
+  { re: /spa|wash|massage/i, icon: Droplets, color: "#2563EB" },
+  { re: /facial|clean|glow/i, icon: Sparkles, color: "#16A34A" },
+  { re: /colou?r|highlight/i, icon: Palette, color: "#E11D48" },
+  { re: /tan|bleach/i, icon: Sun, color: "#EA580C" },
+  { re: /manicure|nail/i, icon: Hand, color: "#D97706" },
+  { re: /pedicure|foot/i, icon: Footprints, color: "#E11D6A" },
+  { re: /smooth|keratin|straight|rebond/i, icon: Wind, color: "#DB2777" },
+  { re: /wax|thread/i, icon: Sparkles, color: "#D97706" },
 ];
+const FALLBACK_STYLE = { icon: Ellipsis, color: "#64748B" };
+const styleOf = (name) => SERVICE_STYLES.find((s) => s.re.test(name || "")) || FALLBACK_STYLE;
 
-const WOMEN = [
-  { name: "Hair Spa", bookings: 4512, share: "22.8%", gmv: "5,86,900" },
-  { name: "Hair Smoothening", bookings: 3245, share: "16.4%", gmv: "7,45,600" },
-  { name: "Facial", bookings: 3012, share: "15.2%", gmv: "4,21,800" },
-  { name: "Manicure", bookings: 2689, share: "13.6%", gmv: "1,59,300" },
-  { name: "Pedicure", bookings: 2256, share: "11.4%", gmv: "1,62,800" },
-  { name: "Haircut", bookings: 1842, share: "9.3%", gmv: "1,10,520" },
-  { name: "Waxing", bookings: 1125, share: "5.7%", gmv: "1,42,200" },
-  { name: "Others", bookings: 1319, share: "6.6%", gmv: "1,39,780" },
-];
-
-// Combined view: the two rankings merged by service name, best eight shown.
-const parseGmv = (text) => Number(text.replace(/,/g, ""));
-const formatGmv = (value) => value.toLocaleString("en-IN");
-const ALL = (() => {
-  const merged = new Map();
-  [...MEN, ...WOMEN].forEach((row) => {
-    const prev = merged.get(row.name) || { name: row.name, bookings: 0, gmvValue: 0 };
-    prev.bookings += row.bookings;
-    prev.gmvValue += parseGmv(row.gmv);
-    merged.set(row.name, prev);
-  });
-  const rows = [...merged.values()].sort((a, b) => b.bookings - a.bookings);
-  const total = rows.reduce((sum, row) => sum + row.bookings, 0);
-  return rows.slice(0, 8).map((row) => ({
-    name: row.name,
-    bookings: row.bookings,
-    share: `${((row.bookings / total) * 100).toFixed(1)}%`,
-    gmv: formatGmv(row.gmvValue),
-  }));
-})();
-const SERVICE_ROWS = { men: MEN, women: WOMEN, all: ALL };
-
-const categories = [
-  { name: "Hair Care", value: 9050, pct: "36.2%", color: "#6D4AE0" },
-  { name: "Skin Care", value: 7025, pct: "28.1%", color: GREEN },
-  { name: "Grooming", value: 4350, pct: "17.4%", color: "#FBBF24" },
-  { name: "Nail Care", value: 2150, pct: "8.6%", color: "#F97316" },
-  { name: "Hair Removal", value: 1375, pct: "5.5%", color: RED },
-  { name: "Others", value: 1050, pct: "4.2%", color: "#9CA3AF" },
-];
-
-const TREND_DAYS = ["May 21", "May 22", "May 23", "May 24", "May 25", "May 26", "May 27"];
-const TREND_LINES = [
-  { key: "haircut", name: "Haircut", color: "#6D4AE0", values: [2050, 2080, 2200, 2160, 2780, 2900, 3750] },
-  { key: "spa", name: "Hair Spa", color: GREEN, values: [700, 760, 800, 1120, 1250, 1500, 2000] },
-  { key: "facial", name: "Facial", color: ORANGE, values: [330, 300, 360, 420, 380, 380, 640] },
-];
-const trend = TREND_DAYS.map((day, i) => ({
-  day,
-  ...Object.fromEntries(TREND_LINES.map((line) => [line.key, line.values[i]])),
-}));
-
-const addOns = [
-  { name: "Hair Wash", icon: Droplets, bookings: "7,854", attach: "42.6%", gmv: "1,96,350" },
-  { name: "Hair Spa", icon: Droplets, bookings: "6,102", attach: "33.1%", gmv: "3,10,200" },
-  { name: "Beard Styling", icon: Scissors, bookings: "4,258", attach: "23.1%", gmv: "89,600" },
-  { name: "Hair Serum", icon: FlaskConical, bookings: "3,925", attach: "21.3%", gmv: "78,450" },
-  { name: "D-Tan Pack", icon: Sun, bookings: "2,854", attach: "15.5%", gmv: "66,230" },
-  { name: "Face Massage", icon: Smile, bookings: "2,102", attach: "11.4%", gmv: "51,300" },
-  { name: "Others", icon: Ellipsis, bookings: "1,950", attach: "10.6%", gmv: "47,850" },
-];
-
-// The mockup leaves "Below ₹99" without a percentage; the remainder is shown.
-const prices = [
-  { label: "Below ₹99", pct: 8.5 },
-  { label: "₹100 – ₹199", pct: 28.7 },
-  { label: "₹200 – ₹299", pct: 26.2 },
-  { label: "₹300 – ₹499", pct: 21.4 },
-  { label: "₹500 – ₹999", pct: 11.7 },
-  { label: "₹1000+", pct: 3.5 },
-];
-const maxPrice = Math.max(...prices.map((row) => row.pct));
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const PEAK_ROWS = ["Hair Care", "Skin Care", "Grooming", "Nail Care", "Hair Removal"];
+const CATEGORY_COLORS = ["#6D4AE0", GREEN, "#FBBF24", "#F97316", RED, "#9CA3AF"];
+const TREND_COLORS = ["#6D4AE0", GREEN, ORANGE];
 const PEAK_RAMP = ["#F3F0FF", "#D5C9FB", "#A58CF2", "#7A55EB", "#5B3FF0"];
-const peak = [
-  [0.12, 0.18, 0.3, 0.42, 0.78, 0.88, 0.62],
-  [0.1, 0.16, 0.26, 0.36, 0.7, 0.8, 0.56],
-  [0.14, 0.2, 0.28, 0.38, 0.6, 0.76, 0.5],
-  [0.08, 0.14, 0.22, 0.32, 0.5, 0.66, 0.46],
-  [0.1, 0.12, 0.2, 0.3, 0.46, 0.6, 0.42],
-];
-// The mockup labels the same grid with days above and times of day below.
-const PEAK_TIMES = [
-  { label: "8 AM", at: 8 },
-  { label: "12 PM", at: 36 },
-  { label: "4 PM", at: 63 },
-  { label: "8 PM", at: 90 },
-];
 
-const repeat = [
-  { name: "Hair Spa", icon: Droplets, rate: "61.2%", color: GREEN, points: [6, 8, 5, 9, 6, 8, 4, 7, 6, 9, 5, 7] },
-  { name: "Facial", icon: Sparkles, rate: "50.8%", color: GREEN, points: [7, 6, 8, 5, 8, 6, 9, 5, 7, 6, 8, 5] },
-  { name: "Smoothening", icon: Wind, rate: "48.3%", color: GREEN, points: [5, 8, 6, 9, 5, 7, 6, 8, 5, 8, 7, 6] },
-  { name: "Haircut", icon: Scissors, rate: "45.6%", color: GREEN, points: [8, 6, 7, 5, 8, 6, 8, 5, 7, 6, 8, 7] },
-  { name: "Manicure", icon: Hand, rate: "41.7%", color: ORANGE, points: [6, 8, 5, 8, 6, 9, 5, 8, 6, 7, 5, 8] },
-  { name: "Pedicure", icon: Footprints, rate: "38.2%", color: ORANGE, points: [7, 5, 8, 6, 8, 5, 9, 6, 8, 5, 7, 6] },
-];
+// ---------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------
 
-const insights = [
-  { icon: TrendingUp, color: "#0E9F6E", tint: "#EEF9F3", title: "Highest Demand Service", text: "Haircut is the most booked service for men (27.4%). Keep offers & slots optimized." },
-  { icon: Crown, color: "#E11D48", tint: "#FDF0F3", title: "Highest Revenue Service", text: "Smoothening generates the highest revenue for women (₹7,45,600)." },
-  { icon: ChartNoAxesCombined, color: "#2563EB", tint: "#EFF4FE", title: "Growing Service", text: "Hair Spa bookings grew 24% this week across all categories." },
-  { icon: TriangleAlert, color: "#D97706", tint: "#FEF5EA", title: "Low Attach Rate", text: "Face Massage add-on has low attach rate (11.4%). Promote with combos." },
-];
-
-const preferences = [
-  { icon: Users, color: "#5B3FF0", tint: "#F4F2FE", title: "New Users", first: "Haircut (42%)", then: "Facial (21%)" },
-  { icon: ChartNoAxesCombined, color: "#16A34A", tint: "#EEF9F3", title: "Returning Users", first: "Hair Spa (31%)", then: "Facial (25%)" },
-  { icon: Crown, color: "#5B3FF0", tint: "#F0EFFE", title: "High Spenders (₹1000+)", first: "Smoothening (28%)", then: "Hair Spa (24%)" },
-  { icon: Tag, color: "#D4A017", tint: "#FEF9E7", title: "Offer Users", first: "Haircut (38%)", then: "Beard Trim (22%)" },
-];
-
-const DATE_RANGES = ["May 21 – May 27, 2026", "May 14 – May 20, 2026", "Apr 28 – May 27, 2026"];
-const CITIES = ["Chennai", "All Cities"];
-const SALON_CATEGORIES = ["All Salon Categories", "Men's Salons", "Women's Salons", "Unisex Salons"];
-const BASIS = ["By Bookings", "By GMV"];
-const BASIS_USERS = ["By Users", "By Bookings"];
-
-const compact = (v) => (v >= 1000 ? `${v / 1000}K` : `${v}`);
-const num = (v) => v.toLocaleString("en-IN");
+const isNum = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+const num = (v) => (isNum(v) ? Number(v).toLocaleString("en-IN") : DASH);
+const rupee = (v) => (isNum(v) ? `₹${Number(v).toLocaleString("en-IN", { maximumFractionDigits: 0 })}` : DASH);
+const fmtPct = (v) => (isNum(v) ? `${Number(v).toFixed(1)}%` : DASH);
+const compact = (v) => (v >= 1000 ? `${Number((v / 1000).toFixed(1))}K` : `${v}`);
+const fmtDay = (d) => (d ? moment(d).format("MMM D") : DASH);
+const fmtRange = (from, to) => (from && to ? `${fmtDay(from)} – ${fmtDay(to)}` : DASH);
+const change = (cur, prev, { points = false } = {}) => {
+  if (!isNum(cur) || !isNum(prev)) return null;
+  const diff = points ? cur - prev : prev ? ((cur - prev) / prev) * 100 : null;
+  if (diff === null) return null;
+  return { value: `${Math.abs(diff).toFixed(1)}${points ? " pts" : "%"}`, up: diff >= 0 };
+};
 
 // ---------------------------------------------------------------------------
 // Building blocks
 // ---------------------------------------------------------------------------
 
 const CardHeader = (props) => <BaseCardHeader titleSize={T.title} subtitleSize={T.micro} {...props} />;
-
-const Select = ({ size = T.micro, ...props }) => (
-  <BaseSelect size={size} className="w-[96px] [&_select]:py-1" {...props} />
-);
-
-const Segmented = (props) => <BaseSegmented size={T.micro} color={BRAND} {...props} />;
+const Segmented = (props) => <BaseSegmented size={T.micro} {...props} />;
 
 const KpiTile = (props) => (
   <BaseKpiTile
-    sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.sm }}
-    iconClass="h-[44px] w-[44px] rounded-full"
-    iconSize={21}
-    caption={COMPARE}
-    up
+    sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.micro }}
+    iconClass="h-11 w-11 rounded-full"
+    iconSize={20}
     className="px-4 py-4"
     {...props}
   />
 );
 
 const Donut = (props) => (
-  <BaseDonut
-    size={176}
-    inner="64%"
-    centerSize={T.donut}
-    captionSize={T.sm}
-    formatter={(value) => num(value)}
-    {...props}
-  />
+  <BaseDonut size={176} inner="64%" centerSize={T.donut} captionSize={T.sm} formatter={(value) => num(value)} {...props} />
+);
+
+// Centred grey note for a card with nothing to show yet.
+const EmptyNote = ({ children }) => (
+  <div className={`grid flex-1 place-items-center px-3 py-6 text-center text-slate-400 ${T.xs}`}>
+    <p className="max-w-[300px]">{children}</p>
+  </div>
 );
 
 // Small outlined circle holding a service glyph.
-const ServiceGlyph = ({ name, icon, color }) => {
-  const style = SERVICE_STYLE[name] || FALLBACK_STYLE;
-  const Icon = icon || style.icon;
+const ServiceGlyph = ({ name, color }) => {
+  const style = styleOf(name);
+  const Icon = style.icon;
   const tone = color || style.color;
   return (
-    <span
-      className="grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border"
-      style={{ borderColor: tone, color: tone }}
-    >
+    <span className="grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border" style={{ borderColor: tone, color: tone }}>
       <Icon size={10} />
     </span>
   );
@@ -315,53 +197,60 @@ const COLS_LEFT = [22, 24, 12, 18, 24];
 const COLS_RIGHT = [37.7, 11.3, 17.8, 15.2, 18];
 
 // Ranking table with the Men's / Women's / All toggle; two cards share it.
-const ServicesCard = ({ segment, setSegment, cols }) => {
-  const rows = SERVICE_ROWS[segment];
+const ServicesCard = ({ rows, segment, setSegment, cols, loading, coverage }) => {
+  const max = Math.max(0, ...rows.filter((r) => r.key !== "others").map((r) => r.bookings));
   return (
     <Card className="p-4">
       <CardHeader
         title="Top Services by Bookings"
+        subtitle={segment !== "all" && isNum(coverage) ? `By customer gender · known for ${fmtPct(coverage)} of bookings` : undefined}
         right={<Segmented value={segment} onChange={setSegment} options={SEGMENTS} />}
       />
-      <table className="mt-3 w-full table-fixed border-collapse text-left">
-        <colgroup>
-          {cols.map((width, i) => (
-            <col key={i} style={{ width: `${width}%` }} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Service</th>
-            <th />
-            <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Bookings</th>
-            <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Share</th>
-            <th className={`pb-2 text-right font-medium text-slate-500 ${T.nano}`}>GMV (₹)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={row.name} className="h-[24px]">
-              <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
-                <span className="flex items-center gap-2">
-                  <ServiceGlyph name={row.name} />
-                  {row.name}
-                </span>
-              </td>
-              <td className="pr-3">
-                <Meter
-                  pct={(row.bookings / rows[0].bookings) * 100}
-                  height={3}
-                  track="transparent"
-                  color={`rgba(91,63,240,${Math.max(0.45, 1 - i * 0.08).toFixed(2)})`}
-                />
-              </td>
-              <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{num(row.bookings)}</td>
-              <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.share}</td>
-              <td className={`whitespace-nowrap text-right text-slate-700 ${T.xs}`}>{row.gmv}</td>
+      {rows.length ? (
+        <table className="mt-3 w-full table-fixed border-collapse text-left">
+          <colgroup>
+            {cols.map((width, i) => (
+              <col key={i} style={{ width: `${width}%` }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Service</th>
+              <th />
+              <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Bookings</th>
+              <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Share</th>
+              <th className={`pb-2 text-right font-medium text-slate-500 ${T.nano}`}>GMV (₹)</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={row.key} className="h-[24px]">
+                <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <ServiceGlyph name={row.name} />
+                    <span className="truncate" title={row.name}>
+                      {row.name}
+                    </span>
+                  </span>
+                </td>
+                <td className="pr-3">
+                  <Meter
+                    pct={max ? (row.bookings / max) * 100 : 0}
+                    height={3}
+                    track="transparent"
+                    color={`rgba(91,63,240,${Math.max(0.45, 1 - i * 0.08).toFixed(2)})`}
+                  />
+                </td>
+                <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{num(row.bookings)}</td>
+                <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{fmtPct(row.share)}</td>
+                <td className={`whitespace-nowrap text-right text-slate-700 ${T.xs}`}>{num(Math.round(row.gmv))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+      )}
     </Card>
   );
 };
@@ -382,79 +271,39 @@ const TrendTooltip = ({ active, payload, label }) => {
   );
 };
 
-// Tiny trend line for the repeat-rate table. Fixed points, drawn as one
-// polyline stretched to the cell width. The height uses a fixed 0-11 scale
-// rather than each line's own min-max, so the wiggle stays as shallow as the
-// mockup's instead of filling the whole row.
+// Tiny bookings line for the repeat-rate table, scaled to its own peak.
 const MiniLine = ({ points, color }) => {
-  const step = 100 / (points.length - 1);
-  const path = points
-    .map((p, i) => `${(i * step).toFixed(1)},${(100 - (p / 11) * 100).toFixed(1)}`)
-    .join(" ");
+  if (!points?.length) return null;
+  const max = Math.max(1, ...points);
+  const step = 100 / Math.max(1, points.length - 1);
+  const path = points.map((p, i) => `${(i * step).toFixed(1)},${(92 - (p / max) * 84).toFixed(1)}`).join(" ");
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[18px] w-full" aria-hidden="true">
-      <polyline
-        points={path}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.4"
-        vectorEffect="non-scaling-stroke"
-        strokeLinejoin="round"
-      />
+      <polyline points={path} fill="none" stroke={color} strokeWidth="1.4" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
     </svg>
   );
 };
 
-const exportServices = (rows) =>
-  downloadCsv(
-    "top-services-by-bookings.csv",
-    ["Service", "Bookings", "Share", "GMV (INR)"],
-    rows.map((row) => [row.name, row.bookings, row.share, row.gmv.replace(/,/g, "")])
-  );
-
 // Title and header controls live in the app bar, not the canvas.
-const PageHeader = ({ title, range, setRange, city, setCity, category, setCategory, onExport }) => (
+const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, cityOptions, category, setCategory, onExport }) => (
   <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0 leading-tight">
         <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-          Deep insights on service performance, preferences &amp; trends
-        </p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">Deep insights on service performance, preferences &amp; trends</p>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        {/* Static stamp, like the bell counts: the demo data never refreshes. */}
-        <span className="hidden items-center gap-2 whitespace-nowrap text-[11px] text-slate-500 2xl:flex">
-          Last updated: Today, 10:30 AM
-          <span className="flex items-center gap-1.5 font-medium text-slate-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Live
-          </span>
-        </span>
+        <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="svc-range" className="relative hidden lg:block" />
         <HeaderSelect
-          icon={CalendarDays}
-          label="Date range"
-          value={range}
-          onChange={setRange}
-          options={DATE_RANGES}
+          label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : [])]}
           className="hidden lg:flex"
         />
-        <HeaderSelect
-          icon={MapPin}
-          label="City"
-          value={city}
-          onChange={setCity}
-          options={CITIES}
-          className="hidden xl:flex"
-        />
-        <HeaderSelect
-          label="Salon category"
-          value={category}
-          onChange={setCategory}
-          options={SALON_CATEGORIES}
-          className="hidden xl:flex"
-        />
+        <HeaderSelect icon={MapPin} label="City" value={city} onChange={setCity} options={cityOptions} className="hidden xl:flex" />
+        <HeaderSelect label="Salon category" value={category} onChange={setCategory} options={SALON_CATEGORIES} className="hidden xl:flex" />
         <HeaderButton icon={Download} label="Export report" color={INDIGO} onClick={onExport}>
           <span className="hidden md:inline">Export Report</span>
         </HeaderButton>
@@ -468,250 +317,320 @@ const PageHeader = ({ title, range, setRange, city, setCity, category, setCatego
 // ---------------------------------------------------------------------------
 
 const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => {
-  const [range, setRange] = useState(DATE_RANGES[0]);
-  const [city, setCity] = useState(CITIES[0]);
-  const [category, setCategory] = useState(SALON_CATEGORIES[0]);
+  const dispatch = useDispatch();
+  const { serviceIntel } = useSelector((state) => state.analytics);
+  const [period, setPeriod] = useState(PERIODS[0].key);
+  const [custom, setCustom] = useState(null);
+  const [city, setCity] = useState("all");
+  const [category, setCategory] = useState("all");
   const [leftSegment, setLeftSegment] = useState("men");
   const [rightSegment, setRightSegment] = useState("women");
-  const [trendBasis, setTrendBasis] = useState(BASIS[0]);
-  const [addOnBasis, setAddOnBasis] = useState(BASIS[0]);
-  const [priceBasis, setPriceBasis] = useState(BASIS[0]);
-  const [repeatBasis, setRepeatBasis] = useState(BASIS_USERS[0]);
+
+  const range = useMemo(() => {
+    if (period === "custom" && custom) return custom;
+    const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[0]).range();
+    return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
+  }, [period, custom]);
+
+  useEffect(() => {
+    const body = { from: range.from, to: range.to };
+    if (city !== "all") body.city = city;
+    if (category !== "all") body.salon_type = category;
+    dispatch(fetchServiceIntelligenceV2(body))
+      .unwrap()
+      .catch((message) => toast.error(message || "Failed to load service intelligence", { id: "svc-v2" }));
+  }, [dispatch, range.from, range.to, city, category]);
+
+  const data = serviceIntel.data;
+  const loading = serviceIntel.loading && !data;
+  const k = data?.kpis || {};
+  const pk = data?.previous_kpis || {};
+  const compare = data ? `vs ${fmtRange(data.previous.from, data.previous.to)}` : "";
+  const shown = (v, fmt = num) => (loading ? "…" : fmt(v));
+  const cityOptions = useMemo(
+    () => [{ value: "all", label: "All Cities" }, ...(data?.cities || []).map((c) => ({ value: c, label: c }))],
+    [data]
+  );
+
+  const kpi = (label, key, fmt, icon, color, tint, opts = {}) => {
+    const delta = change(k[key], pk[key], opts);
+    return { label, value: shown(k[key], fmt), delta: delta?.value, up: delta?.up, caption: compare, icon, color, tint, filled: opts.filled };
+  };
+  const kpis = [
+    kpi("Total Bookings", "bookings", num, CalendarCheck, BRAND, "#EEEAFD"),
+    kpi("Total GMV", "gmv", rupee, ReceiptIndianRupee, "#16A34A", "#DCFCE7"),
+    kpi("Unique Services Booked", "unique_services", num, Boxes, BLUE, "#DBEAFE"),
+    kpi("Avg. Service Price", "avg_service_price", rupee, Ticket, "#F97316", "#FFEDD5"),
+    kpi("Service Add-on Rate", "addon_rate", fmtPct, Gift, "#E11D6A", "#FDE7F0", { points: true }),
+    kpi("Repeat Service Rate", "repeat_service_rate", fmtPct, Heart, "#E11D48", "#FFE4E6", { points: true, filled: true }),
+  ];
+
+  const services = data?.services || { all: [], men: [], women: [] };
+  const categories = (data?.categories || []).map((c, i) => ({ name: c.name, value: c.bookings, pct: c.share, color: CATEGORY_COLORS[i] }));
+  const trendServices = data?.trend?.services || [];
+  const trend = (data?.trend?.days || []).map((d) => ({ ...d, label: fmtDay(d.day) }));
+  const addons = data?.addons || [];
+  const priceBands = data?.price_bands || [];
+  const maxPrice = Math.max(0, ...priceBands.map((b) => b.share || 0));
+  const peak = data?.peak;
+  const peakMax = peak ? Math.max(0, ...peak.values.flat()) : 0;
+  const peakValues = peak ? peak.values.map((row) => row.map((v) => (peakMax ? v / peakMax : 0))) : [];
+  const repeat = data?.repeat || [];
+  const preferences = data?.preferences || [];
+  const PREF_STYLE = {
+    new: { icon: Users, color: "#5B3FF0", tint: "#F4F2FE" },
+    returning: { icon: ChartNoAxesCombined, color: "#16A34A", tint: "#EEF9F3" },
+    high_spenders: { icon: Crown, color: "#5B3FF0", tint: "#F0EFFE" },
+    offer: { icon: Tag, color: "#D4A017", tint: "#FEF9E7" },
+  };
+
+  // Insights from the numbers above.
+  const insights = [];
+  const topMen = services.men.find((s) => s.key !== "others");
+  const topAll = services.all.find((s) => s.key !== "others");
+  if (topMen || topAll) {
+    const s = topMen || topAll;
+    insights.push({
+      icon: TrendingUp,
+      color: "#0E9F6E",
+      tint: "#EEF9F3",
+      title: "Highest Demand Service",
+      text: `${s.name} is the most booked service${topMen ? " for men" : ""} (${fmtPct(s.share)}).`,
+    });
+  }
+  const topRevenue = [...services.women, ...services.men].filter((s) => s.key !== "others").sort((a, b) => b.gmv - a.gmv)[0];
+  if (topRevenue) {
+    insights.push({ icon: Crown, color: "#E11D48", tint: "#FDF0F3", title: "Highest Revenue Service", text: `${topRevenue.name} earns the most (${rupee(topRevenue.gmv)}).` });
+  }
+  const bestRepeat = [...repeat].filter((r) => isNum(r.rate)).sort((a, b) => b.rate - a.rate)[0];
+  if (bestRepeat) {
+    insights.push({ icon: ChartNoAxesCombined, color: "#2563EB", tint: "#EFF4FE", title: "Most Rebooked Service", text: `${fmtPct(bestRepeat.rate)} of ${bestRepeat.name} bookings come from customers who booked it before.` });
+  }
+  const weakAddon = [...addons].filter((a) => a.key !== "others").sort((a, b) => a.attach_rate - b.attach_rate)[0];
+  if (weakAddon) {
+    insights.push({ icon: TriangleAlert, color: "#D97706", tint: "#FEF5EA", title: "Low Attach Rate", text: `${weakAddon.name} is added to only ${fmtPct(weakAddon.attach_rate)} of bookings. Promote it with combos.` });
+  }
+
+  const exportReport = () => {
+    if (!data) return;
+    downloadCsv(
+      `service-intelligence-${data.from}_${data.to}.csv`,
+      ["Segment", "Service", "Bookings", "Share", "GMV (INR)", "Repeat Rate"],
+      ["all", "men", "women"].flatMap((seg) => (services[seg] || []).map((s) => [seg, s.name, s.bookings, fmtPct(s.share), s.gmv, fmtPct(s.repeat_rate)]))
+    );
+  };
 
   return (
     <>
       <PageHeader
         title={title}
         range={range}
-        setRange={setRange}
+        period={period}
+        setPeriod={setPeriod}
+        onCustom={(from, to) => {
+          setCustom({ from, to });
+          setPeriod("custom");
+        }}
         city={city}
         setCity={setCity}
+        cityOptions={cityOptions}
         category={category}
         setCategory={setCategory}
-        onExport={() => exportServices(SERVICE_ROWS[leftSegment])}
+        onExport={exportReport}
       />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 1 - KPI tiles                                                */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 1 - KPI tiles */}
         <div className={`grid grid-cols-6 ${GAP}`}>
-          {kpis.map(({ icon, color, tint, filled, ...kpi }) => (
-            <KpiTile
-              key={kpi.label}
-              {...kpi}
-              icon={icon}
-              iconColor={color}
-              iconTint={tint}
-              iconFill={filled}
-            />
+          {kpis.map(({ icon, color, tint, filled, ...tile }) => (
+            <KpiTile key={tile.label} {...tile} icon={icon} iconColor={color} iconTint={tint} iconFill={filled} />
           ))}
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 2 - Top services x2 / category share                         */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 2 - Top services x2 / category share */}
         <div className={`grid ${ROW_COLS} ${GAP}`}>
-          <ServicesCard segment={leftSegment} setSegment={setLeftSegment} cols={COLS_LEFT} />
-          <ServicesCard segment={rightSegment} setSegment={setRightSegment} cols={COLS_RIGHT} />
+          <ServicesCard rows={services[leftSegment] || []} segment={leftSegment} setSegment={setLeftSegment} cols={COLS_LEFT} loading={loading} coverage={data?.gender_coverage} />
+          <ServicesCard rows={services[rightSegment] || []} segment={rightSegment} setSegment={setRightSegment} cols={COLS_RIGHT} loading={loading} coverage={data?.gender_coverage} />
 
           <Card className="p-4">
             <CardHeader title="Bookings Share by Service Category" />
-            <div className="flex flex-1 items-center gap-6">
-              <Donut data={categories} center="25,000" caption="Total Bookings" />
-              <ul className="flex min-w-0 flex-1 flex-col gap-[14px]">
-                {categories.map((row) => (
-                  <li key={row.name} className={`flex items-center gap-2 ${T.sm}`}>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: row.color }} />
-                    <span className="min-w-0 flex-1 truncate text-slate-700">{row.name}</span>
-                    <span className="w-[40px] shrink-0 text-right text-slate-600">{row.pct}</span>
-                    <span className="w-[48px] shrink-0 text-right text-slate-500">({num(row.value)})</span>
+            {categories.length ? (
+              <div className="flex flex-1 items-center gap-6">
+                <Donut data={categories} center={num(k.bookings)} caption="Total Bookings" />
+                <ul className="flex min-w-0 flex-1 flex-col gap-[14px]">
+                  {categories.map((row) => (
+                    <li key={row.name} className={`flex items-center gap-2 ${T.sm}`}>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: row.color }} />
+                      <span className="min-w-0 flex-1 truncate text-slate-700">{row.name}</span>
+                      <span className="w-[40px] shrink-0 text-right text-slate-600">{fmtPct(row.pct)}</span>
+                      <span className="w-[48px] shrink-0 text-right text-slate-500">({num(row.value)})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
+          </Card>
+        </div>
+
+        {/* Row 3 - Trend / add-ons / price distribution */}
+        <div className={`grid ${ROW_COLS} ${GAP}`}>
+          <Card className="p-4">
+            <CardHeader title="Service Trend Over Time" subtitle="Daily bookings of the three most booked services" />
+            <div className="mt-3 flex items-center justify-center gap-7">
+              {trendServices.map((s, i) => (
+                <LegendDot key={s.key} dash color={TREND_COLORS[i]} label={s.name} size={T.micro} />
+              ))}
+            </div>
+            {trend.length && trendServices.length ? (
+              <div className="mt-1 min-h-[148px] flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trend} margin={{ top: 8, right: 14, bottom: 0, left: -8 }}>
+                    <CartesianGrid stroke="#F1F3F8" vertical={false} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ ...AXIS, fontSize: 10 }} dy={6} interval="preserveStartEnd" minTickGap={14} padding={{ left: 10, right: 6 }} />
+                    <YAxis domain={[0, "auto"]} allowDecimals={false} tickFormatter={(v) => (v === 0 ? "0" : compact(v))} tickLine={false} axisLine={false} tick={{ ...AXIS, fontSize: 10 }} width={34} />
+                    <Tooltip content={<TrendTooltip />} cursor={false} />
+                    {trendServices.map((s, i) => (
+                      <Line
+                        key={s.key}
+                        type="monotone"
+                        dataKey={s.key}
+                        name={s.name}
+                        stroke={TREND_COLORS[i]}
+                        strokeWidth={1.8}
+                        dot={trend.length <= 31 ? { r: 2.6, fill: TREND_COLORS[i], strokeWidth: 0 } : false}
+                        activeDot={{ r: 4 }}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title="Service Add-on Performance" subtitle="Extra services in multi-service bookings" />
+            {addons.length ? (
+              <table className="mt-3 w-full table-auto border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Add-on Service</th>
+                    <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Bookings</th>
+                    <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Attach Rate</th>
+                    <th className={`pb-2 text-right font-medium text-slate-500 ${T.nano}`}>GMV (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {addons.map((row) => (
+                    <tr key={row.key} className="h-[22px]">
+                      <td className={`max-w-[150px] whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <ServiceGlyph name={row.name} color={BRAND} />
+                          <span className="truncate">{row.name}</span>
+                        </span>
+                      </td>
+                      <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{num(row.bookings)}</td>
+                      <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{fmtPct(row.attach_rate)}</td>
+                      <td className={`whitespace-nowrap text-right text-slate-700 ${T.xs}`}>{num(Math.round(row.gmv))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No multi-service bookings in this period"}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title="Service Price Distribution" subtitle="Share of booked services by charged price" />
+            {priceBands.some((b) => b.items) ? (
+              <ul className="mt-4 flex flex-1 flex-col justify-around gap-2.5">
+                {priceBands.map((row) => (
+                  <li key={row.key} className={`flex items-center gap-3 ${T.xs}`} title={`${num(row.items)} services`}>
+                    <span className="w-[78px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
+                    <span className="flex min-w-0 flex-1 items-center gap-3">
+                      <span
+                        className="block h-[4px] shrink-0 rounded-full"
+                        style={{ width: `${maxPrice ? ((row.share || 0) / maxPrice) * 84 : 0}%`, background: "linear-gradient(90deg,#8B74F5,#5B3FF0)" }}
+                      />
+                      <span className="shrink-0 text-slate-600">{fmtPct(row.share)}</span>
+                    </span>
                   </li>
                 ))}
               </ul>
-            </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
           </Card>
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 3 - Trend / add-ons / price distribution                     */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 4 - Peak days / repeat rate / insights */}
         <div className={`grid ${ROW_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader
-              title="Service Trend Over Time"
-              right={<Select value={trendBasis} onChange={setTrendBasis} options={BASIS} />}
-            />
-            <div className="mt-3 flex items-center justify-center gap-7">
-              {TREND_LINES.map((line) => (
-                <LegendDot key={line.key} dash color={line.color} label={line.name} size={T.micro} />
-              ))}
-            </div>
-            <div className="mt-1 min-h-[148px] flex-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trend} margin={{ top: 8, right: 14, bottom: 0, left: -8 }}>
-                  <CartesianGrid stroke="#F1F3F8" vertical={false} />
-                  <XAxis
-                    dataKey="day"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ ...AXIS, fontSize: 10 }}
-                    dy={6}
-                    interval={0}
-                    padding={{ left: 10, right: 6 }}
+            <CardHeader title="Peak Booking Days by Service Category" />
+            {peakMax ? (
+              <>
+                <div className="mt-3">
+                  <BaseHeatGrid
+                    values={peakValues}
+                    ramp={PEAK_RAMP}
+                    rowLabels={peak.categories}
+                    colLabels={peak.weekdays}
+                    labelSize={T.micro}
+                    labelWidth={78}
+                    cellHeight={21}
+                    gap={2}
+                    radius={2}
+                    title={(r, c) => `${peak.categories[r]} · ${peak.weekdays[c]} · ${num(peak.values[r][c])} bookings`}
                   />
-                  <YAxis
-                    domain={[0, 4000]}
-                    ticks={[0, 1000, 2000, 3000, 4000]}
-                    interval={0}
-                    tickFormatter={(v) => (v === 0 ? "0" : compact(v))}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ ...AXIS, fontSize: 10 }}
-                    width={34}
-                  />
-                  <Tooltip content={<TrendTooltip />} defaultIndex={4} cursor={false} />
-                  {TREND_LINES.map((line) => (
-                    <Line
-                      key={line.key}
-                      type="monotone"
-                      dataKey={line.key}
-                      name={line.name}
-                      stroke={line.color}
-                      strokeWidth={1.8}
-                      dot={{ r: 2.6, fill: line.color, strokeWidth: 0 }}
-                      activeDot={{ r: 4 }}
-                      isAnimationActive={false}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+                </div>
+                <div className="mt-auto pt-2">
+                  <RampLegend ramp={PEAK_RAMP} from="Low" to="High" size={T.micro} width={220} />
+                </div>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader
-              title="Service Add-on Performance"
-              right={<Select value={addOnBasis} onChange={setAddOnBasis} options={BASIS} />}
-            />
-            <table className="mt-3 w-full table-auto border-collapse text-left">
-              <thead>
-                <tr>
-                  <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Add-on Service</th>
-                  <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Bookings</th>
-                  <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Attach Rate</th>
-                  <th className={`pb-2 text-right font-medium text-slate-500 ${T.nano}`}>GMV (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {addOns.map((row) => (
-                  <tr key={row.name} className="h-[22px]">
-                    <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
-                      <span className="flex items-center gap-2">
-                        <ServiceGlyph name={row.name} icon={row.icon} color={BRAND} />
-                        {row.name}
-                      </span>
-                    </td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.bookings}</td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.attach}</td>
-                    <td className={`whitespace-nowrap text-right text-slate-700 ${T.xs}`}>{row.gmv}</td>
+            <CardHeader title="Repeat Rate by Service" subtitle="Bookings by customers who booked the service before" />
+            {repeat.length ? (
+              <table className="mt-3 w-full table-auto border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Service</th>
+                    <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Repeat Rate</th>
+                    <th className={`pb-2 pl-6 font-medium text-slate-500 ${T.nano}`}>Bookings Trend</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-
-          <Card className="p-4">
-            <CardHeader
-              title="Service Price Distribution"
-              right={<Select value={priceBasis} onChange={setPriceBasis} options={BASIS} />}
-            />
-            <ul className="mt-4 flex flex-1 flex-col justify-around gap-2.5">
-              {prices.map((row) => (
-                <li key={row.label} className={`flex items-center gap-3 ${T.xs}`}>
-                  <span className="w-[78px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
-                  <span className="flex min-w-0 flex-1 items-center gap-3">
-                    <span
-                      className="block h-[4px] shrink-0 rounded-full"
-                      style={{
-                        width: `${(row.pct / maxPrice) * 84}%`,
-                        background: "linear-gradient(90deg,#8B74F5,#5B3FF0)",
-                      }}
-                    />
-                    <span className="shrink-0 text-slate-600">{row.pct.toFixed(1)}%</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 4 - Peak time / repeat rate / insights                       */}
-        {/* ---------------------------------------------------------------- */}
-        <div className={`grid ${ROW_COLS} ${GAP}`}>
-          <Card className="p-4">
-            <CardHeader title="Peak Booking Time by Service Category" />
-            <div className="mt-3">
-              <BaseHeatGrid
-                values={peak}
-                ramp={PEAK_RAMP}
-                rowLabels={PEAK_ROWS}
-                colLabels={WEEKDAYS}
-                labelSize={T.micro}
-                labelWidth={78}
-                cellHeight={21}
-                gap={2}
-                radius={2}
-                title={(r, c) => `${PEAK_ROWS[r]} · ${WEEKDAYS[c]} · ${Math.round(peak[r][c] * 100)}% of peak`}
-              />
-              <div className="relative ml-[78px] mt-2 h-[12px]">
-                {PEAK_TIMES.map((time) => (
-                  <span
-                    key={time.label}
-                    className={`absolute top-0 -translate-x-1/2 whitespace-nowrap leading-none text-slate-500 ${T.micro}`}
-                    style={{ left: `${time.at}%` }}
-                  >
-                    {time.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="mt-auto pt-2">
-              <RampLegend ramp={PEAK_RAMP} from="Low" to="High" size={T.micro} width={220} />
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <CardHeader
-              title="Repeat Rate by Service"
-              right={<Select value={repeatBasis} onChange={setRepeatBasis} options={BASIS_USERS} />}
-            />
-            <table className="mt-3 w-full table-auto border-collapse text-left">
-              <thead>
-                <tr>
-                  <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Service</th>
-                  <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Repeat Rate (30D)</th>
-                  <th className={`pb-2 pl-6 font-medium text-slate-500 ${T.nano}`}>Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                {repeat.map((row) => (
-                  <tr key={row.name} className="h-[26px]">
-                    <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
-                      <span className="flex items-center gap-2">
-                        <ServiceGlyph name={row.name} icon={row.icon} color={row.color === GREEN ? "#16A34A" : "#D97706"} />
-                        {row.name}
-                      </span>
-                    </td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.rate}</td>
-                    <td className="w-[30%] pl-6">
-                      <MiniLine points={row.points} color={row.color} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {repeat.map((row) => {
+                    const good = isNum(row.rate) && row.rate >= 40;
+                    return (
+                      <tr key={row.key} className="h-[26px]">
+                        <td className={`max-w-[150px] whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <ServiceGlyph name={row.name} color={good ? "#16A34A" : "#D97706"} />
+                            <span className="truncate">{row.name}</span>
+                          </span>
+                        </td>
+                        <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{fmtPct(row.rate)}</td>
+                        <td className="w-[30%] pl-6">
+                          <MiniLine points={row.series} color={good ? GREEN : ORANGE} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
@@ -736,34 +655,48 @@ const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => 
                   {item.text}
                 </InsightTile>
               ))}
+              {!insights.length && <p className={`col-span-2 py-3 text-center text-slate-400 ${T.xs}`}>{loading ? "Loading…" : "Not enough data for insights yet."}</p>}
             </div>
           </Card>
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 5 - Preferences by user segment                              */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 5 - Preferences by customer group */}
         <Card className="px-4 pb-3.5 pt-3.5">
-          <CardHeader title="Service Preferences by User Segment" />
+          <CardHeader title="Service Preferences by Customer Group" />
           <div className={`mt-2.5 grid grid-cols-4 ${GAP}`}>
-            {preferences.map((item) => (
-              <InsightTile
-                key={item.title}
-                plain
-                icon={item.icon}
-                color={item.color}
-                tint={item.tint}
-                title={item.title}
-                titleSize={T.xs}
-                textSize={T.xs}
-                iconClass="h-9 w-9"
-                iconSize={30}
-                padding="px-4 py-2.5"
-              >
-                <span className="block">Most booked: {item.first}</span>
-                <span className="block">Followed by: {item.then}</span>
-              </InsightTile>
-            ))}
+            {preferences.map((item) => {
+              const style = PREF_STYLE[item.key] || PREF_STYLE.new;
+              return (
+                <InsightTile
+                  key={item.key}
+                  plain
+                  icon={style.icon}
+                  color={style.color}
+                  tint={style.tint}
+                  title={item.label}
+                  titleSize={T.xs}
+                  textSize={T.xs}
+                  iconClass="h-9 w-9"
+                  iconSize={30}
+                  padding="px-4 py-2.5"
+                >
+                  {item.top.length ? (
+                    <>
+                      <span className="block">
+                        Most booked: {item.top[0].name} ({fmtPct(item.top[0].share)})
+                      </span>
+                      {item.top[1] && (
+                        <span className="block">
+                          Followed by: {item.top[1].name} ({fmtPct(item.top[1].share)})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="block text-slate-400">No bookings in this group</span>
+                  )}
+                </InsightTile>
+              );
+            })}
           </div>
         </Card>
       </ScaledCanvas>

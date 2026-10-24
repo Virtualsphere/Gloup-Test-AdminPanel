@@ -1,8 +1,10 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import moment from "moment";
+import { toast } from "react-hot-toast";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   CalendarCheck,
-  CalendarDays,
   CalendarRange,
   ChartLine,
   CircleDollarSign,
@@ -13,13 +15,15 @@ import {
   TrendingUp,
   UsersRound,
 } from "lucide-react";
+import { fetchBookingIntelligenceV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, rampColor } from "../v2/tokens";
+import { CHART_AXIS as AXIS, rampColor } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
+  DateRangeButton,
   Donut as BaseDonut,
   HeaderButton,
   HeaderSelect,
@@ -30,17 +34,16 @@ import {
 } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "Booking Intelligence" mockup, on a fixed
-// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
-// there for why bigger px sizes in T read smaller on screen).
+// The approved "Booking Intelligence" mockup, on a fixed DESIGN_WIDTH canvas
+// that ScaledCanvas scales to the available width (see there for why bigger
+// px sizes in T read smaller on screen).
 //
-// UI only for now - every number is static demo data matching the mockup. The
-// booking list (bookingSlice) carries the booking time and amount, so both
-// heat maps, the peak lists, the time-slot split and the trend are plain
-// group-bys over it once an endpoint returns them for a date range; the
-// cancellation rate needs the cancelled bookings too. The date and city
-// pickers and the "By ..." selects hold local state only. "Download Report"
-// exports the day-of-week grid.
+// Data: getBookingIntelligenceV2 (analyticsSlice `bookingIntel`). Served
+// bookings (paid, not cancelled / refunded, from go-live) by service date;
+// the booking time is the booked slot's start (booking_date is date-only), so
+// bookings without a slot are left out of the time grids. Cancellation rate =
+// paid bookings later cancelled or refunded / paid bookings. The "time of
+// day" grid's columns are the window cut into up to 12 equal periods.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -49,7 +52,6 @@ const BRAND = "#6D4AE0";
 const INDIGO = "#4F46E5";
 const GREEN = "#22C55E";
 const ORANGE = "#F59E0B";
-const BLUE = "#3B82F6";
 const PINK = "#F0527E";
 
 // Measured card widths from the mockup, used directly as grid fr units.
@@ -70,151 +72,58 @@ const T = {
 };
 
 const GAP = "gap-3";
-const COMPARE = "vs Jun 01 – Jun 30, 2026";
-
-// ---------------------------------------------------------------------------
-// Static demo data
-// ---------------------------------------------------------------------------
+const DASH = "–";
 
 // Solid gradient badges with a white glyph, as drawn in the mockup.
 const badge = (from, to) => `linear-gradient(135deg, ${from}, ${to})`;
-const kpis = [
-  { label: "Total Bookings", value: "12,842", delta: "18.6%", icon: CalendarCheck, tint: badge("#8B6CF6", "#6D4AE0") },
-  { label: "Total Revenue", value: "₹18,72,450", delta: "22.8%", icon: CircleDollarSign, tint: badge("#4CCB7E", "#22A95A") },
-  { label: "Total Customers", value: "8,721", delta: "16.2%", icon: UsersRound, tint: badge("#FFB347", "#F58A1F") },
-  { label: "Avg. Booking Value", value: "₹146", delta: "6.1%", icon: ChartLine, tint: badge("#4F8DF7", "#2B62E8") },
-  // A falling cancellation rate is good news, so its arrow points down in green.
-  { label: "Cancellation Rate", value: "4.7%", delta: "1.2%", up: false, good: true, icon: CircleX, tint: badge("#FF7A93", "#F0447A") },
-];
 
-// Rows are two-hour slots, columns the hour of the day, as labelled in the
-// mockup.
-const TOD_HOURS = ["12 AM", "2 AM", "4 AM", "6 AM", "8 AM", "10 AM", "12 PM", "2 PM", "4 PM", "6 PM", "8 PM", "10 PM"];
-const TOD_SLOTS = [
-  "12 AM - 2 AM",
-  "2 AM - 4 AM",
-  "4 AM - 6 AM",
-  "6 AM - 8 AM",
-  "8 AM - 10 AM",
-  "10 AM - 12 PM",
-  "12 PM - 2 PM",
-  "2 PM - 4 PM",
-  "4 PM - 6 PM",
-  "6 PM - 8 PM",
-  "8 PM - 10 PM",
-  "10 PM - 12 AM",
-];
-const timeOfDay = [
-  [12, 8, 5, 7, 10, 14, 18, 20, 16, 12, 9, 6],
-  [5, 3, 2, 3, 4, 6, 7, 8, 6, 4, 3, 2],
-  [3, 2, 2, 3, 4, 5, 6, 7, 5, 4, 3, 2],
-  [8, 6, 6, 10, 18, 28, 35, 42, 36, 28, 18, 10],
-  [28, 22, 20, 32, 54, 78, 96, 112, 98, 74, 48, 26],
-  [42, 36, 34, 58, 96, 142, 168, 182, 156, 112, 72, 40],
-  [48, 44, 42, 72, 112, 168, 198, 215, 186, 128, 84, 48],
-  [58, 56, 52, 82, 128, 186, 225, 242, 208, 146, 96, 56],
-  [62, 58, 54, 78, 120, 168, 215, 236, 198, 138, 88, 50],
-  [48, 42, 38, 56, 92, 132, 168, 182, 152, 108, 72, 42],
-  [28, 22, 18, 32, 54, 78, 96, 112, 92, 64, 42, 24],
-  [12, 8, 6, 10, 16, 24, 32, 36, 28, 20, 12, 8],
-];
 const TOD_RAMP = ["#F6F2FF", "#E3D8FC", "#BEA6F7", "#9468EE", "#7141DC"];
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const DOW_SLOTS = [
-  "12 AM - 2 AM",
-  "2 AM - 4 AM",
-  "4 AM - 6 AM",
-  "6 AM - 9 AM",
-  "9 AM - 12 PM",
-  "12 PM - 3 PM",
-  "3 PM - 6 PM",
-  "6 PM - 9 PM",
-  "9 PM - 12 AM",
-];
-const dayOfWeek = [
-  [16, 14, 12, 11, 13, 18, 20],
-  [6, 5, 4, 4, 5, 7, 8],
-  [8, 7, 6, 6, 7, 9, 10],
-  [120, 112, 108, 105, 118, 148, 156],
-  [862, 812, 798, 784, 856, 1026, 1084],
-  [1256, 1198, 1156, 1126, 1236, 1482, 1568],
-  [1482, 1386, 1324, 1298, 1426, 1712, 1824],
-  [1156, 1048, 1006, 968, 1072, 1268, 1348],
-  [86, 78, 74, 70, 76, 92, 98],
-];
 const DOW_RAMP = ["#F0F5FF", "#DCE8FD", "#B3CCFA", "#7FA6F5", "#4A7DE8", "#3B63D9"];
-
-const peakHours = [
-  { label: "3 PM – 4 PM", bookings: 2242, color: "#3730A3" },
-  { label: "2 PM – 3 PM", bookings: 2198, color: "#8B7CF6" },
-  { label: "4 PM – 5 PM", bookings: 2052, color: ORANGE },
-  { label: "1 PM – 2 PM", bookings: 1896, color: "#F5A524" },
-  { label: "12 PM – 1 PM", bookings: 1756, color: "#FACC15" },
-];
-const busiestDays = [
-  { label: "Saturday", bookings: 7672, color: BRAND },
-  { label: "Sunday", bookings: 7020, color: "#5B84E8" },
-  { label: "Friday", bookings: 6679, color: ORANGE },
-  { label: "Monday", bookings: 6416, color: "#F5A524" },
-  { label: "Thursday", bookings: 6053, color: "#FACC15" },
-];
-
-// The mockup colours the ring differently from its legend (it merges slots);
-// the legend's colours are used for both so they agree.
-const timeSlots = [
-  { name: "12 AM - 6 AM", value: 268, pct: "2.1%", color: "#8B5CF6" },
-  { name: "6 AM - 10 AM", value: 1593, pct: "12.4%", color: "#38BDF8" },
-  { name: "10 AM - 2 PM", value: 3171, pct: "24.7%", color: GREEN },
-  { name: "2 PM - 6 PM", value: 4856, pct: "37.8%", color: "#FACC15" },
-  { name: "6 PM - 10 PM", value: 2384, pct: "18.6%", color: "#FB923C" },
-  { name: "10 PM - 12 AM", value: 570, pct: "4.4%", color: PINK },
-];
-
-const TREND_DAYS = Array.from({ length: 31 }, (_, i) => `Jul ${String(i + 1).padStart(2, "0")}`);
-const TREND_TICKS = ["Jul 01", "Jul 08", "Jul 15", "Jul 22", "Jul 31"];
-const THIS_MONTH = [
-  500, 472, 540, 505, 560, 610, 655, 640, 700, 668, 720, 705, 760, 800, 845, 780, 690, 650, 700, 745, 770, 720, 650,
-  610, 690, 760, 820, 850, 800, 760, 720,
-];
-const LAST_MONTH = [
-  280, 300, 330, 315, 380, 420, 440, 400, 450, 470, 430, 400, 380, 400, 460, 540, 560, 500, 450, 430, 480, 540, 570,
-  600, 520, 470, 440, 500, 580, 600, 540,
-];
-const trend = TREND_DAYS.map((day, i) => ({ day, current: THIS_MONTH[i], previous: LAST_MONTH[i] }));
+const RANK_COLORS = ["#3730A3", "#8B7CF6", ORANGE, "#F5A524", "#FACC15"];
+const DAY_RANK_COLORS = [BRAND, "#5B84E8", ORANGE, "#F5A524", "#FACC15"];
+const BAND_COLORS = { night: "#8B5CF6", morning: "#38BDF8", midday: GREEN, afternoon: "#FACC15", evening: "#FB923C", late: PINK };
 const THIS_COLOR = "#7C5CF0";
 const LAST_COLOR = "#A9B1C2";
 
-const insights = [
+const PERIODS = [
+  { key: "last_7", label: "Last 7 Days", range: () => [moment().subtract(6, "days"), moment()] },
+  { key: "last_30", label: "Last 30 Days", range: () => [moment().subtract(29, "days"), moment()] },
+  { key: "this_month", label: "This Month", range: () => [moment().startOf("month"), moment()] },
   {
-    icon: Clock,
-    color: "#3B6FE0",
-    tint: "#E8EEFC",
-    title: "Peak Time Alert",
-    text: "Your peak time is 2 PM – 6 PM. Consider adding more staff to reduce wait time.",
+    key: "last_month",
+    label: "Last Month",
+    range: () => [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")],
   },
-  {
-    icon: CalendarRange,
-    color: "#16A34A",
-    tint: "#E3F5E9",
-    title: "Weekend Rush",
-    text: "Bookings on weekends are 32% higher than weekdays.",
-  },
-  {
-    icon: TrendingUp,
-    color: "#E5365F",
-    tint: "#FDE8EC",
-    title: "Growth Opportunity",
-    text: "Early morning (6 AM – 9 AM) bookings are low. Run offers to boost sales.",
-  },
+  { key: "last_90", label: "Last 90 Days", range: () => [moment().subtract(89, "days"), moment()] },
+];
+const BASIS = [
+  { value: "bookings", label: "By Bookings" },
+  { value: "gmv", label: "By Revenue" },
+];
+const GRANULARITY = [
+  { value: "day", label: "By Day" },
+  { value: "week", label: "By Week" },
 ];
 
-const DATE_RANGES = ["Jul 01 – Jul 31, 2026", "Jun 01 – Jun 30, 2026", "May 01 – May 31, 2026"];
-const CITIES = ["Chennai", "All Cities"];
-const BASIS = ["By Bookings", "By Revenue"];
-const GRANULARITY = ["By Day", "By Week"];
-
-const num = (v) => v.toLocaleString("en-IN");
+const isNum = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+const num = (v) => (isNum(v) ? Number(v).toLocaleString("en-IN", { maximumFractionDigits: 0 }) : DASH);
+const rupee = (v) => (isNum(v) ? `₹${num(v)}` : DASH);
+const fmtPct = (v) => (isNum(v) ? `${Number(v).toFixed(1)}%` : DASH);
+const compact = (v) => (v >= 100000 ? `${Number((v / 100000).toFixed(1))}L` : v >= 1000 ? `${Number((v / 1000).toFixed(1))}K` : `${v}`);
+const fmtDay = (d) => (d ? moment(d).format("MMM D") : DASH);
+const fmtRange = (from, to) => (from && to ? `${fmtDay(from)} – ${fmtDay(to)}` : DASH);
+// "2026-10-01|2026-10-03" -> "Oct 1-3"; a single day -> "Oct 1".
+const periodLabel = (p) => {
+  const [a, b] = String(p).split("|");
+  if (!b) return fmtDay(a);
+  return moment(a).month() === moment(b).month() ? `${moment(a).format("MMM D")}-${moment(b).format("D")}` : `${fmtDay(a)}-${fmtDay(b)}`;
+};
+const change = (cur, prev, points = false) => {
+  if (!isNum(cur) || !isNum(prev)) return null;
+  const diff = points ? cur - prev : prev ? ((cur - prev) / prev) * 100 : null;
+  if (diff === null) return null;
+  return { value: `${Math.abs(diff).toFixed(1)}${points ? " pts" : "%"}`, up: diff >= 0 };
+};
 
 // ---------------------------------------------------------------------------
 // Building blocks
@@ -222,9 +131,7 @@ const num = (v) => v.toLocaleString("en-IN");
 
 const CardHeader = (props) => <BaseCardHeader titleSize={T.title} subtitleSize={T.micro} {...props} />;
 
-const Select = ({ size = T.micro, ...props }) => (
-  <BaseSelect size={size} className="w-[104px] [&_select]:py-1" {...props} />
-);
+const Select = ({ size = T.micro, ...props }) => <BaseSelect size={size} className="w-[104px] [&_select]:py-1" {...props} />;
 
 const KpiTile = (props) => (
   <BaseKpiTile
@@ -232,36 +139,28 @@ const KpiTile = (props) => (
     iconClass="h-[58px] w-[58px] rounded-xl"
     iconSize={26}
     iconColor="#fff"
-    caption={COMPARE}
-    up
     className="px-5 py-5"
     {...props}
   />
 );
 
-const Donut = (props) => (
-  <BaseDonut
-    size={196}
-    inner="70%"
-    centerSize={T.donut}
-    captionSize={T.sm}
-    formatter={(value) => num(value)}
-    {...props}
-  />
+const Donut = (props) => <BaseDonut size={196} inner="70%" centerSize={T.donut} captionSize={T.sm} formatter={(value) => num(value)} {...props} />;
+
+const EmptyNote = ({ children }) => (
+  <div className={`grid flex-1 place-items-center px-3 py-6 text-center text-slate-400 ${T.xs}`}>
+    <p className="max-w-[300px]">{children}</p>
+  </div>
 );
 
 // Heat map with the value written in every cell. Text turns white once the
 // tint is dark enough to need it.
-const NumberGrid = ({ rows, cols, values, ramp, labelWidth, cellHeight, labelSize, cellSize, colSize }) => {
-  const max = Math.max(...values.flat());
+const NumberGrid = ({ rows, cols, values, ramp, labelWidth, cellHeight, labelSize, cellSize, colSize, unit, fmt = num }) => {
+  const max = Math.max(1, ...values.flat());
   return (
-    <div
-      className="grid min-w-0 items-center"
-      style={{ gridTemplateColumns: `${labelWidth}px repeat(${cols.length}, minmax(0, 1fr))`, gap: 3 }}
-    >
+    <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: `${labelWidth}px repeat(${cols.length}, minmax(0, 1fr))`, gap: 3 }}>
       <span />
-      {cols.map((col) => (
-        <span key={col} className={`truncate pb-1 text-center leading-none text-slate-500 ${colSize}`}>
+      {cols.map((col, c) => (
+        <span key={c} className={`truncate pb-1 text-center leading-none text-slate-500 ${colSize}`} title={col}>
           {col}
         </span>
       ))}
@@ -272,15 +171,11 @@ const NumberGrid = ({ rows, cols, values, ramp, labelWidth, cellHeight, labelSiz
           {row.map((value, c) => (
             <span
               key={c}
-              title={`${rows[r]} · ${cols[c]} · ${num(value)} bookings`}
-              className={`grid place-items-center rounded-[3px] font-medium ${cellSize}`}
-              style={{
-                height: cellHeight,
-                background: rampColor(ramp, value / max),
-                color: value / max >= 0.55 ? "#fff" : "#475569",
-              }}
+              title={`${rows[r]} · ${cols[c]} · ${fmt(value)} ${unit}`}
+              className={`grid place-items-center overflow-hidden rounded-[3px] font-medium ${cellSize}`}
+              style={{ height: cellHeight, background: rampColor(ramp, value / max), color: value / max >= 0.55 ? "#fff" : "#475569" }}
             >
-              {num(value)}
+              {value ? compact(Math.round(value)) : ""}
             </span>
           ))}
         </Fragment>
@@ -290,86 +185,63 @@ const NumberGrid = ({ rows, cols, values, ramp, labelWidth, cellHeight, labelSiz
 };
 
 // Ranked list with a coloured position badge and a bar beside the count.
-const RankList = ({ rows, barFrom, barTo }) => {
-  const max = Math.max(...rows.map((row) => row.bookings));
+const RankList = ({ rows, colors, barFrom, barTo }) => {
+  const max = Math.max(1, ...rows.map((row) => row.bookings));
   return (
     <ul className="mt-3 flex flex-1 flex-col justify-around gap-2">
       {rows.map((row, i) => (
-        <li key={row.label} className={`flex items-center gap-3 ${T.sm}`}>
-          <span
-            className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full font-bold text-white ${T.micro}`}
-            style={{ background: row.color }}
-          >
+        <li key={row.label} className={`flex items-center gap-3 ${T.sm}`} title={`${rupee(row.gmv)} GMV`}>
+          <span className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full font-bold text-white ${T.micro}`} style={{ background: colors[i] }}>
             {i + 1}
           </span>
           <span className="w-[92px] shrink-0 whitespace-nowrap font-medium text-slate-800">{row.label}</span>
           <span className="min-w-0 flex-1">
-            <span
-              className="block h-[3px] rounded-full"
-              style={{
-                width: `${(row.bookings / max) * 100}%`,
-                background: `linear-gradient(90deg, ${barFrom}, ${barTo})`,
-              }}
-            />
+            <span className="block h-[3px] rounded-full" style={{ width: `${(row.bookings / max) * 100}%`, background: `linear-gradient(90deg, ${barFrom}, ${barTo})` }} />
           </span>
-          <span className="shrink-0 whitespace-nowrap text-right text-slate-500">{num(row.bookings)} bookings</span>
+          <span className="shrink-0 whitespace-nowrap text-right text-slate-500">
+            {num(row.bookings)} {row.bookings === 1 ? "booking" : "bookings"}
+          </span>
         </li>
       ))}
     </ul>
   );
 };
 
-const TrendTooltip = ({ active, payload, label }) => {
+const TrendTooltip = ({ active, payload, fmt }) => {
   if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
   return (
     <div className="rounded-lg border border-[#E3E7EF] bg-white px-3 py-2 shadow-lg">
-      <p className={`font-bold text-slate-900 ${T.sm}`}>{label}</p>
       {payload.map((entry) => (
         <p key={entry.dataKey} className={`mt-1 flex items-center gap-1.5 text-slate-600 ${T.xs}`}>
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: entry.color }} />
-          {entry.name}: <span className="font-semibold text-slate-900">{num(entry.value)}</span>
+          {entry.dataKey === "current" ? row.curLabel : row.prevLabel}: <span className="font-semibold text-slate-900">{fmt(entry.value)}</span>
         </p>
       ))}
     </div>
   );
 };
 
-const exportReport = () =>
-  downloadCsv(
-    "booking-intelligence-day-of-week.csv",
-    ["Time slot", ...WEEKDAYS],
-    dayOfWeek.map((row, r) => [DOW_SLOTS[r], ...row])
-  );
-
 // Title and header controls live in the app bar, not the canvas.
-const PageHeader = ({ title, range, setRange, city, setCity }) => (
+const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, cityOptions, onExport }) => (
   <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0 leading-tight">
         <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-          Understand booking patterns to grow your business
-        </p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">Understand booking patterns to grow your business</p>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="bi-range" className="relative hidden lg:block" />
         <HeaderSelect
-          icon={CalendarDays}
-          label="Date range"
-          value={range}
-          onChange={setRange}
-          options={DATE_RANGES}
+          label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : [])]}
           className="hidden lg:flex"
         />
-        <HeaderSelect
-          icon={MapPin}
-          label="City"
-          value={city}
-          onChange={setCity}
-          options={CITIES}
-          className="hidden xl:flex"
-        />
-        <HeaderButton icon={Download} label="Download report" color={INDIGO} onClick={exportReport}>
+        <HeaderSelect icon={MapPin} label="City" value={city} onChange={setCity} options={cityOptions} className="hidden xl:flex" />
+        <HeaderButton icon={Download} label="Download report" color={INDIGO} onClick={onExport}>
           <span className="hidden md:inline">Download Report</span>
         </HeaderButton>
       </div>
@@ -382,182 +254,281 @@ const PageHeader = ({ title, range, setRange, city, setCity }) => (
 // ---------------------------------------------------------------------------
 
 const BookingIntelligenceV2 = ({ title = "Booking Intelligence" }) => {
-  const [range, setRange] = useState(DATE_RANGES[0]);
-  const [city, setCity] = useState(CITIES[0]);
-  const [slotBasis, setSlotBasis] = useState(BASIS[0]);
-  const [trendBasis, setTrendBasis] = useState(GRANULARITY[0]);
+  const dispatch = useDispatch();
+  const { bookingIntel } = useSelector((state) => state.analytics);
+  const [period, setPeriod] = useState("last_30");
+  const [custom, setCustom] = useState(null);
+  const [city, setCity] = useState("all");
+  const [gridBasis, setGridBasis] = useState("bookings");
+  const [slotBasis, setSlotBasis] = useState("bookings");
+  const [trendBasis, setTrendBasis] = useState("day");
+
+  const range = useMemo(() => {
+    if (period === "custom" && custom) return custom;
+    const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[1]).range();
+    return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
+  }, [period, custom]);
+
+  useEffect(() => {
+    const body = { from: range.from, to: range.to };
+    if (city !== "all") body.city = city;
+    dispatch(fetchBookingIntelligenceV2(body))
+      .unwrap()
+      .catch((message) => toast.error(message || "Failed to load booking intelligence", { id: "bi-v2" }));
+  }, [dispatch, range.from, range.to, city]);
+
+  const data = bookingIntel.data;
+  const loading = bookingIntel.loading && !data;
+  const k = data?.kpis || {};
+  const pk = data?.previous_kpis || {};
+  const compare = data ? `vs ${fmtRange(data.previous.from, data.previous.to)}` : "";
+  const shown = (v, fmt) => (loading ? "…" : fmt(v));
+  const cityOptions = useMemo(() => [{ value: "all", label: "All Cities" }, ...(data?.cities || []).map((c) => ({ value: c, label: c }))], [data]);
+  const gridFmt = gridBasis === "gmv" ? rupee : num;
+  const gridUnit = gridBasis === "gmv" ? "GMV" : "bookings";
+
+  const kpi = (label, key, fmt, icon, tint, { points = false, inverse = false } = {}) => {
+    const delta = change(k[key], pk[key], points);
+    return {
+      label,
+      value: shown(k[key], fmt),
+      delta: delta?.value,
+      up: delta?.up,
+      // A falling cancellation rate is good news, so it's drawn green.
+      good: delta ? (inverse ? !delta.up : delta.up) : undefined,
+      caption: compare,
+      icon,
+      tint,
+    };
+  };
+  const kpis = [
+    kpi("Total Bookings", "bookings", num, CalendarCheck, badge("#8B6CF6", "#6D4AE0")),
+    kpi("Total GMV", "gmv", rupee, CircleDollarSign, badge("#4CCB7E", "#22A95A")),
+    kpi("Total Customers", "customers", num, UsersRound, badge("#FFB347", "#F58A1F")),
+    kpi("Avg. Booking Value", "aov", rupee, ChartLine, badge("#4F8DF7", "#2B62E8")),
+    kpi("Cancellation Rate", "cancellation_rate", fmtPct, CircleX, badge("#FF7A93", "#F0447A"), { points: true, inverse: true }),
+  ];
+
+  const slots = data?.slots || [];
+  const timedTotal = (data?.by_weekday?.bookings || []).flat().reduce((t, v) => t + v, 0);
+  const periodCols = (data?.by_period?.periods || []).map(periodLabel);
+  const periodGrid = data?.by_period?.[gridBasis] || [];
+  const weekdayGrid = data?.by_weekday?.[gridBasis] || [];
+  const peakHours = data?.peak_hours || [];
+  const busiestDays = data?.busiest_days || [];
+  const bands = data?.day_bands || [];
+  const bandTotal = bands.reduce((t, b) => t + b[slotBasis], 0);
+  const timeSlots = bands.map((b) => ({ name: b.label, value: b[slotBasis], pct: bandTotal ? (b[slotBasis] / bandTotal) * 100 : null, color: BAND_COLORS[b.key] }));
+
+  // Day by day, or summed per 7-day block; current and previous aligned by position.
+  const trend = useMemo(() => {
+    if (!data) return [];
+    const cur = data.trend.current;
+    const prev = data.trend.previous;
+    const rows = cur.map((d, i) => ({
+      label: fmtDay(d.day),
+      curLabel: fmtDay(d.day),
+      prevLabel: fmtDay(prev[i]?.day),
+      current: d.bookings,
+      previous: prev[i]?.bookings ?? 0,
+    }));
+    if (trendBasis === "day") return rows;
+    const weeks = [];
+    for (let i = 0; i < rows.length; i += 7) {
+      const part = rows.slice(i, i + 7);
+      const last = part[part.length - 1];
+      weeks.push({
+        label: `${part[0].label}`,
+        curLabel: `${part[0].curLabel} – ${last.curLabel}`,
+        prevLabel: `${part[0].prevLabel} – ${last.prevLabel}`,
+        current: part.reduce((t, r) => t + r.current, 0),
+        previous: part.reduce((t, r) => t + r.previous, 0),
+      });
+    }
+    return weeks;
+  }, [data, trendBasis]);
+
+  // Insights from the numbers above.
+  const insights = [];
+  const topBand = [...bands].sort((a, b) => b.bookings - a.bookings)[0];
+  if (topBand?.bookings) {
+    insights.push({
+      icon: Clock,
+      color: "#3B6FE0",
+      tint: "#E8EEFC",
+      title: "Peak Time Alert",
+      text: `Most bookings are for ${topBand.label} (${fmtPct((topBand.bookings / Math.max(1, timedTotal)) * 100)}). Make sure salons have staff and open slots then.`,
+    });
+  }
+  const totals = data?.weekday_totals || [];
+  if (totals.some((d) => d.bookings)) {
+    const avg = (list) => list.reduce((t, d) => t + d.bookings, 0) / list.length;
+    const weekend = avg(totals.slice(5));
+    const weekday = avg(totals.slice(0, 5));
+    const diff = weekday ? ((weekend - weekday) / weekday) * 100 : null;
+    if (isNum(diff)) {
+      insights.push({
+        icon: CalendarRange,
+        color: "#16A34A",
+        tint: "#E3F5E9",
+        title: diff >= 0 ? "Weekend Rush" : "Weekday Demand",
+        text: `An average weekend day gets ${Math.abs(diff).toFixed(0)}% ${diff >= 0 ? "more" : "fewer"} bookings than a weekday.`,
+      });
+    }
+  }
+  const quiet = bands.filter((b) => b.key !== "night" && b.key !== "late").sort((a, b) => a.bookings - b.bookings)[0];
+  if (quiet && topBand?.bookings) {
+    insights.push({
+      icon: TrendingUp,
+      color: "#E5365F",
+      tint: "#FDE8EC",
+      title: "Growth Opportunity",
+      text: `${quiet.label} is the quietest daytime band (${num(quiet.bookings)} bookings). Run time-bound offers to fill it.`,
+    });
+  }
+
+  const exportReport = () => {
+    if (!data) return;
+    downloadCsv(
+      `booking-intelligence-${data.from}_${data.to}.csv`,
+      ["Time slot", ...data.by_weekday.weekdays.flatMap((w) => [`${w} bookings`, `${w} GMV`])],
+      slots.map((slot, r) => [slot, ...data.by_weekday.weekdays.flatMap((_, c) => [data.by_weekday.bookings[r][c], data.by_weekday.gmv[r][c]])])
+    );
+  };
+
+  const untimedNote = data?.untimed_bookings ? `${num(data.untimed_bookings)} bookings without a slot time aren't shown` : undefined;
 
   return (
     <>
-      <PageHeader title={title} range={range} setRange={setRange} city={city} setCity={setCity} />
+      <PageHeader
+        title={title}
+        range={range}
+        period={period}
+        setPeriod={setPeriod}
+        onCustom={(from, to) => {
+          setCustom({ from, to });
+          setPeriod("custom");
+        }}
+        city={city}
+        setCity={setCity}
+        cityOptions={cityOptions}
+        onExport={exportReport}
+      />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 1 - KPI tiles                                                */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 1 - KPI tiles */}
         <div className={`grid grid-cols-5 ${GAP}`}>
-          {kpis.map(({ icon, tint, ...kpi }) => (
-            <KpiTile key={kpi.label} {...kpi} icon={icon} iconTint={tint} />
+          {kpis.map(({ icon, tint, ...tile }) => (
+            <KpiTile key={tile.label} {...tile} icon={icon} iconTint={tint} />
           ))}
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 2 - Heat maps / peak lists                                   */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 2 - Heat maps / peak lists */}
         <div className={`grid ${ROW2_COLS} ${GAP}`}>
           <Card className="px-5 pb-5 pt-5">
-            <CardHeader title="Heat Map - Time of Day" info />
-            <div className="mt-5">
-              <NumberGrid
-                rows={TOD_SLOTS}
-                cols={TOD_HOURS}
-                values={timeOfDay}
-                ramp={TOD_RAMP}
-                labelWidth={96}
-                cellHeight={26}
-                labelSize={T.nano}
-                cellSize={T.xs}
-                colSize={T.nano}
-              />
-            </div>
-            <div className="mt-auto pt-4">
-              <RampLegend ramp={TOD_RAMP} from="Low" to="High" size={T.micro} steps={10} width={290} height={9} />
-            </div>
+            <CardHeader
+              title="Heat Map - Time of Day"
+              subtitle={untimedNote || "Booked slot time across the selected dates"}
+              right={<Select value={gridBasis} onChange={setGridBasis} options={BASIS} />}
+            />
+            {timedTotal ? (
+              <>
+                <div className="mt-5">
+                  <NumberGrid rows={slots} cols={periodCols} values={periodGrid} ramp={TOD_RAMP} labelWidth={96} cellHeight={26} labelSize={T.nano} cellSize={T.nano} colSize={T.nano} unit={gridUnit} fmt={gridFmt} />
+                </div>
+                <div className="mt-auto pt-4">
+                  <RampLegend ramp={TOD_RAMP} from="Low" to="High" size={T.micro} steps={10} width={290} height={9} />
+                </div>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No timed bookings in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="px-5 pb-5 pt-5">
-            <CardHeader title="Heat Map - Day of Week" />
-            <div className="mt-5">
-              <NumberGrid
-                rows={DOW_SLOTS}
-                cols={WEEKDAYS}
-                values={dayOfWeek}
-                ramp={DOW_RAMP}
-                labelWidth={92}
-                cellHeight={37}
-                labelSize={T.xs}
-                cellSize={T.sm}
-                colSize={T.xs}
-              />
-            </div>
-            <div className="mt-auto pt-4">
-              <RampLegend ramp={DOW_RAMP} from="Low" to="High" size={T.micro} steps={10} width={250} height={9} />
-            </div>
+            <CardHeader title="Heat Map - Day of Week" subtitle={gridBasis === "gmv" ? "GMV (₹)" : "Bookings"} />
+            {timedTotal ? (
+              <>
+                <div className="mt-5">
+                  <NumberGrid rows={slots} cols={data.by_weekday.weekdays} values={weekdayGrid} ramp={DOW_RAMP} labelWidth={92} cellHeight={26} labelSize={T.nano} cellSize={T.xs} colSize={T.xs} unit={gridUnit} fmt={gridFmt} />
+                </div>
+                <div className="mt-auto pt-4">
+                  <RampLegend ramp={DOW_RAMP} from="Low" to="High" size={T.micro} steps={10} width={250} height={9} />
+                </div>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No timed bookings in this period"}</EmptyNote>
+            )}
           </Card>
 
           <div className={`flex min-w-0 flex-col ${GAP}`}>
             <Card className="flex-[250] px-5 pb-4 pt-5">
-              <CardHeader
-                title="Peak Hours"
-                info
-                right={<span className={`text-slate-500 ${T.micro}`}>By Total Bookings</span>}
-              />
-              <RankList rows={peakHours} barFrom="#CFC3F8" barTo={BRAND} />
+              <CardHeader title="Peak Hours" right={<span className={`text-slate-500 ${T.micro}`}>By Total Bookings</span>} />
+              {peakHours.length ? <RankList rows={peakHours} colors={RANK_COLORS} barFrom="#CFC3F8" barTo={BRAND} /> : <EmptyNote>{loading ? "Loading…" : "No timed bookings"}</EmptyNote>}
             </Card>
 
             <Card className="flex-[176] px-5 pb-4 pt-5">
-              <CardHeader
-                title="Busiest Days"
-                right={<span className={`text-slate-500 ${T.micro}`}>By Total Bookings</span>}
-              />
-              <RankList rows={busiestDays} barFrom="#C9D5F7" barTo="#5B84E8" />
+              <CardHeader title="Busiest Days" right={<span className={`text-slate-500 ${T.micro}`}>By Total Bookings</span>} />
+              {busiestDays.length ? <RankList rows={busiestDays} colors={DAY_RANK_COLORS} barFrom="#C9D5F7" barTo="#5B84E8" /> : <EmptyNote>{loading ? "Loading…" : "No bookings"}</EmptyNote>}
             </Card>
           </div>
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 3 - Time slots / trend / insights                            */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 3 - Time slots / trend / insights */}
         <div className={`grid ${ROW3_COLS} ${GAP}`}>
           <Card className="p-5">
-            <CardHeader
-              title="Bookings by Time Slot"
-              right={<Select value={slotBasis} onChange={setSlotBasis} options={BASIS} />}
-            />
-            <div className="flex flex-1 items-center gap-6 pt-3">
-              <Donut data={timeSlots} center="12,842" caption="Total" />
-              <ul className="flex min-w-0 flex-1 flex-col gap-[13px]">
-                {timeSlots.map((slot) => (
-                  <li key={slot.name} className={`flex items-center gap-2 ${T.sm}`}>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: slot.color }} />
-                    <span className="min-w-0 flex-1 whitespace-nowrap text-slate-700">{slot.name}</span>
-                    <span className="w-[42px] shrink-0 text-right text-slate-500">{slot.pct}</span>
-                    <span className="w-[44px] shrink-0 text-right font-medium text-slate-700">{num(slot.value)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <CardHeader title="Bookings by Time Slot" right={<Select value={slotBasis} onChange={setSlotBasis} options={BASIS} />} />
+            {bandTotal ? (
+              <div className="flex flex-1 items-center gap-6 pt-3">
+                <Donut data={timeSlots} center={slotBasis === "gmv" ? `₹${compact(Math.round(bandTotal))}` : num(bandTotal)} caption={slotBasis === "gmv" ? "GMV" : "Total"} />
+                <ul className="flex min-w-0 flex-1 flex-col gap-[13px]">
+                  {timeSlots.map((slot) => (
+                    <li key={slot.name} className={`flex items-center gap-2 ${T.sm}`}>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: slot.color }} />
+                      <span className="min-w-0 flex-1 whitespace-nowrap text-slate-700">{slot.name}</span>
+                      <span className="w-[42px] shrink-0 text-right text-slate-500">{fmtPct(slot.pct)}</span>
+                      <span className="w-[52px] shrink-0 text-right font-medium text-slate-700">{slotBasis === "gmv" ? compact(Math.round(slot.value)) : num(slot.value)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No timed bookings in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-5">
-            <CardHeader
-              title="Booking Trend"
-              right={<Select value={trendBasis} onChange={setTrendBasis} options={GRANULARITY} />}
-            />
+            <CardHeader title="Booking Trend" right={<Select value={trendBasis} onChange={setTrendBasis} options={GRANULARITY} />} />
             <div className="mt-3 flex items-center justify-center gap-6">
-              <LegendDot line color={THIS_COLOR} label="This Month" size={T.micro} />
-              <LegendDot line color={LAST_COLOR} label="Last Month" size={T.micro} />
+              <LegendDot line color={THIS_COLOR} label={data ? fmtRange(data.from, data.to) : "This Period"} size={T.micro} />
+              <LegendDot line color={LAST_COLOR} label={data ? fmtRange(data.previous.from, data.previous.to) : "Previous Period"} size={T.micro} />
             </div>
-            <div className="mt-1 min-h-[190px] flex-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trend} margin={{ top: 10, right: 14, bottom: 0, left: -6 }}>
-                  <defs>
-                    <linearGradient id="bi-trend-current" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={THIS_COLOR} stopOpacity={0.22} />
-                      <stop offset="100%" stopColor={THIS_COLOR} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="bi-trend-previous" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={LAST_COLOR} stopOpacity={0.14} />
-                      <stop offset="100%" stopColor={LAST_COLOR} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="#EEF0F6" vertical={false} />
-                  <XAxis
-                    dataKey="day"
-                    ticks={TREND_TICKS}
-                    interval={0}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ ...AXIS, fontSize: 11 }}
-                    dy={6}
-                    padding={{ left: 8, right: 8 }}
-                  />
-                  <YAxis
-                    domain={[0, 1000]}
-                    ticks={[0, 250, 500, 750, 1000]}
-                    interval={0}
-                    tickFormatter={(v) => (v === 1000 ? "1K" : v)}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ ...AXIS, fontSize: 11 }}
-                    width={38}
-                  />
-                  <Tooltip content={<TrendTooltip />} cursor={{ stroke: "#CBD2E0", strokeDasharray: "3 3" }} />
-                  <Area
-                    type="monotone"
-                    dataKey="previous"
-                    name="Last Month"
-                    stroke={LAST_COLOR}
-                    strokeWidth={1.8}
-                    fill="url(#bi-trend-previous)"
-                    dot={{ r: 2.4, fill: LAST_COLOR, strokeWidth: 0 }}
-                    activeDot={{ r: 4 }}
-                    isAnimationActive={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="current"
-                    name="This Month"
-                    stroke={THIS_COLOR}
-                    strokeWidth={2}
-                    fill="url(#bi-trend-current)"
-                    dot={{ r: 2.6, fill: THIS_COLOR, strokeWidth: 0 }}
-                    activeDot={{ r: 4 }}
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {trend.length ? (
+              <div className="mt-1 min-h-[190px] flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trend} margin={{ top: 10, right: 14, bottom: 0, left: -6 }}>
+                    <defs>
+                      <linearGradient id="bi-trend-current" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={THIS_COLOR} stopOpacity={0.22} />
+                        <stop offset="100%" stopColor={THIS_COLOR} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="bi-trend-previous" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={LAST_COLOR} stopOpacity={0.14} />
+                        <stop offset="100%" stopColor={LAST_COLOR} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#EEF0F6" vertical={false} />
+                    <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={18} tickLine={false} axisLine={false} tick={{ ...AXIS, fontSize: 11 }} dy={6} padding={{ left: 8, right: 8 }} />
+                    <YAxis domain={[0, "auto"]} allowDecimals={false} tickFormatter={(v) => compact(v)} tickLine={false} axisLine={false} tick={{ ...AXIS, fontSize: 11 }} width={38} />
+                    <Tooltip content={<TrendTooltip fmt={num} />} cursor={{ stroke: "#CBD2E0", strokeDasharray: "3 3" }} />
+                    <Area type="monotone" dataKey="previous" stroke={LAST_COLOR} strokeWidth={1.8} fill="url(#bi-trend-previous)" dot={trend.length <= 31 ? { r: 2.4, fill: LAST_COLOR, strokeWidth: 0 } : false} activeDot={{ r: 4 }} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="current" stroke={THIS_COLOR} strokeWidth={2} fill="url(#bi-trend-current)" dot={trend.length <= 31 ? { r: 2.6, fill: THIS_COLOR, strokeWidth: 0 } : false} activeDot={{ r: 4 }} isAnimationActive={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-5">
@@ -567,10 +538,7 @@ const BookingIntelligenceV2 = ({ title = "Booking Intelligence" }) => {
                 const Icon = item.icon;
                 return (
                   <li key={item.title} className="flex items-start gap-4">
-                    <span
-                      className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full"
-                      style={{ background: item.tint, color: item.color }}
-                    >
+                    <span className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full" style={{ background: item.tint, color: item.color }}>
                       <Icon size={22} />
                     </span>
                     <div className="min-w-0 pt-0.5">
@@ -580,6 +548,7 @@ const BookingIntelligenceV2 = ({ title = "Booking Intelligence" }) => {
                   </li>
                 );
               })}
+              {!insights.length && <li className={`text-center text-slate-400 ${T.sm}`}>{loading ? "Loading…" : "Not enough bookings for insights yet."}</li>}
             </ul>
           </Card>
         </div>

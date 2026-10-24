@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import moment from "moment";
+import { toast } from "react-hot-toast";
 import {
   CalendarDays,
   ChartColumn,
+  ChevronRight,
   Download,
   Ellipsis,
   Flower2,
@@ -20,31 +24,35 @@ import {
   UserRound,
   Zap,
 } from "lucide-react";
+import { fetchClickInteractionV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { toSpark as spark } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
+  DateRangeButton,
   HeaderButton,
   HeaderSelect,
   KpiTile as BaseKpiTile,
-  LiveStamp,
   Meter,
 } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "User Click & Interaction Analytics"
-// mockup, on a fixed DESIGN_WIDTH canvas that ScaledCanvas scales to the
-// available width (see there for why bigger px sizes in T read smaller on
-// screen).
+// The approved "User Click & Interaction Analytics" mockup, on a fixed
+// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
+// there for why bigger px sizes in T read smaller on screen).
 //
-// UI only for now - every number is static demo data matching the mockup. No
-// backend source exists yet: the apps would have to report tap / gesture /
-// screen events first. The phone screens are simplified CSS wireframes with
-// heat blobs drawn over them, standing in for real per-screen click maps. The
-// header pickers and the heatmap tabs hold local state only.
+// Data: getClickInteractionV2 (analyticsSlice `clickInteraction`). Screen
+// views, salon opens, coupon attempts and checkouts are logged by the API
+// already; taps (with position), rage taps, gestures, time on screen and
+// time-to-tap come from the app's event batch (/v2/events), so those cards
+// say so until the Flutter app sends them. Until then "Top Clicked Elements"
+// counts the actions the backend sees. "Repeated attempts" = rage taps +
+// invalid coupon codes + unpaid / retried checkouts. Customer types are by
+// served bookings to date (new 0-1, active 2-4, loyal 5+). The phone screens
+// are CSS wireframes; the heat blobs on them are the busiest tap cells of
+// that screen (8 x 16 grid).
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -52,10 +60,7 @@ const DESIGN_WIDTH = 1520;
 const BRAND = "#5B3FF0";
 const INDIGO = "#4F46E5";
 const GREEN = "#22C55E";
-const BLUE = "#3B82F6";
 const ORANGE = "#F59E0B";
-const PINK = "#EC4899";
-const RED = "#EF4444";
 
 // Measured card widths from the mockup, used directly as grid fr units.
 const ROW2_COLS = "grid-cols-[598fr_449fr_281fr]";
@@ -74,138 +79,53 @@ const T = {
 };
 
 const GAP = "gap-3";
-const COMPARE = "vs May 14 – May 20";
+const DASH = "–";
 
-// ---------------------------------------------------------------------------
-// Static demo data
-// ---------------------------------------------------------------------------
-
-// Fixed wavy upward series (seeded by `seed`, no randomness) for the KPI sparklines.
-const trend = (seed, slope = 0.45, amp = 1.1) =>
-  spark(
-    Array.from({ length: 18 }, (_, i) =>
-      +(10 + slope * i + amp * Math.sin(i * 1.9 + seed) + 0.6 * Math.sin(i * 0.8 + seed * 2)).toFixed(2)
-    )
-  );
-
-// `good` colours the delta independently of its direction, as drawn: a faster
-// time-to-click and fewer rage clicks are both drawn in red.
-const kpis = [
-  { label: "Total Clicks", value: "12,48,230", delta: "16.8%", up: true, color: INDIGO, trend: trend(1) },
-  { label: "Unique Clicks", value: "8,72,310", delta: "15.2%", up: true, color: GREEN, trend: trend(2.3) },
-  { label: "Avg. Clicks per User", value: "46.3", delta: "12.7%", up: true, color: BLUE, trend: trend(3.1) },
-  { label: "Total Taps", value: "15,92,810", delta: "17.6%", up: true, color: ORANGE, trend: trend(4.4) },
-  { label: "Avg. Time to Click", value: "2.34s", delta: "6.4%", up: false, good: false, color: PINK, trend: trend(5.2, 0.35, 1.4) },
-  { label: "Rage Clicks", value: "24,560", delta: "8.1%", up: false, good: false, color: PINK, trend: trend(6.7, 0.3, 1.5) },
+const PERIODS = [
+  { key: "last_7", label: "Last 7 Days", range: () => [moment().subtract(6, "days"), moment()] },
+  { key: "last_14", label: "Last 14 Days", range: () => [moment().subtract(13, "days"), moment()] },
+  { key: "last_30", label: "Last 30 Days", range: () => [moment().subtract(29, "days"), moment()] },
+  { key: "this_month", label: "This Month", range: () => [moment().startOf("month"), moment()] },
 ];
-
-const HEATMAP_TABS = ["Home Screen", "Search Screen", "Salon Details", "Booking Flow", "Payment"];
-// Booking Flow and Payment both point at the booking-summary phone: the mockup
-// only draws four screens.
-const PHONE_FOR_TAB = [0, 1, 2, 3, 3];
-
-const screens = [
-  { screen: "Home Screen", clicks: "2,95,420", pct: "23.7%", unique: "1,98,540", time: "1m 28s", bar: 100 },
-  { screen: "Search Screen", clicks: "2,31,780", pct: "18.6%", unique: "1,55,230", time: "1m 12s", bar: 83 },
-  { screen: "Salon Details", clicks: "2,18,640", pct: "17.5%", unique: "1,42,890", time: "1m 45s", bar: 67 },
-  { screen: "Service Selection", clicks: "1,56,320", pct: "12.5%", unique: "1,05,670", time: "1m 10s", bar: 54 },
-  { screen: "Cart Screen", clicks: "1,12,340", pct: "9.0%", unique: "76,890", time: "1m 05s", bar: 46 },
-  { screen: "Payment Screen", clicks: "74,230", pct: "6.0%", unique: "49,090", time: "1m 20s", bar: 38 },
-  { screen: "Booking Confirmation", clicks: "59,500", pct: "4.8%", unique: "39,720", time: "45s", bar: 27 },
-  { screen: "Offers & Discounts", clicks: "35,000", pct: "2.8%", unique: "24,280", time: "50s", bar: 21 },
-  { screen: "Profile Screen", clicks: "22,380", pct: "1.8%", unique: "15,700", time: "40s", bar: 12.5 },
-  { screen: "Others", clicks: "8,620", pct: "0.7%", unique: "6,410", time: "30s", bar: 6 },
+const PLATFORMS = [
+  { value: "all", label: "All Platforms" },
+  { value: "android", label: "Android" },
+  { value: "ios", label: "iOS" },
+  { value: "web", label: "Web" },
 ];
+const PLATFORM_LABEL = { android: "Android", ios: "iOS", web: "Web", app: "App (platform not sent)" };
 
-const elements = [
-  { element: "Search Bar", clicks: "2,10,340", pct: "16.9%" },
-  { element: "Salon Card", clicks: "1,78,560", pct: "14.3%" },
-  { element: "Add to Cart Button", clicks: "1,12,340", pct: "9.0%" },
-  { element: "Filter Button", clicks: "98,670", pct: "7.9%" },
-  { element: "Book Now Button", clicks: "76,230", pct: "6.1%" },
-  { element: "Back Button", clicks: "68,540", pct: "5.5%" },
-  { element: "Service Item", clicks: "64,320", pct: "5.2%" },
-  { element: "Offers Banner", clicks: "58,760", pct: "4.7%" },
-  { element: "Time Slot", clicks: "48,350", pct: "3.9%" },
-  { element: "Apply Coupon", clicks: "36,890", pct: "3.0%" },
+// Heatmap tabs -> the API's screen key and the wireframe that draws it
+// (Checkout and Payment share the booking-summary phone).
+const HEATMAP_TABS = [
+  { label: "Home Screen", screen: "home", phone: 0 },
+  { label: "Search Screen", screen: "search", phone: 1 },
+  { label: "Salon Details", screen: "salon_details", phone: 2 },
+  { label: "Checkout", screen: "checkout", phone: 3 },
+  { label: "Payment", screen: "payment", phone: 3 },
 ];
+const PHONE_SCREENS = ["home", "search", "salon_details", "checkout"];
 
-const areas = [
-  { n: 1, area: "Top Section", clicks: "2,45,670", pct: "19.7%", color: "#F97316" },
-  { n: 2, area: "Search & Filters", clicks: "2,18,430", pct: "17.5%", color: "#7C5CF0" },
-  { n: 3, area: "Salon / Content Area", clicks: "4,12,560", pct: "33.1%", color: BLUE },
-  { n: 4, area: "Bottom Actions (CTAs)", clicks: "3,05,430", pct: "24.5%", color: "#CA9A04" },
-  { n: 5, area: "Navigation Bar", clicks: "66,140", pct: "5.3%", color: "#16A34A" },
+const AREA_COLORS = { top: "#F97316", search: "#7C5CF0", content: "#3B82F6", cta: "#CA9A04", nav: "#16A34A" };
+const USER_TYPES = [
+  { key: "new", label: "New (0-1 bookings)", color: "#6D4AE0" },
+  { key: "active", label: "Active (2-4)", color: GREEN },
+  { key: "loyal", label: "Loyal (5+)", color: ORANGE },
 ];
-
-const rageClicks = [
-  { element: "Apply Coupon", rage: "8,540", affected: "5,630" },
-  { element: "Proceed to Pay", rage: "6,240", affected: "4,120" },
-  { element: "Book Now Button", rage: "5,310", affected: "3,350" },
-  { element: "Add to Cart", rage: "3,890", affected: "2,980" },
-  { element: "Time Slot Selection", rage: "2,580", affected: "1,940" },
-];
-
-const gestures = [
-  { gesture: "Long Press (Salon Card)", users: "12,450", pct: "9.3%" },
-  { gesture: "Swipe (Left/Right)", users: "24,730", pct: "18.5%" },
-  { gesture: "Pull to Refresh", users: "36,890", pct: "27.6%" },
-  { gesture: "Pinch to Zoom", users: "8,120", pct: "6.1%" },
-  { gesture: "Back Swipe", users: "22,310", pct: "16.7%" },
-  { gesture: "Other Gestures", users: "29,460", pct: "22.1%" },
-];
-
-const dropOffs = [
-  { step: "Salon Details → Add to Cart", users: "1,05,670", rate: 43.9 },
-  { step: "Add to Cart → Checkout", users: "46,456", rate: 22.1 },
-  { step: "Checkout → Payment", users: "26,175", rate: 16.7 },
-  { step: "Payment → Success", users: "8,265", rate: 7.1 },
-  { step: "Others", users: "9,120", rate: 10.2 },
-];
-const maxDropOff = Math.max(...dropOffs.map((row) => row.rate));
-
-const userTypes = [
-  { key: "new", label: "New Users", color: "#6D4AE0" },
-  { key: "active", label: "Active Users", color: GREEN },
-  { key: "loyal", label: "Loyal Users", color: ORANGE },
-];
-const behavior = [
-  { metric: "Avg. Clicks per Session", new: "28.4", active: "45.7", loyal: "63.2" },
-  { metric: "Avg. Time to Click (s)", new: "2.8", active: "2.3", loyal: "1.9" },
-  { metric: "Clicks per Screen", new: "17.2", active: "28.9", loyal: "36.6" },
-  { metric: "Rage Click %", new: "3.6%", active: "2.4%", loyal: "1.5%" },
-  { metric: "Conversion Rate", new: "6.2%", active: "9.8%", loyal: "14.3%" },
-];
-
-const devices = [
-  { device: "Android", clicks: "47.2", accuracy: "94.6%", tone: "good", mistap: "5.4%" },
-  { device: "iOS", clicks: "45.1", accuracy: "95.2%", tone: "good", mistap: "4.8%" },
-  { device: "Web", clicks: "32.6", accuracy: "91.3%", tone: "fair", mistap: "8.7%" },
-];
-const ACCURACY_TONES = {
-  good: "bg-emerald-50 text-emerald-600",
-  fair: "bg-amber-50 text-amber-600",
-};
-
-const insights = [
-  { icon: MousePointerClick, color: "#E11D48", tint: "#FFE4E6", text: "Users click most on Search Bar, Salon Cards & Add to Cart." },
-  { icon: ChartColumn, color: BLUE, tint: "#DBEAFE", text: "High drop-off observed between Add to Cart → Checkout (22.1%)." },
-  { icon: ShieldAlert, color: "#16A34A", tint: "#DCFCE7", text: "Payment screen has highest rage clicks, improve reliability." },
-  { icon: Star, color: "#D97706", tint: "#FEF3C7", text: "Loyal users click 40% more but rage click 60% less than new users." },
-  { icon: Timer, color: "#7C5CF0", tint: "#EDE9FE", text: "Average time to click improved by 6.4% this week." },
-];
-
 const glossary = [
-  { icon: MousePointerClick, color: "#7C5CF0", tint: "#EDE9FE", term: "Clicks", text: "Total number of times any element was clicked." },
-  { icon: Zap, color: "#E11D48", tint: "#FFE4E6", term: "Rage Clicks", text: "Repeated taps on same element without response." },
-  { icon: Target, color: "#D97706", tint: "#FEF3C7", term: "Click Accuracy", text: "Successful clicks vs total clicks." },
-  { icon: Timer, color: BLUE, tint: "#DBEAFE", term: "Avg. Time to Click", text: "Time taken from screen load to first click." },
-  { icon: TrendingDown, color: "#16A34A", tint: "#DCFCE7", term: "Drop-off Rate", text: "Users who left the flow after a specific step." },
+  { icon: MousePointerClick, color: "#7C5CF0", tint: "#EDE9FE", term: "Interactions", text: "Screen views, taps, searches, filters, salon opens, coupon and checkout steps." },
+  { icon: Zap, color: "#E11D48", tint: "#FFE4E6", term: "Repeated Attempts", text: "Rage taps, invalid coupon codes and unpaid or retried checkouts." },
+  { icon: Target, color: "#D97706", tint: "#FEF3C7", term: "Rage-tap Rate", text: "Rage taps as a share of all taps on that platform." },
+  { icon: Timer, color: "#3B82F6", tint: "#DBEAFE", term: "Avg. Time to Tap", text: "Time from screen open to the first tap (reported by the app)." },
+  { icon: TrendingDown, color: "#16A34A", tint: "#DCFCE7", term: "Drop-off Rate", text: "Users who reached a step but not the next one." },
 ];
 
-const DATE_RANGES = ["May 21 – May 27, 2026", "May 14 – May 20, 2026", "Apr 28 – May 27, 2026"];
-const PLATFORMS = [{ value: "all", label: "Platforms" }, "Android", "iOS", "Web"];
-const VERSIONS = [{ value: "all", label: "All Versions" }, "4.2.0", "4.1.0", "4.0.0"];
+const isNum = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+const num = (v) => (isNum(v) ? Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 }) : DASH);
+const fmtPct = (v) => (isNum(v) ? `${Number(v).toFixed(1)}%` : DASH);
+const secs = (v) => (isNum(v) ? (v >= 60 ? `${Math.floor(v / 60)}m ${String(Math.round(v % 60)).padStart(2, "0")}s` : `${Number(v).toFixed(v < 10 ? 2 : 0)}s`) : DASH);
+const fmtDay = (d) => (d ? moment(d).format("MMM D") : DASH);
+const fmtRange = (from, to) => (from && to ? `${fmtDay(from)} – ${fmtDay(to)}` : DASH);
 
 // ---------------------------------------------------------------------------
 // Building blocks
@@ -216,9 +136,7 @@ const CardHeader = (props) => <BaseCardHeader titleSize={T.title} subtitleSize={
 const KpiTile = (props) => (
   <BaseKpiTile
     sizes={{ label: T.micro, value: T.kpi, delta: T.sm, caption: T.xs }}
-    sparkHeight={40}
-    caption={COMPARE}
-    className="px-4 pb-2 pt-3.5"
+    className="px-4 pb-3 pt-3.5"
     {...props}
   />
 );
@@ -450,81 +368,8 @@ const BookingScreen = () => (
   </PhoneBody>
 );
 
-const PHONES = [
-  { Screen: HomeScreen, blobs: [{ x: 68, y: 12, size: 44 }, { x: 88, y: 27, size: 30 }, { x: 19, y: 92, size: 16 }] },
-  { Screen: SearchScreen, blobs: [{ x: 15, y: 21, size: 32 }, { x: 73, y: 50, size: 24 }, { x: 85, y: 93, size: 28 }] },
-  { Screen: SalonScreen, blobs: [{ x: 14, y: 16, size: 28 }, { x: 60, y: 96, size: 44 }] },
-  { Screen: BookingScreen, blobs: [{ x: 10, y: 5, size: 24 }, { x: 31, y: 93, size: 32 }] },
-];
-
-// --- Click flow (journey) ---------------------------------------------------
-
-// Boxes and bands share one coordinate space (design px), so the SVG bands
-// meet the HTML boxes exactly: the container is laid out at this size.
-const FLOW_W = 413;
-const FLOW_H = 164;
-// Coordinates below were measured at the mockup's height; this squeezes them.
-const sy = (v) => Math.round(v * 0.9);
-
-const ribbon = (x1, a1, b1, x2, a2, b2) => {
-  const m = (x1 + x2) / 2;
-  const [p1, q1, p2, q2] = [a1, b1, a2, b2].map(sy);
-  return `M${x1},${p1} C${m},${p1} ${m},${p2} ${x2},${p2} L${x2},${q2} C${m},${q2} ${m},${q1} ${x1},${q1} Z`;
-};
-
-const flowBoxes = [
-  { id: "open", x: 0, y: 31, w: 60, h: 90, label: "App Open", pct: "100%", sub: "(2,98,540)", tone: "lavender" },
-  { id: "search", x: 107, y: 9, w: 74, h: 44, label: "Search", pct: "62.7%", tone: "lavender" },
-  { id: "explore", x: 107, y: 71, w: 74, h: 45, label: "Explore Home", pct: "29.3%", tone: "lavender" },
-  { id: "offers", x: 107, y: 133, w: 74, h: 44, label: "Offers Page", pct: "8.0%", tone: "lavender" },
-  { id: "salon", x: 220, y: 23, w: 62, h: 40, label: "Salon Details", pct: "55.2%", tone: "lavender" },
-  { id: "none", x: 220, y: 102, w: 62, h: 37, label: "No Further Action", pct: "44.8%", tone: "lavender" },
-  { id: "cart", x: 333, y: 20, w: 79, h: 44, label: "Add to Cart", pct: "56.1%", tone: "green" },
-  { id: "book", x: 333, y: 96, w: 79, h: 45, label: "Book Now", pct: "43.9%", tone: "green" },
-];
-const FLOW_BOX_TONES = {
-  lavender: "bg-[#E9E5FC] text-[#2D2570]",
-  green: "bg-[#DDF3E7] text-[#0F5132]",
-};
-
-const flowBands = [
-  { d: ribbon(60, 34, 78, 107, 12, 50), tone: "#DCD5FA" },
-  { d: ribbon(60, 78, 104, 107, 74, 108), tone: "#DCD5FA" },
-  { d: ribbon(60, 104, 118, 107, 138, 170), tone: "#DCD5FA" },
-  { d: ribbon(181, 12, 36, 220, 25, 46), tone: "#DCD5FA" },
-  { d: ribbon(181, 36, 50, 220, 104, 114), tone: "#DCD5FA" },
-  { d: ribbon(181, 76, 92, 220, 46, 58), tone: "#DCD5FA" },
-  { d: ribbon(181, 92, 108, 220, 114, 126), tone: "#DCD5FA" },
-  { d: ribbon(181, 140, 166, 220, 126, 138), tone: "#DCD5FA" },
-  { d: ribbon(282, 26, 46, 333, 24, 48), tone: "#BFE8D1" },
-  { d: ribbon(282, 46, 60, 333, 100, 124), tone: "#BFE8D1" },
-];
-
-const ClickFlow = () => (
-  <div className="relative mt-2" style={{ width: FLOW_W, height: FLOW_H }}>
-    <svg
-      viewBox={`0 0 ${FLOW_W} ${FLOW_H}`}
-      className="absolute inset-0 h-full w-full"
-      aria-hidden="true"
-    >
-      {flowBands.map((band, i) => (
-        <path key={i} d={band.d} fill={band.tone} opacity={0.9} />
-      ))}
-    </svg>
-
-    {flowBoxes.map((box) => (
-      <div
-        key={box.id}
-        className={`absolute grid place-content-center justify-items-center rounded-md text-center leading-tight shadow-[0_1px_3px_rgba(15,23,42,0.08)] ${FLOW_BOX_TONES[box.tone]}`}
-        style={{ left: box.x, top: sy(box.y), width: box.w, height: sy(box.h) }}
-      >
-        <span className="text-[9px] font-medium">{box.label}</span>
-        <span className="mt-[2px] text-[12px] font-bold">{box.pct}</span>
-        {box.sub && <span className="mt-[1px] text-[8.5px] opacity-70">{box.sub}</span>}
-      </div>
-    ))}
-  </div>
-);
+// The four wireframes, in PHONE_SCREENS order.
+const PHONES = [HomeScreen, SearchScreen, SalonScreen, BookingScreen];
 
 // --- Click intensity (phone zones) -----------------------------------------
 
@@ -556,51 +401,34 @@ const IntensityPhone = () => (
   </div>
 );
 
-const exportScreens = () =>
-  downloadCsv(
-    "click-distribution-by-screen.csv",
-    ["Screen", "Clicks", "Clicks (%)", "Unique Clicks", "Avg. Time on Screen"],
-    screens.map((row) => [row.screen, row.clicks, row.pct, row.unique, row.time])
-  );
+const EmptyNote = ({ children }) => (
+  <div className={`grid flex-1 place-items-center px-3 py-6 text-center text-slate-400 ${T.xs}`}>
+    <p className="max-w-[280px]">{children}</p>
+  </div>
+);
 
 // Title and header controls live in the app bar, not the canvas.
-const PageHeader = ({ title, range, setRange, platform, setPlatform, version, setVersion }) => (
+const PageHeader = ({ title, range, period, setPeriod, onCustom, platform, setPlatform, version, setVersion, versionOptions, onExport }) => (
   <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0 leading-tight">
         <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-          Understand every tap, swipe &amp; click to improve user experience
-        </p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">Understand every tap, swipe &amp; click to improve user experience</p>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        <LiveStamp updated="10:30 AM" className="hidden 2xl:flex" />
+        <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="click-range" maxDays={92} className="relative hidden lg:block" />
         <HeaderSelect
           icon={CalendarDays}
-          label="Date range"
-          value={range}
-          onChange={setRange}
-          options={DATE_RANGES}
+          label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : [])]}
           className="hidden lg:flex"
         />
-        <HeaderSelect
-          icon={MonitorSmartphone}
-          label="Platform"
-          value={platform}
-          onChange={setPlatform}
-          options={PLATFORMS}
-          className="hidden xl:flex"
-        />
-        <HeaderSelect
-          icon={Layers}
-          label="App version"
-          value={version}
-          onChange={setVersion}
-          options={VERSIONS}
-          className="hidden xl:flex"
-        />
-        <HeaderButton icon={Download} label="Export report" color={INDIGO} onClick={exportScreens}>
+        <HeaderSelect icon={MonitorSmartphone} label="Platform" value={platform} onChange={setPlatform} options={PLATFORMS} className="hidden xl:flex" />
+        <HeaderSelect icon={Layers} label="App version" value={version} onChange={setVersion} options={versionOptions} className="hidden xl:flex" />
+        <HeaderButton icon={Download} label="Export report" color={INDIGO} onClick={onExport}>
           <span className="hidden md:inline">Export Report</span>
         </HeaderButton>
       </div>
@@ -613,291 +441,418 @@ const PageHeader = ({ title, range, setRange, platform, setPlatform, version, se
 // ---------------------------------------------------------------------------
 
 const ClickInteractionV2 = ({ title = "User Click & Interaction Analytics" }) => {
-  const [range, setRange] = useState(DATE_RANGES[0]);
+  const dispatch = useDispatch();
+  const { clickInteraction } = useSelector((state) => state.analytics);
+  const [period, setPeriod] = useState(PERIODS[0].key);
+  const [custom, setCustom] = useState(null);
   const [platform, setPlatform] = useState("all");
   const [version, setVersion] = useState("all");
   const [tab, setTab] = useState(0);
+
+  const range = useMemo(() => {
+    if (period === "custom" && custom) return custom;
+    const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[0]).range();
+    return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
+  }, [period, custom]);
+
+  useEffect(() => {
+    const body = { from: range.from, to: range.to };
+    if (platform !== "all") body.platform = platform;
+    if (version !== "all") body.app_version = version;
+    dispatch(fetchClickInteractionV2(body))
+      .unwrap()
+      .catch((message) => toast.error(message || "Failed to load click analytics", { id: "click-v2" }));
+  }, [dispatch, range.from, range.to, platform, version]);
+
+  const data = clickInteraction.data;
+  const loading = clickInteraction.loading && !data;
+  const k = data?.kpis || {};
+  const pk = data?.previous_kpis || {};
+  const compare = data ? `vs ${fmtRange(data.previous.from, data.previous.to)}` : "";
+  const appNote = data?.app_events_since ? `App events since ${fmtDay(data.app_events_since)}` : "Waiting for app events";
+  const screensNote = data?.screens_since ? `Tracked since ${fmtDay(data.screens_since)}` : "No screen views tracked yet";
+  const versionOptions = useMemo(() => [{ value: "all", label: "All Versions" }, ...(data?.app_versions || []).map((v) => ({ value: v, label: v }))], [data]);
+
+  // `good` colours the delta by meaning: slower taps and more repeats are bad.
+  const kpi = (label, key, fmt, color, { inverse = false, missing = compare } = {}) => {
+    const cur = k[key];
+    const prev = pk[key];
+    const d = isNum(cur) && isNum(prev) && prev ? ((cur - prev) / prev) * 100 : null;
+    const up = isNum(d) ? d >= 0 : undefined;
+    return {
+      label,
+      value: loading ? "…" : fmt(cur),
+      delta: isNum(d) ? `${Math.abs(d).toFixed(1)}%` : undefined,
+      up,
+      good: up === undefined ? undefined : inverse ? !up : up,
+      caption: isNum(cur) ? compare : missing,
+      color,
+    };
+  };
+  const kpis = [
+    kpi("Total Interactions", "interactions", num, INDIGO, { missing: screensNote }),
+    kpi("Unique Users", "unique_users", num, GREEN, { missing: screensNote }),
+    kpi("Avg. Interactions per User", "avg_per_user", num, "#3B82F6", { missing: screensNote }),
+    kpi("Total Taps", "taps", num, ORANGE, { missing: appNote }),
+    kpi("Avg. Time to Tap", "avg_seconds_to_tap", secs, "#EC4899", { inverse: true, missing: appNote }),
+    kpi("Repeated Attempts", "repeated_attempts", num, "#EC4899", { inverse: true }),
+  ];
+
+  const heatmaps = data?.heatmaps || {};
+  const activeTab = HEATMAP_TABS[tab];
+  const phoneScreen = (i) => (i === 3 && activeTab.phone === 3 ? activeTab.screen : PHONE_SCREENS[i]);
+  const blobsFor = (screen) => (heatmaps[screen] || []).map((c) => ({ x: c.x * 100, y: c.y * 100, size: Math.round(12 + c.weight * 34) }));
+  const hasTaps = Object.keys(heatmaps).length > 0;
+  const screens = data?.screens || [];
+  const maxViews = Math.max(0, ...screens.map((s) => s.views));
+  const elements = data?.elements || [];
+  const flows = data?.flows || [];
+  const areas = data?.areas;
+  const repeated = data?.repeated_attempts || [];
+  const gestures = data?.gestures || [];
+  const dropOffs = data?.drop_offs || [];
+  const maxDropOff = Math.max(0, ...dropOffs.map((r) => r.rate || 0));
+  const byType = Object.fromEntries((data?.by_customer_type || []).map((r) => [r.type, r]));
+  const typeRows = [
+    { metric: "Interactions per Session", key: "interactions_per_session", fmt: num },
+    { metric: "Interactions per Screen", key: "interactions_per_screen", fmt: num },
+    { metric: "Avg. Time to Tap", key: "avg_seconds_to_tap", fmt: secs },
+    { metric: "Repeated Attempt %", key: "repeated_attempt_rate", fmt: fmtPct },
+    { metric: "Conversion Rate", key: "conversion_rate", fmt: fmtPct },
+  ];
+  const devices = data?.devices || [];
+
+  // Insights from the numbers above.
+  const insights = [];
+  if (elements.length) insights.push({ icon: MousePointerClick, color: "#E11D48", tint: "#FFE4E6", text: `Most used: ${elements.slice(0, 3).map((e) => e.element).join(", ")}.` });
+  const worstDrop = [...dropOffs].filter((d) => d.of).sort((a, b) => (b.rate || 0) - (a.rate || 0))[0];
+  if (worstDrop) insights.push({ icon: ChartColumn, color: "#3B82F6", tint: "#DBEAFE", text: `Biggest drop-off: ${worstDrop.step} (${fmtPct(worstDrop.rate)}).` });
+  if (repeated[0]) insights.push({ icon: ShieldAlert, color: "#16A34A", tint: "#DCFCE7", text: `Most repeated attempts on "${repeated[0].element}" (${num(repeated[0].attempts)} by ${num(repeated[0].users)} users).` });
+  if (byType.loyal?.conversion_rate !== null && byType.new?.conversion_rate !== null && byType.loyal && byType.new) {
+    insights.push({ icon: Star, color: "#D97706", tint: "#FEF3C7", text: `Loyal customers convert at ${fmtPct(byType.loyal.conversion_rate)} vs ${fmtPct(byType.new.conversion_rate)} for new ones.` });
+  }
+  if (screens[0]) insights.push({ icon: Timer, color: "#7C5CF0", tint: "#EDE9FE", text: `${screens[0].label} is the most viewed screen (${fmtPct(screens[0].share)} of views).` });
+
+  const exportReport = () => {
+    if (!data) return;
+    downloadCsv(
+      `click-interaction_${data.from}_${data.to}.csv`,
+      ["Section", "Item", "Count", "Share / Detail"],
+      [
+        ...kpis.map((x) => ["KPI", x.label, x.value, ""]),
+        ...screens.map((s) => ["Screens", s.label, s.views, `${fmtPct(s.share)} · ${s.unique_users} users`]),
+        ...elements.map((e) => ["Elements", e.element, e.clicks, fmtPct(e.share)]),
+        ...flows.map((f) => ["Paths", f.steps.join(" > "), f.sessions, fmtPct(f.share)]),
+        ...repeated.map((r) => ["Repeated attempts", r.element, r.attempts, `${r.users} users`]),
+        ...dropOffs.map((d) => ["Drop-off", d.step, d.dropped, fmtPct(d.rate)]),
+      ]
+    );
+  };
 
   return (
     <>
       <PageHeader
         title={title}
         range={range}
-        setRange={setRange}
+        period={period}
+        setPeriod={setPeriod}
+        onCustom={(from, to) => {
+          setCustom({ from, to });
+          setPeriod("custom");
+        }}
         platform={platform}
         setPlatform={setPlatform}
         version={version}
         setVersion={setVersion}
+        versionOptions={versionOptions}
+        onExport={exportReport}
       />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 1 - KPI tiles                                                */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 1 - KPI tiles */}
         <div className={`grid grid-cols-6 ${GAP}`}>
-          {kpis.map(({ color, trend: series, ...kpi }) => (
-            <KpiTile
-              key={kpi.label}
-              {...kpi}
-              spark={series}
-              sparkColor={color}
-              sparkId={`ci-kpi-${kpi.label.replace(/\W/g, "")}`}
-            />
+          {kpis.map(({ color, ...tile }) => (
+            <KpiTile key={tile.label} {...tile} footer={<span className="mt-2 block h-[3px] rounded-full" style={{ background: color, opacity: 0.5 }} />} />
           ))}
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 2 - Heatmap / distribution by screen / top elements          */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 2 - Heatmap / distribution by screen / top elements */}
         <div className={`grid ${ROW2_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader title="1. Screen Click Heatmap" info />
+            <CardHeader title="1. Screen Tap Heatmap" subtitle={hasTaps ? "Busiest tap spots per screen" : `Tap positions come from the app · ${appNote}`} />
 
             <div className="mt-2.5 flex items-center gap-2">
-              {HEATMAP_TABS.map((label, i) => (
+              {HEATMAP_TABS.map((item, i) => (
                 <button
-                  key={label}
+                  key={item.label}
                   type="button"
                   onClick={() => setTab(i)}
-                  className={`rounded-md border px-3.5 py-1.5 font-medium transition-colors ${T.sm} ${
-                    tab === i
-                      ? "border-transparent text-white"
-                      : "border-[#E6E8F0] bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+                  className={`rounded-md border px-3.5 py-1.5 font-medium transition-colors ${T.sm} ${tab === i ? "border-transparent text-white" : "border-[#E6E8F0] bg-white text-slate-600 hover:bg-slate-50"}`}
                   style={tab === i ? { background: BRAND } : undefined}
                 >
-                  {label}
+                  {item.label}
+                  {heatmaps[item.screen] ? "" : <span className="ml-1 opacity-60">·</span>}
                 </button>
               ))}
             </div>
 
             <div className="mt-3 flex flex-1 items-center justify-between px-1.5">
-              {PHONES.map((phone, i) => {
-                const Screen = phone.Screen;
-                return (
-                  <Phone key={i} active={PHONE_FOR_TAB[tab] === i} blobs={phone.blobs}>
-                    <Screen />
-                  </Phone>
-                );
-              })}
+              {PHONES.map((Screen, i) => (
+                <Phone key={i} active={activeTab.phone === i} blobs={blobsFor(phoneScreen(i))}>
+                  <Screen />
+                </Phone>
+              ))}
             </div>
           </Card>
 
           <Card className="p-4">
-            <CardHeader title="2. Click Distribution by Screen" />
-            <div className="mt-3">
-              <DataTable
-                rowHeight={27}
-                columns={[
-                  { key: "screen", label: "Screen", className: "font-medium text-slate-800" },
-                  {
-                    key: "clicks",
-                    label: "Clicks",
-                    // The bars fade as the screens get quieter, as in the mockup.
-                    render: (row, i) => (
-                      <span className="flex items-center gap-2">
-                        <span className="w-[52px] shrink-0">
-                          <Meter
-                            pct={row.bar}
-                            height={3}
-                            color={`rgba(91,63,240,${Math.max(0.35, 1 - i * 0.07).toFixed(2)})`}
-                            track="transparent"
-                          />
-                        </span>
-                        {row.clicks}
-                      </span>
-                    ),
-                  },
-                  { key: "pct", label: "Clicks (%)", align: "right" },
-                  { key: "unique", label: "Unique Clicks", align: "right" },
-                  { key: "time", label: "Avg. Time on Screen", align: "right" },
-                ]}
-                rows={screens}
-              />
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <CardHeader title="3. Top Clicked Elements" />
-            <div className="mt-3">
-              <DataTable
-                rowHeight={27}
-                columns={[
-                  { key: "element", label: "Element", className: "font-medium text-slate-800" },
-                  { key: "clicks", label: "Clicks", align: "right" },
-                  { key: "pct", label: "Clicks (%)", align: "right" },
-                ]}
-                rows={elements}
-              />
-            </div>
-          </Card>
-        </div>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 3 - Journey / intensity / rage clicks / gestures             */}
-        {/* ---------------------------------------------------------------- */}
-        <div className={`grid ${ROW3_COLS} ${GAP}`}>
-          <Card className="p-4">
-            <CardHeader title="4. User Click Flow (Journey)" subtitle="Most common click paths taken by users" />
-            <ClickFlow />
-          </Card>
-
-          <Card className="p-4">
-            <CardHeader title="5. Click Intensity by Area (All Screens)" />
-            <div className="mt-3 flex items-center gap-4">
-              <IntensityPhone />
-              <div className="min-w-0 flex-1">
+            <CardHeader title="2. Views by Screen" subtitle={data?.screens_since ? undefined : screensNote} />
+            {screens.length ? (
+              <div className="mt-3">
                 <DataTable
-                  rowHeight={30}
+                  rowHeight={27}
                   columns={[
+                    { key: "label", label: "Screen", className: "font-medium text-slate-800" },
                     {
-                      key: "area",
-                      label: "Area",
-                      className: "text-slate-700",
-                      render: (row) => (
+                      key: "views",
+                      label: "Views",
+                      // The bars fade as the screens get quieter, as in the mockup.
+                      render: (row, i) => (
                         <span className="flex items-center gap-2">
-                          <span
-                            className="grid h-[14px] w-[14px] shrink-0 place-items-center rounded-full text-[8px] font-bold"
-                            style={{ background: `${row.color}22`, color: row.color }}
-                          >
-                            {row.n}
+                          <span className="w-[52px] shrink-0">
+                            <Meter pct={maxViews ? (row.views / maxViews) * 100 : 0} height={3} color={`rgba(91,63,240,${Math.max(0.35, 1 - i * 0.07).toFixed(2)})`} track="transparent" />
                           </span>
-                          {row.area}
+                          {num(row.views)}
                         </span>
                       ),
                     },
-                    { key: "clicks", label: "Clicks", align: "right" },
-                    { key: "pct", label: "Clicks (%)", align: "right" },
+                    { key: "share", label: "Views (%)", align: "right", render: (row) => fmtPct(row.share) },
+                    { key: "unique_users", label: "Unique Users", align: "right", render: (row) => num(row.unique_users) },
+                    { key: "avg_seconds", label: "Avg. Time on Screen", align: "right", render: (row) => secs(row.avg_seconds) },
                   ]}
-                  rows={areas}
+                  rows={screens.slice(0, 10)}
                 />
               </div>
-            </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No screen views in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader title="6. Rage Click Analysis" subtitle="Users who repeatedly clicked on same element" />
-            <div className="mt-3">
-              <DataTable
-                rowHeight={26}
-                columns={[
-                  { key: "element", label: "Element", className: "font-medium text-slate-800" },
-                  { key: "rage", label: "Rage Clicks", align: "right" },
-                  { key: "affected", label: "Users Affected", align: "right" },
-                ]}
-                rows={rageClicks}
-              />
-            </div>
+            <CardHeader title="3. Top Clicked Elements" subtitle={data?.elements_source === "server_actions" ? "Actions seen by the server until app taps arrive" : undefined} />
+            {elements.length ? (
+              <div className="mt-3">
+                <DataTable
+                  rowHeight={27}
+                  columns={[
+                    { key: "element", label: "Element", className: "max-w-[130px] truncate font-medium text-slate-800" },
+                    { key: "clicks", label: "Clicks", align: "right", render: (row) => num(row.clicks) },
+                    { key: "share", label: "Clicks (%)", align: "right", render: (row) => fmtPct(row.share) },
+                  ]}
+                  rows={elements}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No interactions in this period"}</EmptyNote>
+            )}
+          </Card>
+        </div>
+
+        {/* Row 3 - Journey / intensity / repeated attempts / gestures */}
+        <div className={`grid ${ROW3_COLS} ${GAP}`}>
+          <Card className="p-4">
+            <CardHeader title="4. Top Screen Paths (Journey)" subtitle="Most common first steps of a user's day" />
+            {flows.length ? (
+              <ul className="mt-3 flex flex-1 flex-col justify-around gap-2">
+                {flows.map((flow, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                      {flow.steps.map((step, j) => (
+                        <Fragment key={j}>
+                          {j > 0 && <ChevronRight size={10} className="shrink-0 text-slate-300" />}
+                          <span className={`rounded-md px-1.5 py-[3px] font-medium ${T.micro} ${j === flow.steps.length - 1 ? "bg-[#DDF3E7] text-[#0F5132]" : "bg-[#E9E5FC] text-[#2D2570]"}`}>{step}</span>
+                        </Fragment>
+                      ))}
+                    </span>
+                    <span className={`shrink-0 text-right text-slate-600 ${T.xs}`}>
+                      <b className="text-slate-800">{fmtPct(flow.share)}</b> ({num(flow.sessions)})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No multi-screen journeys in this period"}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title="5. Tap Intensity by Area (All Screens)" />
+            {areas ? (
+              <div className="mt-3 flex items-center gap-4">
+                <IntensityPhone />
+                <div className="min-w-0 flex-1">
+                  <DataTable
+                    rowHeight={30}
+                    columns={[
+                      {
+                        key: "label",
+                        label: "Area",
+                        className: "text-slate-700",
+                        render: (row, i) => (
+                          <span className="flex items-center gap-2">
+                            <span className="grid h-[14px] w-[14px] shrink-0 place-items-center rounded-full text-[8px] font-bold" style={{ background: `${AREA_COLORS[row.key]}22`, color: AREA_COLORS[row.key] }}>
+                              {i + 1}
+                            </span>
+                            {row.label}
+                          </span>
+                        ),
+                      },
+                      { key: "taps", label: "Taps", align: "right", render: (row) => num(row.taps) },
+                      { key: "share", label: "Taps (%)", align: "right", render: (row) => fmtPct(row.share) },
+                    ]}
+                    rows={areas}
+                  />
+                </div>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : `Needs tap positions from the app · ${appNote}`}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title="6. Repeated Attempts" subtitle="Rage taps, invalid coupons, retried / unpaid checkouts" />
+            {repeated.length ? (
+              <div className="mt-3">
+                <DataTable
+                  rowHeight={26}
+                  columns={[
+                    { key: "element", label: "Element", className: "max-w-[120px] truncate font-medium text-slate-800" },
+                    { key: "attempts", label: "Attempts", align: "right", render: (row) => num(row.attempts) },
+                    { key: "users", label: "Users Affected", align: "right", render: (row) => num(row.users) },
+                  ]}
+                  rows={repeated}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No repeated attempts in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader title="7. Long Press & Gestures" />
-            <div className="mt-3">
-              <DataTable
-                rowHeight={25}
-                columns={[
-                  { key: "gesture", label: "Gesture", className: "font-medium text-slate-800" },
-                  { key: "users", label: "Users", align: "right" },
-                  { key: "pct", label: "% of Users", align: "right" },
-                ]}
-                rows={gestures}
-              />
-            </div>
+            {gestures.length ? (
+              <div className="mt-3">
+                <DataTable
+                  rowHeight={25}
+                  columns={[
+                    { key: "gesture", label: "Gesture", className: "font-medium text-slate-800" },
+                    { key: "users", label: "Users", align: "right", render: (row) => num(row.users) },
+                    { key: "share", label: "% of Users", align: "right", render: (row) => fmtPct(row.share) },
+                  ]}
+                  rows={gestures.slice(0, 6)}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : `Gestures come from the app · ${appNote}`}</EmptyNote>
+            )}
           </Card>
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 4 - Drop-off / behaviour / devices / insights                */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 4 - Drop-off / behaviour / devices / insights */}
         <div className={`grid ${ROW4_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader title="8. Click Drop-off Analysis" subtitle="Where users drop-off from after clicking" />
-            <div className="mt-3">
-              <DataTable
-                rowHeight={27}
-                columns={[
-                  { key: "step", label: "Step", className: "font-medium text-slate-800" },
-                  { key: "users", label: "Drop-off Users", align: "right" },
-                  {
-                    key: "rate",
-                    label: "Drop-off Rate",
-                    render: (row) => (
-                      <span className="flex items-center gap-2">
-                        <span className="w-[58px] shrink-0">
-                          <Meter pct={(row.rate / maxDropOff) * 100} height={4} color={BRAND} track="transparent" />
+            <CardHeader title="8. Drop-off Analysis" subtitle="Users who reached a step but not the next" />
+            {dropOffs.some((d) => d.of) ? (
+              <div className="mt-3">
+                <DataTable
+                  rowHeight={27}
+                  columns={[
+                    { key: "step", label: "Step", className: "font-medium text-slate-800" },
+                    { key: "dropped", label: "Drop-off Users", align: "right", render: (row) => `${num(row.dropped)} / ${num(row.of)}` },
+                    {
+                      key: "rate",
+                      label: "Drop-off Rate",
+                      render: (row) => (
+                        <span className="flex items-center gap-2">
+                          <span className="w-[58px] shrink-0">
+                            <Meter pct={maxDropOff ? ((row.rate || 0) / maxDropOff) * 100 : 0} height={4} color={BRAND} track="transparent" />
+                          </span>
+                          <span>{fmtPct(row.rate)}</span>
                         </span>
-                        <span>{row.rate}%</span>
-                      </span>
-                    ),
-                  },
-                ]}
-                rows={dropOffs}
-              />
-            </div>
+                      ),
+                    },
+                  ]}
+                  rows={dropOffs}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No salon detail views in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader
-              title="9. Click Behavior by User Type"
-              subtitle="Compare click behavior of different user segments"
-            />
-            <table className="mt-3 w-full table-auto border-collapse text-left">
-              <thead>
-                <tr>
-                  <th />
-                  {userTypes.map((type) => (
-                    <th
-                      key={type.key}
-                      className={`pb-2.5 text-center font-medium text-slate-500 ${T.nano}`}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: type.color }} />
-                        {type.label}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {behavior.map((row) => (
-                  <tr key={row.metric} className="h-[27px]">
-                    <td className={`whitespace-nowrap pr-2 text-slate-600 ${T.xs}`}>{row.metric}</td>
-                    {userTypes.map((type) => (
-                      <td key={type.key} className={`text-center font-medium text-slate-800 ${T.xs}`}>
-                        {row[type.key]}
-                      </td>
+            <CardHeader title="9. Interaction by Customer Type" subtitle="By served bookings to date" />
+            {Object.values(byType).some((r) => r.users) ? (
+              <table className="mt-3 w-full table-auto border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th />
+                    {USER_TYPES.map((type) => (
+                      <th key={type.key} className={`pb-2.5 text-center font-medium text-slate-500 ${T.nano}`} title={`${num(byType[type.key]?.users)} users`}>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-[5px] w-[5px] rounded-full" style={{ background: type.color }} />
+                          {type.label}
+                        </span>
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {typeRows.map((row) => (
+                    <tr key={row.metric} className="h-[27px]">
+                      <td className={`whitespace-nowrap pr-2 text-slate-600 ${T.xs}`}>{row.metric}</td>
+                      {USER_TYPES.map((type) => (
+                        <td key={type.key} className={`text-center font-medium text-slate-800 ${T.xs}`}>
+                          {row.fmt(byType[type.key]?.[row.key])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No interactions in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader title="10. Device Click Comparison" />
-            <div className="mt-3">
-              <DataTable
-                rowHeight={36}
-                columns={[
-                  { key: "device", label: "Device", className: "font-medium text-slate-800" },
-                  { key: "clicks", label: "Avg. Clicks per Session", align: "center" },
-                  {
-                    key: "accuracy",
-                    label: "Click Accuracy",
-                    align: "center",
-                    render: (row) => (
-                      <span
-                        className={`inline-block rounded-md px-3 py-[5px] font-semibold ${ACCURACY_TONES[row.tone]}`}
-                      >
-                        {row.accuracy}
-                      </span>
-                    ),
-                  },
-                  { key: "mistap", label: "Mis-tap Rate", align: "center" },
-                ]}
-                rows={devices}
-              />
-            </div>
+            <CardHeader title="10. Device Comparison" />
+            {devices.length ? (
+              <div className="mt-3">
+                <DataTable
+                  rowHeight={36}
+                  columns={[
+                    { key: "platform", label: "Device", className: "font-medium text-slate-800", render: (row) => PLATFORM_LABEL[row.platform] || row.platform },
+                    { key: "users", label: "Users", align: "center", render: (row) => num(row.users) },
+                    { key: "interactions_per_user", label: "Interactions / User", align: "center", render: (row) => num(row.interactions_per_user) },
+                    {
+                      key: "rage_tap_rate",
+                      label: "Rage-tap Rate",
+                      align: "center",
+                      render: (row) =>
+                        isNum(row.rage_tap_rate) ? (
+                          <span className={`inline-block rounded-md px-3 py-[5px] font-semibold ${row.rage_tap_rate <= 5 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>{fmtPct(row.rage_tap_rate)}</span>
+                        ) : (
+                          DASH
+                        ),
+                    },
+                  ]}
+                  rows={devices}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No interactions with a known platform"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
@@ -907,23 +862,19 @@ const ClickInteractionV2 = ({ title = "User Click & Interaction Analytics" }) =>
                 const Icon = item.icon;
                 return (
                   <li key={item.text} className="flex items-center gap-3">
-                    <span
-                      className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md"
-                      style={{ background: item.tint, color: item.color }}
-                    >
+                    <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md" style={{ background: item.tint, color: item.color }}>
                       <Icon size={12} />
                     </span>
                     <span className={`min-w-0 text-slate-700 ${T.xs}`}>{item.text}</span>
                   </li>
                 );
               })}
+              {!insights.length && <li className={`text-center text-slate-400 ${T.xs}`}>{loading ? "Loading…" : "Not enough data for insights yet."}</li>}
             </ul>
           </Card>
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Row 5 - Glossary                                                 */}
-        {/* ---------------------------------------------------------------- */}
+        {/* Row 5 - Glossary */}
         <Card className="px-4 py-3">
           <CardHeader title="What do these metrics mean?" />
           <div className="mt-2 grid grid-cols-5 gap-3">
@@ -931,10 +882,7 @@ const ClickInteractionV2 = ({ title = "User Click & Interaction Analytics" }) =>
               const Icon = item.icon;
               return (
                 <div key={item.term} className="flex min-w-0 items-center gap-2.5">
-                  <span
-                    className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full"
-                    style={{ background: item.tint, color: item.color }}
-                  >
+                  <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full" style={{ background: item.tint, color: item.color }}>
                     <Icon size={11} />
                   </span>
                   <p className={`min-w-0 text-slate-500 ${T.nano}`}>
