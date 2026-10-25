@@ -6,8 +6,7 @@ import {
   Autocomplete,
 } from "@react-google-maps/api";
 import { useState, useCallback, useEffect } from "react";
-
-const LIBRARIES = ["places"];
+import { GOOGLE_MAPS_LOADER } from "../../utils/googleMaps";
 
 const fallbackCenter = { lat: 13.0724, lng: 80.2460 };
 
@@ -22,10 +21,7 @@ export default function MapPicker({
     width: "100%",
     height,
   };
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
-    libraries: LIBRARIES,
-  });
+  const { isLoaded } = useLoadScript(GOOGLE_MAPS_LOADER);
 
   console.log("Maps Key:", import.meta.env.VITE_GOOGLE_MAPS_KEY);
 
