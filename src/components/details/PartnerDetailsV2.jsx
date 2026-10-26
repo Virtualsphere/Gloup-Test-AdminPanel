@@ -8,6 +8,7 @@ import {
   CalendarCheck,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CircleCheck,
   Clock,
@@ -21,19 +22,35 @@ import {
   MapPin,
   MessageCircle,
   MessageSquare,
+  Pencil,
   Phone,
   Scissors,
   ShieldCheck,
   ShieldOff,
   Star,
   Store,
+  Trash2,
   Users,
   Wallet,
   X,
 } from "lucide-react";
 import { fetchPartnerOverviewV2, fetchPartnerPickerV2, sendPartnerNotificationV2 } from "../../redux/slices/analyticsSlice";
-import { updatePartnerStatus } from "../../redux/slices/partnersSlice";
-import { downloadCsv } from "../../utils/format";
+import { deletePartner, getAllPartnersList, getPartnerDetail, updatePartnerStatus } from "../../redux/slices/partnersSlice";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import { EditPartnerModal, savePartnerEdit } from "./PartnerDetails";
+import {
+  ActivityTab,
+  AnalyticsTab,
+  BookingsTab,
+  OffersTab,
+  PayoutsTab,
+  PerformanceTab,
+  ReviewsTab,
+  ServicesTab,
+  SubscriptionsTab,
+} from "./PartnerDetailsTabs";
+import { useListUiState } from "../../hooks/useListUiState";
+import { downloadCsv, pick } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
@@ -58,7 +75,9 @@ import {
 // DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
 // there for why bigger px sizes in T read smaller on screen).
 //
-// Route /partner-details-v2/:id; without an id it shows a salon picker. Data:
+// Route /partner-details-v2/:id; without an id it shows a salon picker over
+// every partner (/getallpartner, the Partners page's list - getPartnerPickerV2
+// stops at 50), searched and paged in the browser. Data:
 // getPartnerOverviewV2 (analyticsSlice `partnerOverview`), read from the
 // appointments of that salon - served bookings are paid and not cancelled /
 // refunded, from go-live, by service date. GloUp revenue = the fixed platform
@@ -66,7 +85,11 @@ import {
 // commission is charged). Empty seat hours = unbooked slot time up to today.
 // Booking source isn't recorded, so that card splits bookings by who they were
 // for (self / someone else). Only the Overview tab is in the mockup; the other
-// tabs point at the classic page (details/PartnerDetails.jsx).
+// tabs (PartnerDetailsTabs.jsx) carry the classic page's backend - services,
+// slots, holidays, stylists, payout logs - and the per-salon APIs of the
+// Bookings / Reviews / Invoices / Monthly Report / Subscriptions pages. Edit
+// Salon and Delete Partner (More Actions) are the classic page's, saving
+// through its savePartnerEdit().
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -352,51 +375,157 @@ const SalonSearch = ({ onPick }) => {
   );
 };
 
-// Shown at /partner-details-v2 with no id: live salons first, filtered by name.
+// The picker pages through every partner, so it reads the full partner list
+// (/getallpartner) rather than getPartnerPickerV2, which returns at most 50.
+const PICKER_PAGE_SIZE = 48;
+const PICKER_UI_KEY = "partnerPicker";
+const PICKER_DEFAULTS = { search: "", page: 1 };
+
+// One /getallpartner row -> what a picker card shows. Partner id = store id.
+const toPickerSalon = (p) => ({
+  store_id: p.id,
+  name: p.name || "No Name",
+  logo: Array.isArray(p.images) ? p.images[0] : null,
+  type: p.categoryName || "",
+  area: pick(p.location, ["area", "locality"]) || "",
+  city: p.location?.city || (typeof p.location === "string" ? p.location : ""),
+  active: p.status === "active",
+});
+
+// 1 … 4 5 6 … 20 style page list.
+const pickerPages = (page, last) => {
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+  const items = [1];
+  if (page > 3) items.push("…");
+  for (let n = Math.max(2, page - 1); n <= Math.min(last - 1, page + 1); n++) items.push(n);
+  if (page < last - 2) items.push("…");
+  items.push(last);
+  return items;
+};
+
+// Shown at /partner-details-v2 with no id: active salons first, then by name.
+// Search and page live in the listUiState slice so they survive opening a
+// salon and coming back.
 const SalonPicker = ({ onPick }) => {
   const dispatch = useDispatch();
-  const [search, setSearch] = useState("");
-  const [salons, setSalons] = useState(null);
+  const partners = useSelector((state) => state.allPartners.allPartnersList);
+  const [ui, setUi] = useListUiState(PICKER_UI_KEY, PICKER_DEFAULTS);
+  const { search, page } = ui;
+  const [status, setStatus] = useState("loading"); // "loading" | "ready" | "failed"
+
   useEffect(() => {
-    const id = setTimeout(() => {
-      dispatch(fetchPartnerPickerV2({ search }))
-        .unwrap()
-        .then((res) => setSalons(res.salons || []))
-        .catch((message) => {
-          setSalons([]);
-          toast.error(message || "Failed to load salons", { id: "partner-picker" });
-        });
-    }, search ? 300 : 0);
-    return () => clearTimeout(id);
-  }, [dispatch, search]);
+    dispatch(getAllPartnersList())
+      .unwrap()
+      .then(() => setStatus("ready"))
+      .catch((message) => {
+        setStatus("failed");
+        toast.error(message || "Failed to load salons", { id: "partner-picker" });
+      });
+  }, [dispatch]);
+
+  const salons = useMemo(
+    () =>
+      (Array.isArray(partners) ? partners : [])
+        .map(toPickerSalon)
+        .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name)),
+    [partners]
+  );
+
+  const term = search.trim().toLowerCase();
+  const matches = term
+    ? salons.filter((s) => [s.name, s.area, s.city, s.type, s.store_id].some((v) => String(v ?? "").toLowerCase().includes(term)))
+    : salons;
+  const lastPage = Math.max(1, Math.ceil(matches.length / PICKER_PAGE_SIZE));
+  const current = Math.min(page, lastPage);
+  const first = (current - 1) * PICKER_PAGE_SIZE;
+  const shown = matches.slice(first, first + PICKER_PAGE_SIZE);
+  // A cached list from the Partners page shows straight away while it refreshes.
+  const loading = status === "loading" && salons.length === 0;
+
+  const pageButton = "grid h-8 min-w-8 place-items-center rounded-lg px-2 font-semibold transition-colors";
+
   return (
     <Card className="p-5">
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
           <h2 className={`font-bold text-slate-900 ${T.title}`}>Choose a salon</h2>
-          <p className={`mt-0.5 text-slate-500 ${T.xs}`}>Live salons are listed first. Showing up to 50.</p>
+          <p className={`mt-0.5 text-slate-500 ${T.xs}`}>Active salons are listed first.</p>
         </div>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, area, city or ID" className={`w-[300px] rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${T.sm}`} />
+        <input
+          value={search}
+          onChange={(e) => {
+            setUi("search", e.target.value);
+            setUi("page", 1);
+          }}
+          placeholder="Search by name, area, city or ID"
+          className={`w-[300px] rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${T.sm}`}
+        />
       </div>
-      {salons === null ? (
+      {loading ? (
         <EmptyNote>Loading…</EmptyNote>
-      ) : salons.length ? (
-        <ul className="mt-4 grid grid-cols-4 gap-3">
-          {salons.map((s) => (
-            <li key={s.store_id}>
-              <button type="button" onClick={() => onPick(s.store_id)} className="flex w-full items-center gap-3 rounded-xl border border-[#E6E8F0] p-3 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50/40">
-                <Logo name={s.name} logo={s.logo} size={40} className="rounded-lg text-[13px]" />
-                <span className="min-w-0 flex-1">
-                  <span className={`block truncate font-semibold text-slate-900 ${T.sm}`}>{s.name}</span>
-                  <span className={`block truncate text-slate-500 ${T.tiny}`}>{[TYPE_LABEL[s.type], s.area, s.city].filter(Boolean).join(" · ")}</span>
-                </span>
-                <span className={`h-2 w-2 shrink-0 rounded-full ${s.live ? "bg-emerald-500" : "bg-slate-300"}`} title={s.live ? "Live" : "Not live"} />
+      ) : shown.length ? (
+        <>
+          <ul className="mt-4 grid grid-cols-4 gap-3">
+            {shown.map((s) => (
+              <li key={s.store_id}>
+                <button type="button" onClick={() => onPick(s.store_id)} className="flex w-full items-center gap-3 rounded-xl border border-[#E6E8F0] p-3 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50/40">
+                  <Logo name={s.name} logo={s.logo} size={40} className="rounded-lg text-[13px]" />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate font-semibold text-slate-900 ${T.sm}`}>{s.name}</span>
+                    <span className={`block truncate text-slate-500 ${T.tiny}`}>{[s.type, s.area, s.city].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${s.active ? "bg-emerald-500" : "bg-slate-300"}`} title={s.active ? "Active" : "Inactive"} />
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#EDEFF5] pt-4">
+            <span className={`text-slate-500 ${T.xs}`}>
+              Showing {(first + 1).toLocaleString("en-IN")}–{(first + shown.length).toLocaleString("en-IN")} of{" "}
+              {matches.length.toLocaleString("en-IN")} salon{matches.length === 1 ? "" : "s"}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setUi("page", current - 1)}
+                disabled={current === 1}
+                aria-label="Previous page"
+                className={`${pageButton} border border-[#E6E8F0] bg-white text-slate-600 hover:bg-slate-50 disabled:text-slate-300 ${T.xs}`}
+              >
+                <ChevronLeft size={14} />
               </button>
-            </li>
-          ))}
-        </ul>
+              {pickerPages(current, lastPage).map((item, i) =>
+                item === "…" ? (
+                  <span key={`gap-${i}`} className={`px-1 text-slate-400 ${T.xs}`}>
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setUi("page", item)}
+                    className={`${pageButton} ${T.xs} ${item === current ? "text-white" : "border border-[#E6E8F0] bg-white text-slate-600 hover:bg-slate-50"}`}
+                    style={item === current ? { background: BRAND } : undefined}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => setUi("page", current + 1)}
+                disabled={current === lastPage}
+                aria-label="Next page"
+                className={`${pageButton} border border-[#E6E8F0] bg-white text-slate-600 hover:bg-slate-50 disabled:text-slate-300 ${T.xs}`}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </span>
+          </div>
+        </>
       ) : (
-        <EmptyNote>No salons match “{search}”.</EmptyNote>
+        <EmptyNote>{status === "failed" ? "Couldn't load the salons." : term ? `No salons match “${search}”.` : "No salons yet."}</EmptyNote>
       )}
     </Card>
   );
@@ -426,6 +555,9 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const [messageOpen, setMessageOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [editData, setEditData] = useState(null); // classic /getallpartnerdetails payload
+  const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const range = useMemo(() => {
     const [from, to] = (PERIODS.find((p) => p.value === period) || PERIODS[0]).range();
@@ -502,6 +634,40 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
       setStatusBusy(false);
     }
   };
+  // Edit Salon / Delete Partner are the classic page's, on the same APIs.
+  const openEdit = async () => {
+    try {
+      setEditData(await dispatch(getPartnerDetail({ id: String(storeId) })).unwrap());
+    } catch (message) {
+      toast.error(typeof message === "string" ? message : "Failed to load the salon", { id: "partner-v2-edit" });
+    }
+  };
+  const saveEdit = async (updated) => {
+    try {
+      setSaving(true);
+      if (!(await savePartnerEdit(dispatch, String(storeId), updated))) return;
+      toast.success("Partner updated", { id: "partner-v2-edit" });
+      setEditData(null);
+      load();
+    } catch {
+      toast.error("Failed to save changes. Please try again.", { id: "partner-v2-edit" });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const confirmDelete = async () => {
+    try {
+      // The thunk wraps the id itself ({ id }), as the Partners list calls it.
+      await dispatch(deletePartner(storeId)).unwrap();
+      setDeleteOpen(false);
+      toast.success(`${p?.name || "Partner"} deleted`, { id: "partner-v2-delete" });
+      navigate("/partner");
+    } catch (message) {
+      setDeleteOpen(false);
+      toast.error(typeof message === "string" ? message : "Failed to delete partner.", { id: "partner-v2-delete" });
+    }
+  };
+
   const exportReport = () => {
     if (!data) return;
     const rows = [
@@ -592,10 +758,15 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const quickActions = [
     { icon: MessageSquare, label: "Send Message", color: BRAND, onClick: () => setMessageOpen(true) },
     { icon: Gift, label: "Create Offer", color: BRAND, onClick: () => navigate("/category-discount") },
-    { icon: Star, label: "View Reviews", color: "#475569", onClick: () => navigate("/review") },
+    { icon: Star, label: "View Reviews", color: "#475569", onClick: () => setTab("Reviews") },
     { icon: FileDown, label: "Download Report", color: "#475569", onClick: exportReport },
     { icon: ExternalLink, label: "Open Classic Page", color: "#475569", onClick: classic },
     { icon: active ? ShieldOff : ShieldCheck, label: active ? "Deactivate Partner" : "Activate Partner", color: active ? RED : "#16A34A", onClick: toggleStatus, disabled: statusBusy || !p },
+  ];
+  const moreActions = [
+    ...quickActions.slice(2),
+    { icon: Pencil, label: "Edit Salon", color: "#475569", onClick: openEdit },
+    { icon: Trash2, label: "Delete Partner", color: RED, onClick: () => setDeleteOpen(true), disabled: !p },
   ];
 
   return (
@@ -620,7 +791,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
               </ActionButton>
               {moreOpen && (
                 <ul className="absolute right-0 top-full z-20 mt-1 w-[200px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg" onMouseLeave={() => setMoreOpen(false)}>
-                  {quickActions.slice(2).map((action) => (
+                  {moreActions.map((action) => (
                     <li key={action.label}>
                       <button
                         type="button"
@@ -759,14 +930,24 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
             </div>
 
             {tab !== TABS[0] ? (
-              <Card className="items-center justify-center gap-2 py-24 text-center">
-                <ExternalLink size={26} className="text-slate-400" />
-                <p className={`font-semibold text-slate-700 ${T.sm}`}>{tab}</p>
-                <p className={`max-w-[360px] text-slate-500 ${T.xs}`}>This tab isn't redesigned yet. The classic partner page has the full details.</p>
-                <button type="button" onClick={classic} className={`mt-1 font-semibold text-blue-600 hover:underline ${T.xs}`}>
-                  Open classic page
-                </button>
-              </Card>
+              <>
+                {tab === "Analytics" && (
+                  <AnalyticsTab
+                    data={data}
+                    loading={loading}
+                    periodLabel={periodLabel}
+                    periodSelect={<Select value={period} onChange={setPeriod} options={PERIODS} />}
+                  />
+                )}
+                {tab === "Bookings" && <BookingsTab storeId={storeId} recent={recent} loading={loading} />}
+                {tab === "Services" && <ServicesTab storeId={storeId} />}
+                {tab === "Offers" && <OffersTab storeId={storeId} />}
+                {tab === "Performance" && <PerformanceTab storeId={storeId} salonName={p?.name} />}
+                {tab === "Reviews" && <ReviewsTab storeId={storeId} />}
+                {tab === "Payouts" && <PayoutsTab storeId={storeId} />}
+                {tab === "Subscriptions" && <SubscriptionsTab storeId={storeId} subscription={sub} loading={loading} />}
+                {tab === "Activity Log" && <ActivityTab activity={activity} loading={loading} kinds={ACTIVITY} />}
+              </>
             ) : (
               <>
                 {/* KPI tiles */}
@@ -873,7 +1054,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                       right={
                         <span className="flex items-center gap-3">
                           <Select value={period} onChange={setPeriod} options={PERIODS} />
-                          <ViewAll pill onClick={classic} />
+                          <ViewAll pill onClick={() => setTab("Services")} />
                         </span>
                       }
                     />
@@ -987,7 +1168,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                   </Card>
 
                   <Card className={PAD}>
-                    <CardHeader title="Ratings & Reviews" right={<ViewAll onClick={() => navigate("/review")} />} />
+                    <CardHeader title="Ratings & Reviews" right={<ViewAll onClick={() => setTab("Reviews")} />} />
                     {ratings?.total ? (
                       <div className="flex flex-1 items-center gap-6 pt-2">
                         <div className="flex shrink-0 flex-col items-center">
@@ -1024,7 +1205,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                 {/* Row 4 - Recent bookings / activity / quick actions */}
                 <div className={`grid ${ROW4_COLS} ${GAP}`}>
                   <Card className={PAD}>
-                    <CardHeader title="Recent Bookings" subtitle="Latest paid bookings, any status" right={<ViewAll pill onClick={classic} />} />
+                    <CardHeader title="Recent Bookings" subtitle="Latest paid bookings, any status" right={<ViewAll pill onClick={() => setTab("Bookings")} />} />
                     {recent.length ? (
                       <ul className="mt-2 flex flex-1 flex-col justify-around">
                         {recent.slice(0, 4).map((row, i) => {
@@ -1068,7 +1249,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                           Partner Activity <span className="font-medium text-slate-500">(Latest)</span>
                         </>
                       }
-                      right={<ViewAll pill onClick={classic} />}
+                      right={<ViewAll pill onClick={() => setTab("Activity Log")} />}
                     />
                     {activity.length ? (
                       <ul className="mt-2 flex flex-1 flex-col justify-around gap-2">
@@ -1127,6 +1308,17 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
       </ScaledCanvas>
 
       {messageOpen && p && <MessageDialog salon={p.name} onClose={() => setMessageOpen(false)} onSend={sendMessage} />}
+
+      {/* The classic page's edit form and delete confirmation, outside the canvas. */}
+      {editData && (
+        <EditPartnerModal isOpen onClose={() => setEditData(null)} partnerData={editData} onSave={saveEdit} saving={saving} />
+      )}
+      <DeleteConfirmationModal
+        isOpen={deleteOpen}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteOpen(false)}
+        partnerName={p?.name || "this partner"}
+      />
     </>
   );
 };

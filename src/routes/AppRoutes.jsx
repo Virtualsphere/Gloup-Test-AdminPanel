@@ -1,5 +1,6 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { lazy, Suspense } from "react";
+import ErrorBoundary from "../components/common/ErrorBoundary";
 
 // Lazy-loaded components
 const DashboardPage = lazy(() =>
@@ -55,70 +56,74 @@ const PartnerDetailsV2 = lazy(() => import("../components/details/PartnerDetails
 const SalonCategoryIntelligenceV2 = lazy(() => import("../components/analytics/SalonCategoryIntelligenceV2"));
 
 const AppRoutes = () => {
+  const { pathname } = useLocation();
+
   return (
-    <Suspense
-      fallback={
-        <div className="text-center p-4 min-h-screen flex justify-center items-center">
-          Loading...
-        </div>
-      }
-    >
-      <Routes>
-        <Route path="/" element={<DashboardPage title="DashboardPage" />} />
-        <Route path="/analytics-intelligence" element={<AnalyticsIntelligence title="Analytics Intelligence" />} />
-        <Route path="/analytics-intelligence-v2" element={<AnalyticsIntelligenceV2 title="Analytics Intelligence V2" />} />
-        <Route path="/dashboard-v2" element={<DashboardV2 title="Dashboard" />} />
-        <Route path="/user-analytics-v2" element={<UserAnalyticsV2 title="User Analytics Dashboard" />} />
-        <Route path="/deep-user-insights-v2" element={<DeepUserInsightsV2 title="Deep User Insights" />} />
-        <Route path="/growth-dashboard-v2" element={<GrowthDashboardV2 title="Dashboard" />} />
-        <Route path="/click-interaction-v2" element={<ClickInteractionV2 title="User Click & Interaction Analytics" />} />
-        <Route path="/user-analytics-overview-v2" element={<UserAnalyticsOverviewV2 title="User Analytics" />} />
-        <Route path="/service-intelligence-v2" element={<ServiceIntelligenceV2 title="Service Intelligence Dashboard" />} />
-        <Route path="/behavior-analytics-v2" element={<BehaviorAnalyticsV2 title="Advanced Behavior Analytics" />} />
-        <Route path="/user-analytics-360-v2" element={<UserAnalytics360V2 title="User Analytics 360°" />} />
-        <Route path="/salon-heatmap-v2" element={<SalonHeatmapV2 title="Salon Analytics - Heatmap" />} />
-        <Route path="/booking-intelligence-v2" element={<BookingIntelligenceV2 title="Booking Intelligence" />} />
-        <Route path="/partner-details-v2" element={<PartnerDetailsV2 title="Partner Details" />} />
-        <Route path="/partner-details-v2/:id" element={<PartnerDetailsV2 title="Partner Details" />} />
-        <Route path="/salon-category-intelligence-v2" element={<SalonCategoryIntelligenceV2 title="Salon Category Intelligence" />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/admin" element={<Admin title="Admin" />} />
-        <Route path="/allusers" element={<AllUsers title="Users"/>} />
-        <Route path="/gender-probability" element={<GenderProbability title="Gender Probability"/>} />
-        <Route path="/category-discount" element={<CategoryDiscount title="Category Discount"/>} />
-        <Route path="/userdetails" element={<UserDetails />} />
-        <Route path="/userdetails/:id" element={<UserDetails />} />
-        <Route path="/partner" element={<Partner title="Partner"/>} />
-        <Route path="/bookings" element={<Bookings title="Bookings"/>} />
-        <Route path="/bookings-by-order-date" element={<BookingsByOrderDate title="Bookings by Order Date"/>} />
-        <Route path="/monthly-report" element={<MonthlyReportPartners title="Monthly Report"/>} />
-        <Route path="/monthly-report/:id" element={<MonthlyReportDetails />} />
-        <Route path="/holidays" element={<Holidays title="Holidays"/>} />
-        <Route path="/bookings/:id" element={<BookingForm />} />
-        <Route path="/partnersubscriptionplans" element={<PartnerSubscription title="Partner Subscription" />} />
-        <Route path="/partnersubscription/add" element={<PartnerSubscriptionForm />} />
-        <Route path="/partnersubscription/edit/:id" element={<PartnerSubscriptionForm />} />
-        <Route path="/partnerdetails/:id" element={<PartnerDetails title="Partner Details"/>} />
-        <Route path="/createPartner" element={<CreatePartner title="CreatePartner"/>} />
-        <Route path="/verifypartner" element={<VerifyPartner title="Verify Partner"/>} />
-        <Route path="/appointments" element={<Appointments title="Appointments"/>} />
-        <Route path="/services" element={<Services title="Services"/>} />
-        <Route path="/storeservices/:id" element={<StoreServices title="Store Services"/>} />
-        <Route path="/category" element={<Category title="Category"/>} />
-        <Route path="/notification" element={<Notification title="Notification"/>} />
-        <Route path="/banner" element={<Banner title="Banner"/>} />
-        <Route path="/marketing" element={<Marketing title="Marketing"/>} />
-        <Route path="/coupon" element={<Coupon title="Coupon"/>} />
-        <Route path="/refund" element={<Refund title="Refunds"/>} />
-        <Route path="/subscription" element={<Subscription title="Subscription"/>} />
-        <Route path="/review" element={<Review title="Reviews & Ratings"/>} />
-        <Route path="/partnersubscriptionstatus" element={<PartnerPaymentStatusPage title="Partner Subscription Status"/>} />
-        <Route path="/invoice" element={<InvoicePartners title="Invoices & Payouts"/>} />
-        <Route path="/invoice/:id" element={<InvoiceDetails />} />
-        <Route path="/partner-subscriptions" element={<PartnerManualSubscriptions title="Partner Subscriptions"/>} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Suspense>
+    <ErrorBoundary resetKey={pathname}>
+      <Suspense
+        fallback={
+          <div className="text-center p-4 min-h-screen flex justify-center items-center">
+            Loading...
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/" element={<DashboardPage title="DashboardPage" />} />
+          <Route path="/analytics-intelligence" element={<AnalyticsIntelligence title="Analytics Intelligence" />} />
+          <Route path="/analytics-intelligence-v2" element={<AnalyticsIntelligenceV2 title="Analytics Intelligence V2" />} />
+          <Route path="/dashboard-v2" element={<DashboardV2 title="Dashboard" />} />
+          <Route path="/user-analytics-v2" element={<UserAnalyticsV2 title="User Analytics Dashboard" />} />
+          <Route path="/deep-user-insights-v2" element={<DeepUserInsightsV2 title="Deep User Insights" />} />
+          <Route path="/growth-dashboard-v2" element={<GrowthDashboardV2 title="Dashboard" />} />
+          <Route path="/click-interaction-v2" element={<ClickInteractionV2 title="User Click & Interaction Analytics" />} />
+          <Route path="/user-analytics-overview-v2" element={<UserAnalyticsOverviewV2 title="User Analytics" />} />
+          <Route path="/service-intelligence-v2" element={<ServiceIntelligenceV2 title="Service Intelligence Dashboard" />} />
+          <Route path="/behavior-analytics-v2" element={<BehaviorAnalyticsV2 title="Advanced Behavior Analytics" />} />
+          <Route path="/user-analytics-360-v2" element={<UserAnalytics360V2 title="User Analytics 360°" />} />
+          <Route path="/salon-heatmap-v2" element={<SalonHeatmapV2 title="Salon Analytics - Heatmap" />} />
+          <Route path="/booking-intelligence-v2" element={<BookingIntelligenceV2 title="Booking Intelligence" />} />
+          <Route path="/partner-details-v2" element={<PartnerDetailsV2 title="Partner Details" />} />
+          <Route path="/partner-details-v2/:id" element={<PartnerDetailsV2 title="Partner Details" />} />
+          <Route path="/salon-category-intelligence-v2" element={<SalonCategoryIntelligenceV2 title="Salon Category Intelligence" />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/admin" element={<Admin title="Admin" />} />
+          <Route path="/allusers" element={<AllUsers title="Users"/>} />
+          <Route path="/gender-probability" element={<GenderProbability title="Gender Probability"/>} />
+          <Route path="/category-discount" element={<CategoryDiscount title="Category Discount"/>} />
+          <Route path="/userdetails" element={<UserDetails />} />
+          <Route path="/userdetails/:id" element={<UserDetails />} />
+          <Route path="/partner" element={<Partner title="Partner"/>} />
+          <Route path="/bookings" element={<Bookings title="Bookings"/>} />
+          <Route path="/bookings-by-order-date" element={<BookingsByOrderDate title="Bookings by Order Date"/>} />
+          <Route path="/monthly-report" element={<MonthlyReportPartners title="Monthly Report"/>} />
+          <Route path="/monthly-report/:id" element={<MonthlyReportDetails />} />
+          <Route path="/holidays" element={<Holidays title="Holidays"/>} />
+          <Route path="/bookings/:id" element={<BookingForm />} />
+          <Route path="/partnersubscriptionplans" element={<PartnerSubscription title="Partner Subscription" />} />
+          <Route path="/partnersubscription/add" element={<PartnerSubscriptionForm />} />
+          <Route path="/partnersubscription/edit/:id" element={<PartnerSubscriptionForm />} />
+          <Route path="/partnerdetails/:id" element={<PartnerDetails title="Partner Details"/>} />
+          <Route path="/createPartner" element={<CreatePartner title="CreatePartner"/>} />
+          <Route path="/verifypartner" element={<VerifyPartner title="Verify Partner"/>} />
+          <Route path="/appointments" element={<Appointments title="Appointments"/>} />
+          <Route path="/services" element={<Services title="Services"/>} />
+          <Route path="/storeservices/:id" element={<StoreServices title="Store Services"/>} />
+          <Route path="/category" element={<Category title="Category"/>} />
+          <Route path="/notification" element={<Notification title="Notification"/>} />
+          <Route path="/banner" element={<Banner title="Banner"/>} />
+          <Route path="/marketing" element={<Marketing title="Marketing"/>} />
+          <Route path="/coupon" element={<Coupon title="Coupon"/>} />
+          <Route path="/refund" element={<Refund title="Refunds"/>} />
+          <Route path="/subscription" element={<Subscription title="Subscription"/>} />
+          <Route path="/review" element={<Review title="Reviews & Ratings"/>} />
+          <Route path="/partnersubscriptionstatus" element={<PartnerPaymentStatusPage title="Partner Subscription Status"/>} />
+          <Route path="/invoice" element={<InvoicePartners title="Invoices & Payouts"/>} />
+          <Route path="/invoice/:id" element={<InvoiceDetails />} />
+          <Route path="/partner-subscriptions" element={<PartnerManualSubscriptions title="Partner Subscriptions"/>} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
