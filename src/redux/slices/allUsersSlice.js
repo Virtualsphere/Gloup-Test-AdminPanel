@@ -73,7 +73,7 @@ export const updateUserStatus = createAsyncThunk(
   }
 );
 
-// ---- Users V2 (AllUsers / UserDetails) ------------------------------------
+// ---- Users V2 (UsersV2 / UserDetailsV2) ------------------------------------
 
 const postAdmin = async (path, body, fallback, rejectWithValue) => {
   try {

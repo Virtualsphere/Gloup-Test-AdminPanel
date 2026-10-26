@@ -148,7 +148,7 @@ export const updateFreeBookingLimit = createAsyncThunk(
   }
 );
 
-// ---- V2 (PartnerManualSubscriptions page) ----
+// ---- V2 (PartnerSubscriptionsV2 page) ----
 
 const v2Error = (error, fallback) =>
   error.response?.data?.error?.message || error.message || fallback;

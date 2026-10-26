@@ -67,7 +67,7 @@ export const downloadMonthlyInvoicePDF = createAsyncThunk(
   }
 );
 
-// ---- V2 (MonthlyReportPartners page) ----
+// ---- V2 (MonthlyReportV2 page) ----
 
 const v2Error = (error, fallback) =>
   error.response?.data?.error?.message || error.message || fallback;

@@ -84,7 +84,7 @@ export const updateReviewRequest = createAsyncThunk(
   }
 );
 
-// ---- Reviews V2 (Review page) ----
+// ---- Reviews V2 (ReviewsRatingsV2 page) ----
 
 const errorMessage = (error, fallback) =>
   error.response?.data?.error?.message || error.message || fallback;
