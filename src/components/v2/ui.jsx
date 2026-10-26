@@ -1,6 +1,20 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import moment from "moment";
+import { toast } from "react-hot-toast";
 import { Area, AreaChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
-import { ArrowDown, ArrowUp, Bell, ChevronDown, Info, RefreshCw, Search } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bell,
+  CalendarDays,
+  ChevronDown,
+  Download,
+  Info,
+  Loader2,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import { CARD, CHART_TOOLTIP, initials, rampColor } from "./tokens";
 
 // Building blocks shared by the V2 pages. Each page still owns its type scale
@@ -580,3 +594,284 @@ export const LiveStamp = ({ updated, className = "flex" }) => (
     <RefreshCw size={12} className="shrink-0 text-slate-400" />
   </span>
 );
+
+const DIALOG_DASH = "—";
+const fmtDialogRange = (from, to) => {
+  const a = moment(from);
+  const b = moment(to);
+  return `${a.format(a.year() === b.year() ? "D MMM" : "D MMM YYYY")} – ${b.format("D MMM YYYY")}`;
+};
+
+// Header date button with a "Custom range" popover (from / to, at most
+// `maxDays` days, nothing after today). onApply(from, to) gets YYYY-MM-DD.
+export const DateRangeButton = ({
+  from,
+  to,
+  onApply,
+  color,
+  toastId = "v2-date-range",
+  maxDays = 366,
+  className = "relative hidden md:block",
+}) => {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState({ from: "", to: "" });
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handle = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  const toggle = () => {
+    setDraft({ from, to });
+    setOpen((value) => !value);
+  };
+  const apply = () => {
+    if (!draft.from || !draft.to || draft.from > draft.to) {
+      toast.error("Pick a start date on or before the end date", { id: toastId });
+      return;
+    }
+    if (moment(draft.to).diff(moment(draft.from), "days") > maxDays - 1) {
+      toast.error(`The range can be at most ${maxDays} days`, { id: toastId });
+      return;
+    }
+    onApply(draft.from, draft.to);
+    setOpen(false);
+  };
+
+  return (
+    <div className={className} ref={ref}>
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300"
+      >
+        {fmtDialogRange(from, to)}
+        <CalendarDays size={14} className="shrink-0 text-slate-500" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-2 w-[260px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+          <p className="text-[13px] font-bold text-slate-800">Custom range</p>
+          {[
+            ["from", "From"],
+            ["to", "To"],
+          ].map(([key, label]) => (
+            <label key={key} className="mt-2 block text-[12px] text-slate-500">
+              {label}
+              <input
+                type="date"
+                value={draft[key]}
+                max={moment().format("YYYY-MM-DD")}
+                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] text-slate-800 focus:outline-none"
+              />
+            </label>
+          ))}
+          <button
+            type="button"
+            onClick={apply}
+            className="mt-3 w-full rounded-lg py-2 text-[13px] font-bold text-white"
+            style={{ backgroundColor: color }}
+          >
+            Apply
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const dialogCell = (column, row) => {
+  if (column.render) return column.render(row);
+  const value = column.get(row);
+  if (value === null || value === undefined || value === "") return DIALOG_DASH;
+  switch (column.kind) {
+    case "int":
+      return Number(value).toLocaleString("en-IN");
+    case "decimal":
+      return Number(value).toLocaleString("en-IN", { maximumFractionDigits: 1 });
+    case "money": {
+      const abs = `₹${Math.abs(Number(value)).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+      return Number(value) < 0 ? `-${abs}` : abs;
+    }
+    case "percent":
+      return `${Number(value).toFixed(1)}%`;
+    case "date":
+      return moment(value).format("DD MMM YYYY");
+    default:
+      return value;
+  }
+};
+const isNumericColumn = (column) => column.kind && column.kind !== "text" && column.kind !== "date";
+
+// Full-list dialog behind "View All" links. Render it outside ScaledCanvas -
+// a transformed ancestor would trap position: fixed. Columns are
+// { header, kind: text|int|decimal|money|percent|date, width, get, render? };
+// the same list can feed downloadXlsx. Rows with `onRowClick` are clickable.
+export const ListDialog = ({ title, subtitle, columns, rows, loading, note, onExport, onClose, onRowClick }) => {
+  const [exporting, setExporting] = useState(false);
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const runExport = async () => {
+    setExporting(true);
+    try {
+      await onExport();
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="flex max-h-[85vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[16px] font-extrabold text-slate-900">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-[12px] text-slate-500">{subtitle}</p>}
+          </div>
+          {onExport && (
+            <button
+              type="button"
+              onClick={runExport}
+              disabled={exporting || loading || !rows.length}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Export Excel
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto px-5 pb-4">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-[13px] text-slate-400">
+              <Loader2 size={16} className="animate-spin" /> Loading…
+            </div>
+          ) : rows.length ? (
+            <table className="w-full border-collapse text-left text-[13px]">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b border-slate-200">
+                  {columns.map((c) => (
+                    <th
+                      key={c.header}
+                      className={`whitespace-nowrap py-3 pr-3 text-[11px] font-bold uppercase text-slate-400 ${
+                        isNumericColumn(c) ? "text-right" : ""
+                      }`}
+                    >
+                      {c.header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr
+                    key={row.store_id ?? row.user_id ?? i}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={`border-b border-slate-50 ${onRowClick ? "cursor-pointer hover:bg-slate-50" : ""}`}
+                  >
+                    {columns.map((c) => (
+                      <td
+                        key={c.header}
+                        className={`whitespace-nowrap py-2.5 pr-3 text-slate-700 ${
+                          isNumericColumn(c) ? "text-right tabular-nums" : ""
+                        }`}
+                      >
+                        {dialogCell(c, row)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="py-6 text-center text-[13px] text-slate-400">Nothing in this period</p>
+          )}
+          {note && <p className="mt-3 text-[12px] leading-snug text-slate-400">{note}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Title + message composer for a bulk push (sendBulkUserPushV2). Render it
+// outside ScaledCanvas. `audience` reads "To 1,234 <audience>".
+export const PushDialog = ({ count, audience = "users", sending, onSend, onClose, color = "#5B3FF0" }) => {
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const n = Number(count || 0).toLocaleString("en-IN");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[16px] font-extrabold text-slate-900">Send Push Notification</h2>
+            <p className="mt-0.5 text-[12px] text-slate-500">
+              To {n} {audience} · also saved as an in-app notification
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <label className="mt-4 block text-[12px] font-semibold text-slate-600">
+          Title
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={80}
+            placeholder="Your slot is still available!"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-normal text-slate-800 focus:outline-none"
+          />
+        </label>
+        <label className="mt-3 block text-[12px] font-semibold text-slate-600">
+          Message
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={3}
+            maxLength={240}
+            placeholder="Complete your booking now before the slot is taken."
+            className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-normal text-slate-800 focus:outline-none"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={sending || !title.trim() || !message.trim() || !count}
+          onClick={() => onSend(title.trim(), message.trim())}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
+          style={{ background: color }}
+        >
+          {sending && <Loader2 size={14} className="animate-spin" />}
+          Send to {n} users
+        </button>
+      </div>
+    </div>
+  );
+};

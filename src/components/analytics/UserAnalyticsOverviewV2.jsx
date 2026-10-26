@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import moment from "moment";
+import { toast } from "react-hot-toast";
 import {
   Area,
   AreaChart,
@@ -12,18 +15,18 @@ import {
 } from "recharts";
 import {
   CalendarCheck2,
-  CalendarDays,
-  ChevronDown,
   Clock,
   Contact,
   Download,
   Globe,
   MapPin,
+  MonitorSmartphone,
   RefreshCw,
-  Repeat,
   UsersRound,
   Users,
 } from "lucide-react";
+import { fetchUserAnalyticsOverviewV2, fetchUserRetentionV2, fetchUserSegmentsV2 } from "../../redux/slices/analyticsSlice";
+import { getUsersSummaryV2 } from "../../redux/slices/allUsersSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
@@ -31,6 +34,7 @@ import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
+  DateRangeButton,
   Donut as BaseDonut,
   HeaderButton,
   HeaderSelect,
@@ -43,16 +47,18 @@ import {
 } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved "User Analytics" mockup (Jul 01 - Jul 31
-// overview; a separate page from User Analytics Dashboard), on a fixed
-// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
-// there for why bigger px sizes in T read smaller on screen).
+// The approved "User Analytics" mockup (the overview; a separate page from the
+// User Analytics Dashboard), on a fixed DESIGN_WIDTH canvas that ScaledCanvas
+// scales to the available width (see there for why bigger px sizes in T read
+// smaller on screen).
 //
-// UI only for now - every number is static demo data matching the mockup. The
-// user list behind it exists (allUsersSlice, see UsersV2.jsx), but the city /
-// device / demographics splits, the activity heatmap, funnel and engagement
-// series need event data the apps don't report yet. The header pickers and the
-// card selects hold local state only.
+// Data: getUserAnalyticsOverviewV2 + getUserRetentionV2 (analyticsSlice, the
+// same as the User Analytics Dashboard), getUserSegmentsV2 (segments and age
+// groups, analyticsSlice `userSegments`) and getUsersSummaryV2 (allUsersSlice,
+// the Users V2 summary). App activity (active users, DAU / WAU / MAU, devices,
+// the heatmap) starts with the heartbeat tracking, so those cards say so until
+// it has data. Ages come from the profile age / date of birth, which few users
+// have set; cities from the profile city, likewise.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -64,6 +70,7 @@ const AMBER = "#F59E0B";
 const ORANGE = "#F97316";
 const RED = "#F0455A";
 const PINK = "#F25C8A";
+const SLATE = "#CBD5E1";
 
 // Measured card widths from the mockup, used directly as grid fr units.
 const ROW_COLS = "grid-cols-[435fr_414fr_423fr]";
@@ -80,124 +87,82 @@ const T = {
 };
 
 const GAP = "gap-3";
-const COMPARE = "vs Jun 01 – Jun 30, 2026";
+const DASH = "–";
 
-// ---------------------------------------------------------------------------
-// Static demo data
-// ---------------------------------------------------------------------------
-
-const kpis = [
-  { label: "Total Users", value: "56,782", delta: "18.6%", icon: Users, color: "#6D4AE0" },
-  { label: "New Users", value: "12,456", delta: "21.3%", icon: Globe, color: "#1FB76A" },
-  { label: "Active Users", value: "28,934", delta: "16.8%", icon: UsersRound, color: "#F59E0B" },
-  { label: "Returning Users", value: "23,848", delta: "14.2%", icon: Contact, color: "#2D7CF0" },
-  { label: "User Retention (30 Days)", value: "42.6%", delta: "3.4%", icon: RefreshCw, color: "#F0455A" },
+const PERIODS = [
+  { key: "this_month", label: "This Month", range: () => [moment().startOf("month"), moment()] },
+  {
+    key: "last_month",
+    label: "Last Month",
+    range: () => [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")],
+  },
+  { key: "last_30", label: "Last 30 Days", range: () => [moment().subtract(29, "days"), moment()] },
+  { key: "last_90", label: "Last 90 Days", range: () => [moment().subtract(89, "days"), moment()] },
 ];
-
-// 31 days of fixed wavy upward series (no randomness).
-const DAYS = Array.from({ length: 31 }, (_, i) => `Jul ${String(i + 1).padStart(2, "0")}`);
-const DAY_TICKS = ["Jul 01", "Jul 08", "Jul 15", "Jul 22", "Jul 31"];
-const series = (base, slope, amp, freq, phase = 0) =>
-  DAYS.map((_, i) => Math.round(base + slope * i + amp * Math.sin(i * freq + phase)));
-
-const growth = DAYS.map((day, i) => ({
-  day,
-  total: series(4200, 1790, 1500, 1.1)[i],
-  fresh: series(1400, 990, 1250, 0.9, 1)[i],
-}));
-
-const engagement = DAYS.map((day, i) => ({
-  day,
-  dau: series(3400, 190, 650, 1.3)[i],
-  wau: series(12500, 320, 800, 1.0, 2)[i],
-  mau: series(26500, 380, 900, 0.8, 4)[i],
-}));
-
-const cities = [
-  { name: "Chennai", value: 25678, pct: "45.2%", color: VIOLET },
-  { name: "Bangalore", value: 10612, pct: "18.7%", color: BLUE },
-  { name: "Hyderabad", value: 7046, pct: "12.4%", color: GREEN },
-  { name: "Coimbatore", value: 4714, pct: "8.3%", color: "#FBBF24" },
-  { name: "Madurai", value: 3180, pct: "5.6%", color: ORANGE },
-  { name: "Others", value: 5552, pct: "9.8%", color: PINK },
-];
-
-const devices = [
-  { name: "Android", value: 44565, pct: "78.5%", color: BLUE },
-  { name: "iOS", value: 10914, pct: "19.2%", color: GREEN },
-  { name: "Web", value: 1303, pct: "2.3%", color: RED },
-];
-
-const ages = [
-  { label: "18 – 24", pct: 28.6 },
-  { label: "25 – 34", pct: 34.7 },
-  { label: "35 – 44", pct: 22.1 },
-  { label: "45 – 54", pct: 9.8 },
-  { label: "55+", pct: 4.8 },
-];
-const maxAge = Math.max(...ages.map((row) => row.pct));
-
-const genders = [
-  { name: "Male", value: 62.3, pct: "62.3%", color: VIOLET },
-  { name: "Female", value: 37.1, pct: "37.1%", color: GREEN },
-  { name: "Other", value: 0.6, pct: "0.6%", color: ORANGE },
-];
-
+const STEPS = ["Daily", "Weekly", "Monthly"];
+const CITY_COLORS = [VIOLET, BLUE, GREEN, "#FBBF24", ORANGE, PINK];
+const PLATFORM_SLICES = {
+  android: { name: "Android", color: BLUE },
+  ios: { name: "iOS", color: GREEN },
+  web: { name: "Web", color: RED },
+  app: { name: "App (platform not sent)", color: VIOLET },
+  unknown: { name: "Unknown", color: SLATE },
+};
+const FUNNEL_COLORS = ["#7E6CF5", "#3B9AF2", "#34B368", "#F7C233", "#F5933A", "#F0507A"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-// Hour labels: every fourth column of the 24 is named, the rest are blank.
-const HOUR_LABELS = Array.from({ length: 24 }, (_, h) =>
-  h % 4 === 0 ? `${h === 0 ? 12 : h > 12 ? h - 12 : h} ${h < 12 ? "AM" : "PM"}` : ""
-);
-// Quiet overnight, busy through the evening, a touch busier at the weekend.
-const HOUR_CURVE = [0.16, 0.12, 0.1, 0.1, 0.12, 0.18, 0.28, 0.4, 0.5, 0.55, 0.58, 0.62, 0.66, 0.62, 0.6, 0.64, 0.72, 0.82, 0.92, 1, 0.96, 0.86, 0.66, 0.38];
-const DAY_BOOST = [0.82, 0.86, 0.9, 0.92, 0.98, 1, 0.96];
-const activity = DAY_BOOST.map((boost) => HOUR_CURVE.map((v) => Math.min(1, +(v * boost).toFixed(3))));
+const WEEKDAY_NAMES = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+const SEGMENT_COLORS = { new: BLUE, active: GREEN, loyal: VIOLET, at_risk: AMBER, inactive: RED };
+const SEGMENT_HINTS = {
+  new: "Signed up in the period",
+  loyal: "5+ bookings, the last within 60 days",
+  active: "Booked or used the app within 30 days",
+  at_risk: "Last booking or app use 31-60 days ago",
+  inactive: "Nothing for 60+ days, or never",
+};
 const ACTIVITY_RAMP = ["#F3F0FF", "#D9D0FB", "#A996F5", "#7A5CF0", "#5B3FF0"];
 
-const actions = [
-  { label: "Search Salon", value: 45672 },
-  { label: "View Salon Details", value: 38924 },
-  { label: "Check Pricing", value: 34221 },
-  { label: "Add to Cart", value: 28146 },
-  { label: "Place Booking", value: 22987 },
-  { label: "Apply Offer", value: 16842 },
-  { label: "Write Review", value: 8421 },
-];
+// ---------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------
 
-// The mockup draws the fourth band green, against an amber legend dot; the
-// legend colour is used for both so they agree.
-const funnel = [
-  { name: "App Open", users: "56,782", pct: "100%", color: "#7E6CF5" },
-  { name: "Search Salon", users: "45,672", pct: "80.5%", color: "#3B9AF2" },
-  { name: "View Salon", users: "38,924", pct: "68.6%", color: "#34B368" },
-  { name: "Add to Cart", users: "28,146", pct: "49.6%", color: "#F7C233" },
-  { name: "Place Booking", users: "22,987", pct: "40.5%", color: "#F5933A" },
-  { name: "Booking Completed", users: "19,432", pct: "34.2%", color: "#F0507A" },
-];
+const isNum = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+const num = (v) => (isNum(v) ? Number(v).toLocaleString("en-IN") : DASH);
+const fmtPct = (v) => (isNum(v) ? `${Number(v).toFixed(1)}%` : DASH);
+const pctOf = (part, whole) => (isNum(part) && isNum(whole) && Number(whole) ? (part / whole) * 100 : null);
+const compact = (v) => (v >= 1000 ? `${Number((v / 1000).toFixed(1))}K` : `${v}`);
+const fmtDay = (d) => (d ? moment(d).format("MMM DD") : DASH);
+const fmtRange = (from, to) => (from && to ? `${fmtDay(from)} – ${moment(to).format("MMM DD, YYYY")}` : DASH);
 
-const segments = [
-  { segment: "New Users", users: "12,456", share: "21.9%", bookings: "3,201", aov: "₹486" },
-  { segment: "Active Users", users: "16,478", share: "29.0%", bookings: "8,924", aov: "₹512" },
-  { segment: "Loyal Users", users: "15,236", share: "26.8%", bookings: "10,987", aov: "₹548" },
-  { segment: "At Risk Users", users: "7,892", share: "13.9%", bookings: "2,145", aov: "₹432" },
-  { segment: "Inactive Users", users: "4,720", share: "8.3%", bookings: "512", aov: "₹398" },
-];
+const change = (cur, prev, { points = false } = {}) => {
+  if (!isNum(cur) || !isNum(prev)) return null;
+  const diff = points ? cur - prev : prev ? ((cur - prev) / prev) * 100 : null;
+  if (diff === null) return null;
+  return { value: `${Math.abs(diff).toFixed(1)}${points ? " pts" : "%"}`, up: diff >= 0 };
+};
 
-const insights = [
-  { icon: Clock, color: "#5B3FF0", tint: "#F1EEFE", title: "Peak Usage Time", lead: "6 PM – 9 PM", caption: "is the most active time for your users." },
-  { icon: CalendarCheck2, color: "#0E9F6E", tint: "#EDF9F2", title: "High Conversion on Weekends", leadStat: "34%", lead: "higher booking conversion", caption: "on Saturdays & Sundays." },
-  { icon: Repeat, color: "#D97706", tint: "#FEF6E7", title: "Repeat Booking Users", leadStat: "61%", lead: "of users book again", caption: "within 30 days." },
-  { icon: MapPin, color: "#3B6FE0", tint: "#EEF3FE", title: "Top Performing City", lead: "Chennai", caption: "generates 45% of total bookings." },
-];
-
-const DATE_RANGES = ["Jul 01 – Jul 31, 2026", "Jun 01 – Jun 30, 2026", "May 01 – May 31, 2026"];
-const CITIES = ["Chennai", "All Cities"];
-const GROWTH_STEPS = ["Daily", "Weekly", "Monthly"];
-const HEAT_BASIS = ["By Hour", "By Day"];
-const ACTION_FILTERS = ["All Actions", "Search", "Booking"];
-
-const compact = (v) => (v >= 1000 ? `${v / 1000}K` : `${v}`);
-const num = (v) => v.toLocaleString("en-IN");
+// Daily rows -> weekly / monthly buckets. `sum` keys add up, `last` keys take
+// the bucket's last value, `avg` keys average the days that have one.
+const bucketSeries = (rows, step, { sum = [], last = [], avg = [] }) => {
+  if (step === "Daily") return rows.map((r) => ({ ...r, label: moment(r.day).format("MMM DD") }));
+  const keyOf = (day) => (step === "Weekly" ? moment(day).startOf("isoWeek").format("YYYY-MM-DD") : day.slice(0, 7));
+  const buckets = new Map();
+  for (const r of rows) {
+    const k = keyOf(r.day);
+    const b = buckets.get(k) || { day: k, label: step === "Weekly" ? `Wk ${moment(k).format("MMM DD")}` : moment(`${k}-01`).format("MMM YYYY"), n: {} };
+    for (const key of sum) b[key] = (b[key] || 0) + (Number(r[key]) || 0);
+    for (const key of last) if (isNum(r[key])) b[key] = r[key];
+    for (const key of avg) {
+      if (!isNum(r[key])) continue;
+      b.n[key] = (b.n[key] || 0) + 1;
+      b[key] = ((b[key] || 0) * (b.n[key] - 1) + Number(r[key])) / b.n[key];
+    }
+    buckets.set(k, b);
+  }
+  return [...buckets.values()].map((b) => {
+    for (const key of avg) if (isNum(b[key])) b[key] = Number(b[key].toFixed(1));
+    return b;
+  });
+};
 
 // ---------------------------------------------------------------------------
 // Building blocks
@@ -214,34 +179,24 @@ const KpiTile = (props) => (
     sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.xs }}
     iconClass="h-[55px] w-[55px] rounded-xl"
     iconSize={26}
-    caption={COMPARE}
-    up
     className="px-4 py-5"
     {...props}
   />
 );
 
 const Donut = (props) => (
-  <BaseDonut
-    size={178}
-    inner="62%"
-    centerSize={T.donut}
-    captionSize={T.xs}
-    formatter={(value) => num(value)}
-    {...props}
-  />
+  <BaseDonut size={178} inner="62%" centerSize={T.donut} captionSize={T.xs} formatter={(value) => num(value)} {...props} />
 );
 
 const HeatGrid = (props) => (
-  <BaseHeatGrid
-    labelSize={T.tiny}
-    labelWidth={32}
-    cellHeight={14}
-    gap="3px 2px"
-    radius={2}
-    labelsAt="bottom"
-    {...props}
-  />
+  <BaseHeatGrid labelSize={T.tiny} labelWidth={32} cellHeight={22} gap="3px 2px" radius={2} labelsAt="bottom" {...props} />
+);
+
+// Centred grey note for a card with nothing to show yet.
+const EmptyNote = ({ children }) => (
+  <div className={`grid flex-1 place-items-center px-3 py-6 text-center text-slate-400 ${T.xs}`}>
+    <p className="max-w-[300px]">{children}</p>
+  </div>
 );
 
 // Donut legend: dot, name, share and (count).
@@ -251,15 +206,15 @@ const CountLegend = ({ data }) => (
       <li key={row.name} className={`flex items-center gap-2 ${T.xs}`}>
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: row.color }} />
         <span className="min-w-0 flex-1 truncate text-slate-700">{row.name}</span>
-        <span className="w-[42px] shrink-0 text-right text-slate-600">{row.pct}</span>
+        <span className="w-[42px] shrink-0 text-right text-slate-600">{fmtPct(row.pct)}</span>
         <span className="w-[58px] shrink-0 text-right text-slate-500">({num(row.value)})</span>
       </li>
     ))}
   </ul>
 );
 
-// Two- or three-series line/area chart on the 31-day x axis.
-const SeriesChart = ({ data, lines, area = false, domain, ticks, height, idPrefix }) => {
+// Line / area chart over the period.
+const SeriesChart = ({ data, lines, area = false, height, idPrefix }) => {
   const Chart = area ? AreaChart : LineChart;
   return (
     <div className="w-full" style={{ height }}>
@@ -277,9 +232,9 @@ const SeriesChart = ({ data, lines, area = false, domain, ticks, height, idPrefi
           )}
           <CartesianGrid stroke="#EEF1F6" vertical={false} />
           <XAxis
-            dataKey="day"
-            ticks={DAY_TICKS}
-            interval={0}
+            dataKey="label"
+            interval="preserveStartEnd"
+            minTickGap={18}
             tickLine={false}
             axisLine={false}
             tick={{ ...AXIS, fontSize: 10.5 }}
@@ -287,9 +242,8 @@ const SeriesChart = ({ data, lines, area = false, domain, ticks, height, idPrefi
             padding={{ left: 8, right: 8 }}
           />
           <YAxis
-            domain={domain}
-            ticks={ticks}
-            interval={0}
+            domain={[0, "auto"]}
+            allowDecimals={false}
             tickFormatter={compact}
             tickLine={false}
             axisLine={false}
@@ -309,6 +263,7 @@ const SeriesChart = ({ data, lines, area = false, domain, ticks, height, idPrefi
                 fill={`url(#${idPrefix}-${line.key})`}
                 dot={false}
                 activeDot={{ r: 4 }}
+                connectNulls={false}
                 isAnimationActive={false}
               />
             ) : (
@@ -321,6 +276,7 @@ const SeriesChart = ({ data, lines, area = false, domain, ticks, height, idPrefi
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                connectNulls={false}
                 isAnimationActive={false}
               />
             )
@@ -338,14 +294,14 @@ const FUNNEL_EDGES = [238, 208, 180, 154, 128, 104, 82];
 const BAND_H = 27;
 const BAND_GAP = 3;
 
-const FunnelGraphic = () => (
+const FunnelGraphic = ({ stages }) => (
   <div className="flex shrink-0 flex-col items-center" style={{ width: FUNNEL_W, gap: BAND_GAP }}>
-    {funnel.map((stage, i) => {
+    {stages.map((stage, i) => {
       const top = FUNNEL_EDGES[i];
       const inset = (top - FUNNEL_EDGES[i + 1]) / 2;
       return (
         <div
-          key={stage.name}
+          key={stage.key}
           className={`grid place-items-center font-bold text-white ${T.xs}`}
           style={{
             width: top,
@@ -353,9 +309,9 @@ const FunnelGraphic = () => (
             background: stage.color,
             clipPath: `polygon(0 0, 100% 0, calc(100% - ${inset}px) 100%, ${inset}px 100%)`,
           }}
-          title={`${stage.name}: ${stage.users} (${stage.pct})`}
+          title={`${stage.label}: ${num(stage.users)} (${fmtPct(stage.pct)})`}
         >
-          {i > 0 && stage.pct}
+          {i > 0 && fmtPct(stage.pct)}
         </div>
       );
     })}
@@ -365,10 +321,7 @@ const FunnelGraphic = () => (
 const StatInsight = ({ item }) => {
   const Icon = item.icon;
   return (
-    <div
-      className="flex min-w-0 items-center gap-4 rounded-xl border border-black/[0.04] px-4 py-4"
-      style={{ background: item.tint }}
-    >
+    <div className="flex min-w-0 items-center gap-4 rounded-xl border border-black/[0.04] px-4 py-4" style={{ background: item.tint }}>
       <span className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-xl bg-white/80 ring-1 ring-black/[0.05]">
         <Icon size={22} style={{ color: item.color }} />
       </span>
@@ -377,14 +330,8 @@ const StatInsight = ({ item }) => {
           {item.title}
         </p>
         <p className={`mt-1 text-slate-600 ${T.xs}`}>
-          {item.leadStat && (
-            <b className="mr-1 text-[17px] font-extrabold tracking-tight text-slate-900">{item.leadStat}</b>
-          )}
-          {item.leadStat ? (
-            item.lead
-          ) : (
-            <b className="block text-[17px] font-extrabold tracking-tight text-slate-900">{item.lead}</b>
-          )}
+          {item.leadStat && <b className="mr-1 text-[17px] font-extrabold tracking-tight text-slate-900">{item.leadStat}</b>}
+          {item.leadStat ? item.lead : <b className="block text-[17px] font-extrabold tracking-tight text-slate-900">{item.lead}</b>}
         </p>
         <p className={`text-slate-500 ${T.tiny}`}>{item.caption}</p>
       </div>
@@ -392,42 +339,29 @@ const StatInsight = ({ item }) => {
   );
 };
 
-const exportSegments = () =>
-  downloadCsv(
-    "user-segmentation.csv",
-    ["Segment", "Users", "% of Total", "Bookings", "AOV (INR)"],
-    segments.map((row) => [row.segment, row.users, row.share, row.bookings, row.aov.replace("₹", "")])
-  );
-
 // Title and header controls live in the app bar, not the canvas.
-const PageHeader = ({ title, range, setRange, city, setCity }) => (
+const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, cityOptions, onExport }) => (
   <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0 leading-tight">
         <h1 className="truncate text-[18px] font-extrabold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-          Understand your users better and grow your platform
-        </p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">Understand your users better and grow your platform</p>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={VIOLET} toastId="uao-range" className="relative hidden lg:block" />
         <HeaderSelect
-          icon={CalendarDays}
-          label="Date range"
-          value={range}
-          onChange={setRange}
-          options={DATE_RANGES}
+          label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={[
+            ...PERIODS.map((p) => ({ value: p.key, label: p.label })),
+            ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []),
+          ]}
           className="hidden lg:flex"
         />
-        <HeaderSelect
-          icon={MapPin}
-          label="City"
-          value={city}
-          onChange={setCity}
-          options={CITIES}
-          className="hidden xl:flex"
-        />
-        <HeaderButton icon={Download} label="Download report" color="#334155" onClick={exportSegments}>
+        <HeaderSelect icon={MapPin} label="City" value={city} onChange={setCity} options={cityOptions} className="hidden xl:flex" />
+        <HeaderButton icon={Download} label="Download report" color="#334155" onClick={onExport}>
           <span className="hidden md:inline">Download Report</span>
         </HeaderButton>
       </div>
@@ -440,16 +374,214 @@ const PageHeader = ({ title, range, setRange, city, setCity }) => (
 // ---------------------------------------------------------------------------
 
 const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
-  const [range, setRange] = useState(DATE_RANGES[0]);
-  const [city, setCity] = useState(CITIES[0]);
-  const [growthStep, setGrowthStep] = useState(GROWTH_STEPS[0]);
-  const [engagementStep, setEngagementStep] = useState(GROWTH_STEPS[0]);
-  const [heatBasis, setHeatBasis] = useState(HEAT_BASIS[0]);
-  const [actionFilter, setActionFilter] = useState(ACTION_FILTERS[0]);
+  const dispatch = useDispatch();
+  const { userOverview, userRetention, userSegments } = useSelector((state) => state.analytics);
+  const summary = useSelector((state) => state.allUsers?.usersSummaryV2);
+  const [period, setPeriod] = useState(PERIODS[0].key);
+  const [custom, setCustom] = useState(null);
+  const [city, setCity] = useState("all");
+  const [growthStep, setGrowthStep] = useState(STEPS[0]);
+  const [engagementStep, setEngagementStep] = useState(STEPS[0]);
+
+  const range = useMemo(() => {
+    if (period === "custom" && custom) return custom;
+    const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[0]).range();
+    return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
+  }, [period, custom]);
+
+  useEffect(() => {
+    const body = { from: range.from, to: range.to };
+    if (city !== "all") body.city = city;
+    dispatch(fetchUserAnalyticsOverviewV2(body))
+      .unwrap()
+      .catch((message) => toast.error(message || "Failed to load user analytics", { id: "uao-overview" }));
+  }, [dispatch, range.from, range.to, city]);
+
+  useEffect(() => {
+    dispatch(fetchUserSegmentsV2({ from: range.from, to: range.to }))
+      .unwrap()
+      .catch((message) => toast.error(message || "Failed to load user segments", { id: "uao-segments" }));
+  }, [dispatch, range.from, range.to]);
+
+  useEffect(() => {
+    dispatch(getUsersSummaryV2());
+    dispatch(fetchUserRetentionV2({ mode: "signup", weeks: 8 }))
+      .unwrap()
+      .catch((message) => toast.error(message || "Failed to load retention", { id: "uao-retention" }));
+  }, [dispatch]);
+
+  const data = userOverview.data;
+  const loading = userOverview.loading && !data;
+  const m = data?.metrics || {};
+  const pm = data?.previous_metrics || {};
+  const compare = data ? `vs ${fmtRange(data.previous.from, data.previous.to)}` : "";
+  const shown = (v, fmt = num) => (loading ? "…" : fmt(v));
+  const activityNote = !data ? "" : !data.activity_since ? "No app activity recorded yet" : m.activity_partial ? `Tracked since ${fmtDay(data.activity_since)}` : compare;
+
+  const cityOptions = useMemo(
+    () => [{ value: "all", label: "All Cities" }, ...(data?.cities || []).map((c) => ({ value: c, label: c }))],
+    [data]
+  );
+
+  // ---- Retention: the latest signup cohort that has reached day 30.
+  const retention = userRetention.data?.mode === "signup" ? userRetention.data : null;
+  const day30 = retention ? retention.days.indexOf(30) : -1;
+  const ret30 = retention ? retention.cohorts.filter((c) => isNum(c.retention[day30])) : [];
+  const retLatest = ret30[0];
+  const retChange = ret30.length >= 2 ? change(ret30[0].retention[day30], ret30[1].retention[day30], { points: true }) : null;
+
+  // ---- KPI tiles ----------------------------------------------------------
+  const nvr = data?.new_vs_returning;
+  const signupChange = change(m.signups, pm.signups);
+  const activeChange = change(m.unique_users, pm.unique_users);
+  const kpis = [
+    { label: "Total Users", value: num(summary?.total_users), caption: "All registered users", icon: Users, color: "#6D4AE0" },
+    { label: "New Users", value: shown(m.signups), delta: signupChange?.value, up: signupChange?.up, caption: compare, icon: Globe, color: "#1FB76A" },
+    { label: "Active Users", value: shown(m.unique_users), delta: activeChange?.value, up: activeChange?.up, caption: activityNote, icon: UsersRound, color: "#F59E0B" },
+    { label: "Returning Customers", value: shown(nvr?.returning), caption: "Booked again in the period", icon: Contact, color: "#2D7CF0" },
+    {
+      label: "User Retention (30 Days)",
+      value: retLatest ? fmtPct(retLatest.retention[day30]) : userRetention.loading ? "…" : DASH,
+      delta: retChange?.value,
+      up: retChange?.up,
+      caption: retLatest ? `Signed up ${fmtRange(retLatest.from, retLatest.to)}` : "No cohort has reached day 30 yet",
+      icon: RefreshCw,
+      color: "#F0455A",
+    },
+  ];
+
+  // ---- Growth / engagement series -------------------------------------------
+  const rawSeries = useMemo(() => {
+    let running = 0;
+    return (data?.series || []).map((row) => {
+      running += Number(row.signups) || 0;
+      return { ...row, cumulative: running };
+    });
+  }, [data]);
+  const growthSeries = bucketSeries(rawSeries, growthStep, { sum: ["signups"], last: ["cumulative"] });
+  const engagementSeries = bucketSeries(rawSeries, engagementStep, { avg: ["dau"], last: ["wau", "mau"] });
+
+  // ---- Segments / age groups (getUserSegmentsV2) -------------------------------
+  const seg = userSegments.data;
+  const segLoading = userSegments.loading && !seg;
+  const ageGroups = seg?.age_groups;
+  const ageMax = ageGroups ? Math.max(0, ...ageGroups.groups.map((g) => g.users)) : 0;
+
+  // ---- Cities (profile city) ----------------------------------------------
+  const topCities = summary?.top_cities || [];
+  const cityTotal = topCities.reduce((t, c) => t + c.users, 0);
+  const cityRows = topCities.slice(0, 5).map((c, i) => ({ name: c.city, value: c.users, color: CITY_COLORS[i] }));
+  const otherCities = cityTotal - cityRows.reduce((t, c) => t + c.value, 0);
+  if (otherCities > 0) cityRows.push({ name: "Others", value: otherCities, color: CITY_COLORS[5] });
+  cityRows.forEach((c) => (c.pct = pctOf(c.value, cityTotal)));
+
+  // ---- Devices ----------------------------------------------------------------
+  const devices = (data?.platforms || []).map((row) => ({ ...(PLATFORM_SLICES[row.key] || PLATFORM_SLICES.unknown), value: row.users }));
+  const deviceTotal = devices.reduce((t, d) => t + d.value, 0);
+  devices.forEach((d) => (d.pct = pctOf(d.value, deviceTotal)));
+
+  // ---- Gender -------------------------------------------------------------
+  const genderTotal = summary?.total_users || 0;
+  const genders = summary
+    ? [
+        { name: "Male", value: summary.male_users, color: VIOLET },
+        { name: "Female", value: summary.female_users, color: GREEN },
+        { name: "Not set", value: Math.max(0, genderTotal - summary.male_users - summary.female_users), color: ORANGE },
+      ].map((g) => ({ ...g, pct: pctOf(g.value, genderTotal) }))
+    : [];
+
+  // ---- Activity heatmap: weekdays x 4-hour parts --------------------------------
+  const heat = data?.heatmap;
+  const heatMax = heat ? Math.max(0, ...heat.users.flat()) : 0;
+  const heatValues = heat ? WEEKDAYS.map((_, wd) => heat.users.map((row) => (heatMax ? row[wd] / heatMax : 0))) : null;
+
+  // ---- Actions / funnel -----------------------------------------------------
+  const actions = (data?.top_actions || []).filter((a) => isNum(a.users));
+  const actionMax = Math.max(0, ...actions.map((a) => a.users));
+  const funnel = (data?.funnel || []).map((s, i, all) => ({
+    ...s,
+    color: FUNNEL_COLORS[i],
+    pct: pctOf(s.users, all[0]?.users),
+  }));
+
+  // ---- Insights ---------------------------------------------------------------
+  const insights = [];
+  if (heatMax) {
+    let best = { v: -1, r: 0, c: 0 };
+    heat.users.forEach((row, r) => row.forEach((v, c) => v > best.v && (best = { v, r, c })));
+    insights.push({
+      icon: Clock,
+      color: "#5B3FF0",
+      tint: "#F1EEFE",
+      title: "Peak Usage Time",
+      lead: `${heat.day_parts[best.r]} – ${heat.day_parts[(best.r + 1) % heat.day_parts.length]}`,
+      caption: `on ${WEEKDAY_NAMES[best.c]} is when most users are active.`,
+    });
+  }
+  const topDevice = [...devices].sort((a, b) => b.value - a.value)[0];
+  if (topDevice) {
+    insights.push({
+      icon: MonitorSmartphone,
+      color: "#0E9F6E",
+      tint: "#EDF9F2",
+      title: "Top Platform",
+      leadStat: fmtPct(topDevice.pct),
+      lead: `of active users on ${topDevice.name}`,
+      caption: "in this period.",
+    });
+  }
+  if (nvr?.customers) {
+    insights.push({
+      icon: CalendarCheck2,
+      color: "#D97706",
+      tint: "#FEF6E7",
+      title: "Returning Customers",
+      leadStat: fmtPct(pctOf(nvr.returning, nvr.customers)),
+      lead: "of booking customers",
+      caption: "had booked before this period.",
+    });
+  }
+  if (cityRows.length && cityRows[0].name !== "Others") {
+    insights.push({
+      icon: MapPin,
+      color: "#3B6FE0",
+      tint: "#EEF3FE",
+      title: "Top City",
+      lead: cityRows[0].name,
+      caption: `${fmtPct(cityRows[0].pct)} of users with a profile city.`,
+    });
+  }
+
+  const exportReport = () => {
+    if (!data) return;
+    downloadCsv(
+      `user-analytics-overview-${data.from}_${data.to}.csv`,
+      ["Section", "Metric", "Value"],
+      [
+        ...kpis.map((k) => ["KPI", k.label, k.value]),
+        ...funnel.map((s) => ["Funnel", s.label, `${s.users ?? ""} (${fmtPct(s.pct)})`]),
+        ...devices.map((d) => ["Devices", d.name, d.value]),
+        ...genders.map((g) => ["Gender", g.name, g.value]),
+      ]
+    );
+  };
 
   return (
     <>
-      <PageHeader title={title} range={range} setRange={setRange} city={city} setCity={setCity} />
+      <PageHeader
+        title={title}
+        range={range}
+        period={period}
+        setPeriod={setPeriod}
+        onCustom={(from, to) => {
+          setCustom({ from, to });
+          setPeriod("custom");
+        }}
+        city={city}
+        setCity={setCity}
+        cityOptions={cityOptions}
+        onExport={exportReport}
+      />
 
       <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
@@ -466,60 +598,63 @@ const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader
-              title="User Growth Over Time"
-              right={<Select value={growthStep} onChange={setGrowthStep} options={GROWTH_STEPS} />}
-            />
+            <CardHeader title="User Growth Over Time" right={<Select value={growthStep} onChange={setGrowthStep} options={STEPS} />} />
             <div className="mt-2 flex items-center gap-5">
-              <LegendDot dash color={VIOLET} label="Total Users" size={T.tiny} />
+              <LegendDot dash color={VIOLET} label="Cumulative New Users" size={T.tiny} />
               <LegendDot dash color={GREEN} label="New Users" size={T.tiny} />
             </div>
-            <div className="mt-1 min-h-[174px] flex-1">
-              <SeriesChart
-                area
-                idPrefix="uao-growth"
-                data={growth}
-                height="100%"
-                domain={[0, 60000]}
-                ticks={[0, 15000, 30000, 45000, 60000]}
-                lines={[
-                  { key: "total", name: "Total Users", color: VIOLET, fill: 0.16 },
-                  { key: "fresh", name: "New Users", color: GREEN, fill: 0.08 },
-                ]}
-              />
-            </div>
+            {growthSeries.length ? (
+              <div className="mt-1 min-h-[174px] flex-1">
+                <SeriesChart
+                  area
+                  idPrefix="uao-growth"
+                  data={growthSeries}
+                  height="100%"
+                  lines={[
+                    { key: "cumulative", name: "Cumulative new users", color: VIOLET, fill: 0.16 },
+                    { key: "signups", name: "New users", color: GREEN, fill: 0.08 },
+                  ]}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No sign-ups in this period"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
             <CardHeader
               title="User Distribution by City"
-              right={
-                <button type="button" className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
-                  View All
-                </button>
-              }
+              subtitle={summary ? `Profile city · ${num(cityTotal)} of ${num(summary.total_users)} users have one` : undefined}
             />
-            <div className="flex flex-1 items-center gap-5">
-              <Donut data={cities} center="56,782" caption="Total" />
-              <CountLegend data={cities} />
-            </div>
+            {cityTotal ? (
+              <div className="flex flex-1 items-center gap-5">
+                <Donut data={cityRows} center={num(cityTotal)} caption="With a city" />
+                <CountLegend data={cityRows} />
+              </div>
+            ) : (
+              <EmptyNote>{summary ? "No users have a profile city yet" : "Loading…"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader title="Device Usage" />
-            <div className="flex flex-1 items-center gap-6">
-              <Donut data={devices} center="56,782" caption="Total" />
-              <ul className="flex min-w-0 flex-1 flex-col gap-[18px]">
-                {devices.map((row) => (
-                  <li key={row.name} className={`flex items-center gap-2 ${T.xs}`}>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: row.color }} />
-                    <span className="min-w-0 flex-1 truncate text-slate-700">{row.name}</span>
-                    <span className="w-[42px] shrink-0 text-right text-slate-600">{row.pct}</span>
-                    <span className="w-[58px] shrink-0 text-right text-slate-500">({num(row.value)})</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <CardHeader title="Device Usage" subtitle="Active users by platform" />
+            {deviceTotal ? (
+              <div className="flex flex-1 items-center gap-6">
+                <Donut data={devices} center={num(deviceTotal)} caption="Active" />
+                <ul className="flex min-w-0 flex-1 flex-col gap-[18px]">
+                  {devices.map((row) => (
+                    <li key={row.name} className={`flex items-center gap-2 ${T.xs}`}>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: row.color }} />
+                      <span className="min-w-0 flex-1 truncate text-slate-700">{row.name}</span>
+                      <span className="w-[42px] shrink-0 text-right text-slate-600">{fmtPct(row.pct)}</span>
+                      <span className="w-[58px] shrink-0 text-right text-slate-500">({num(row.value)})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : activityNote || "No app activity in this period"}</EmptyNote>
+            )}
           </Card>
         </div>
 
@@ -529,95 +664,91 @@ const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
         <div className={`grid ${ROW_COLS} ${GAP}`}>
           <Card className="p-4">
             <CardHeader title="User Demographics" />
-            <p className={`mt-3 flex items-center gap-1 text-slate-600 ${T.xs}`}>
-              Age <ChevronDown size={12} className="text-slate-400" />
-            </p>
-
             <div className="mt-2 flex flex-1 items-center gap-5">
-              <ul className="flex min-w-0 flex-1 flex-col gap-[13px]">
-                {ages.map((row) => (
-                  <li key={row.label} className={`flex items-center gap-3 ${T.xs}`}>
-                    <span className="w-[52px] shrink-0 whitespace-nowrap text-slate-600">{row.label}</span>
+              <div className="min-w-0 flex-1 self-stretch">
+                <p className={`font-semibold text-slate-700 ${T.xs}`}>Age groups</p>
+                {ageMax ? (
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {ageGroups.groups.map((g) => (
+                      <li key={g.label} className={`flex items-center gap-2 ${T.tiny}`} title={`${num(g.users)} users`}>
+                        <span className="w-[42px] shrink-0 text-slate-600">{g.label}</span>
+                        <span className="min-w-0 flex-1">
+                          <Meter pct={(g.users / ageMax) * 100} color={VIOLET} height={5} track="#F1F3F8" />
+                        </span>
+                        <span className="w-[38px] shrink-0 text-right text-slate-600">{fmtPct(g.share)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={`mt-2 text-slate-400 ${T.tiny}`}>{segLoading ? "Loading…" : "No users have an age or date of birth yet"}</p>
+                )}
+                {ageGroups?.known > 0 && (
+                  <p className={`mt-2 text-slate-400 ${T.tiny}`}>
+                    Known for {num(ageGroups.known)} of {num(ageGroups.total)} users
+                  </p>
+                )}
+              </div>
+              {genderTotal ? (
+                <>
+                  <BaseDonut data={genders} size={104} inner="78%" formatter={(value) => num(value)} />
+                  <ul className="flex shrink-0 flex-col gap-3">
+                    {genders.map((row) => (
+                      <li key={row.name} className={`flex items-center gap-2 ${T.xs}`}>
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: row.color }} />
+                        <span className="text-slate-700">{row.name}</span>
+                        <span className="text-slate-500">{fmtPct(row.pct)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title="User Activity Heatmap" subtitle="Active users by session start (IST)" />
+            {heatMax ? (
+              <>
+                <div className="mt-3">
+                  <HeatGrid
+                    values={heatValues}
+                    ramp={ACTIVITY_RAMP}
+                    rowLabels={WEEKDAYS}
+                    colLabels={heat.day_parts}
+                    title={(r, c) => `${WEEKDAYS[r]} ${heat.day_parts[c]} · ${num(heat.users[c][r])} active users`}
+                  />
+                </div>
+                <div className="mt-auto pt-3">
+                  <RampLegend ramp={ACTIVITY_RAMP} from="Low" to="High" size={T.tiny} width={310} />
+                </div>
+              </>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : activityNote || "No app activity in this period"}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title="Top User Actions" subtitle="Users per action in the period" />
+            {actions.length ? (
+              <ul className="mt-3 flex flex-1 flex-col justify-around gap-1.5">
+                {actions.map((row) => (
+                  <li key={row.key} className={`flex items-center gap-3 ${T.xs}`}>
+                    <span className="w-[118px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
                     <span className="min-w-0 flex-1">
                       <Meter
-                        pct={(row.pct / maxAge) * 100}
+                        pct={actionMax ? (row.users / actionMax) * 100 : 0}
                         color="linear-gradient(90deg,#8B74F5,#6D4AE0)"
                         height={4}
                         track="transparent"
                       />
                     </span>
-                    <span className="w-[42px] shrink-0 text-right text-slate-600">{row.pct}%</span>
+                    <span className="w-[50px] shrink-0 text-right text-slate-700">{num(row.users)}</span>
                   </li>
                 ))}
               </ul>
-
-              <BaseDonut
-                data={genders}
-                size={104}
-                inner="78%"
-                formatter={(value) => `${value}%`}
-              />
-              <ul className="flex shrink-0 flex-col gap-3">
-                {genders.map((row) => (
-                  <li key={row.name} className={`flex items-center gap-2 ${T.xs}`}>
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: row.color }} />
-                    <span className="text-slate-700">{row.name}</span>
-                    <span className="text-slate-500">{row.pct}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <CardHeader
-              title="User Activity Heatmap"
-              right={<Select value={heatBasis} onChange={setHeatBasis} options={HEAT_BASIS} />}
-            />
-            <div className="mt-3">
-              <HeatGrid
-                values={activity}
-                ramp={ACTIVITY_RAMP}
-                rowLabels={WEEKDAYS}
-                colLabels={HOUR_LABELS}
-                title={(r, c) =>
-                  `${WEEKDAYS[r]} ${String(c).padStart(2, "0")}:00 · ${Math.round(activity[r][c] * 100)}% of peak`
-                }
-              />
-            </div>
-            <div className="mt-auto pt-3">
-              <RampLegend ramp={ACTIVITY_RAMP} from="Low" to="High" size={T.tiny} width={310} />
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <CardHeader
-              title="Top User Actions"
-              right={
-                <Select
-                  value={actionFilter}
-                  onChange={setActionFilter}
-                  options={ACTION_FILTERS}
-                  className="w-[104px] [&_select]:py-1"
-                />
-              }
-            />
-            <ul className="mt-3 flex flex-1 flex-col justify-around gap-1.5">
-              {actions.map((row) => (
-                <li key={row.label} className={`flex items-center gap-3 ${T.xs}`}>
-                  <span className="w-[118px] shrink-0 whitespace-nowrap text-slate-700">{row.label}</span>
-                  <span className="min-w-0 flex-1">
-                    <Meter
-                      pct={(row.value / actions[0].value) * 100}
-                      color="linear-gradient(90deg,#8B74F5,#6D4AE0)"
-                      height={4}
-                      track="transparent"
-                    />
-                  </span>
-                  <span className="w-[50px] shrink-0 text-right text-slate-700">{num(row.value)}</span>
-                </li>
-              ))}
-            </ul>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No actions recorded in this period"}</EmptyNote>
+            )}
           </Card>
         </div>
 
@@ -626,85 +757,85 @@ const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW_COLS} ${GAP}`}>
           <Card className="p-4">
-            <CardHeader title="Funnel Analysis" />
-            <div className="mt-3 flex flex-1 items-center gap-5">
-              <ul className="flex min-w-0 flex-1 flex-col gap-[14px]">
-                {funnel.map((stage) => (
-                  <li key={stage.name} className={`flex items-center gap-2 ${T.tiny}`}>
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: stage.color }} />
-                    <span className="min-w-0 flex-1 truncate text-slate-700">{stage.name}</span>
-                    <span className="shrink-0 whitespace-nowrap text-slate-500">
-                      {stage.users} ({stage.pct})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <FunnelGraphic />
-            </div>
+            <CardHeader title="Funnel Analysis" subtitle="Unique users per step in the period" />
+            {funnel.length ? (
+              <div className="mt-3 flex flex-1 items-center gap-5">
+                <ul className="flex min-w-0 flex-1 flex-col gap-[14px]">
+                  {funnel.map((stage) => (
+                    <li key={stage.key} className={`flex items-center gap-2 ${T.tiny}`}>
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: stage.color }} />
+                      <span className="min-w-0 flex-1 truncate text-slate-700">{stage.label}</span>
+                      <span className="shrink-0 whitespace-nowrap text-slate-500">
+                        {num(stage.users)} ({fmtPct(stage.pct)})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <FunnelGraphic stages={funnel} />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : DASH}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader
-              title="User Engagement Over Time"
-              right={<Select value={engagementStep} onChange={setEngagementStep} options={GROWTH_STEPS} />}
-            />
+            <CardHeader title="User Engagement Over Time" right={<Select value={engagementStep} onChange={setEngagementStep} options={STEPS} />} />
             <div className="mt-2 flex items-center gap-5">
               <LegendDot dash color={VIOLET} label="DAU" size={T.tiny} />
-              <LegendDot dash color={GREEN} label="WAU" size={T.tiny} />
-              <LegendDot dash color={ORANGE} label="MAU" size={T.tiny} />
+              <LegendDot dash color={GREEN} label="WAU (7 days)" size={T.tiny} />
+              <LegendDot dash color={ORANGE} label="MAU (30 days)" size={T.tiny} />
             </div>
-            <div className="mt-1 min-h-[130px] flex-1">
-              <SeriesChart
-                idPrefix="uao-engagement"
-                data={engagement}
-                height="100%"
-                domain={[0, 40000]}
-                ticks={[0, 10000, 20000, 30000, 40000]}
-                lines={[
-                  { key: "dau", name: "DAU", color: VIOLET },
-                  { key: "wau", name: "WAU", color: GREEN },
-                  { key: "mau", name: "MAU", color: ORANGE },
-                ]}
-              />
-            </div>
+            {data?.activity_since ? (
+              <div className="mt-1 min-h-[130px] flex-1">
+                <SeriesChart
+                  idPrefix="uao-engagement"
+                  data={engagementSeries}
+                  height="100%"
+                  lines={[
+                    { key: "dau", name: "DAU", color: VIOLET },
+                    { key: "wau", name: "WAU", color: GREEN },
+                    { key: "mau", name: "MAU", color: ORANGE },
+                  ]}
+                />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No app activity recorded yet"}</EmptyNote>
+            )}
           </Card>
 
           <Card className="p-4">
-            <CardHeader title="User Segmentation" />
-            <table className="mt-3 w-full table-auto border-collapse text-left">
-              <thead>
-                <tr>
-                  {["Segment", "Users", "% of Total", "Bookings", "AOV (₹)"].map((heading, i) => (
-                    <th
-                      key={heading}
-                      className={`pb-2 pr-2 font-medium text-slate-500 last:pr-0 ${T.tiny} ${
-                        i ? "text-right" : ""
-                      }`}
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {segments.map((row) => (
-                  <tr key={row.segment} className="h-[23px]">
-                    <td className={`whitespace-nowrap pr-2 text-slate-700 ${T.xs}`}>{row.segment}</td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.users}</td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.share}</td>
-                    <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{row.bookings}</td>
-                    <td className={`whitespace-nowrap text-right font-medium text-slate-800 ${T.xs}`}>{row.aov}</td>
+            <CardHeader title="User Segmentation" subtitle="As of the period end · bookings and AOV in the period" />
+            {seg?.segments?.length ? (
+              <table className="mt-3 w-full table-auto border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.tiny}`}>Segment</th>
+                    <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.tiny}`}>Users</th>
+                    <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.tiny}`}>% of Users</th>
+                    <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.tiny}`}>Bookings</th>
+                    <th className={`pb-2 text-right font-medium text-slate-500 ${T.tiny}`}>AOV</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <button
-              type="button"
-              className={`mt-auto flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#E6E8F0] py-1.5 font-semibold hover:bg-slate-50 ${T.xs}`}
-              style={{ color: "#4F5BE8" }}
-            >
-              View All Segments →
-            </button>
+                </thead>
+                <tbody>
+                  {seg.segments.map((row) => (
+                    <tr key={row.key} className="h-[30px] border-b border-slate-50 last:border-0" title={SEGMENT_HINTS[row.key]}>
+                      <td className={`pr-2 text-slate-800 ${T.xs}`}>
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: SEGMENT_COLORS[row.key] || SLATE }} />
+                          {row.label}
+                        </span>
+                      </td>
+                      <td className={`pr-2 text-right text-slate-700 ${T.xs}`}>{num(row.users)}</td>
+                      <td className={`pr-2 text-right text-slate-700 ${T.xs}`}>{fmtPct(row.share)}</td>
+                      <td className={`pr-2 text-right text-slate-700 ${T.xs}`}>{num(row.bookings)}</td>
+                      <td className={`text-right text-slate-700 ${T.xs}`}>{isNum(row.aov) ? `₹${num(Math.round(row.aov))}` : DASH}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyNote>{segLoading ? "Loading…" : "No users yet"}</EmptyNote>
+            )}
           </Card>
         </div>
 
@@ -717,6 +848,9 @@ const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
             {insights.map((item) => (
               <StatInsight key={item.title} item={item} />
             ))}
+            {!insights.length && (
+              <p className={`col-span-4 py-3 text-center text-slate-400 ${T.xs}`}>{loading ? "Loading…" : "Not enough data for insights yet."}</p>
+            )}
           </div>
         </Card>
       </ScaledCanvas>

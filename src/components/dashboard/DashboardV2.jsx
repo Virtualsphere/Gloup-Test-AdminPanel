@@ -25,6 +25,7 @@ import {
   Gift,
   Info,
   IndianRupee,
+  ShoppingBag,
   ShoppingCart,
   Slash,
   Store,
@@ -556,6 +557,7 @@ const HOW_IT_WORKS = [
     items: [
       "Bookings: paid appointments, by appointment date. Checkouts whose payment failed or expired are not bookings.",
       "Revenue: what Gloup itself earns - the platform fee customers paid on bookings that weren't cancelled or refunded, plus manual subscription fees (incl. GST) collected from salon payouts, counted on the day the payout was marked paid.",
+      "GMV: the value of what customers booked, on paid bookings that weren't cancelled or refunded, by appointment date. Each service counts at what the customer was charged for it (after the service discount), except \"important\" services, which count at their original price. Prices are the ones saved on the booking; coupons, GST and the platform fee are not included.",
       "Cancellations: paid bookings later cancelled or refunded. Cancellation rate = cancellations ÷ bookings.",
       "CAC spend: the discount Gloup funds on each booking (the service's list price when it was booked minus what the customer paid, nothing for \"important\" services), so later price edits don't change past months. CAC per booking = CAC spend ÷ non-cancelled bookings.",
       "Users, partners and subscriptions are running totals at the end of the period. Users count from their registration date; users older than that field with no history are counted as existing from the start.",
@@ -749,6 +751,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const pct = {
     bookings: change("bookings"),
     revenue: change("revenue"),
+    gmv: change("gmv"),
     rate: pctChange(cur.rate ?? null, last.rate ?? null),
     cac: change("cac_per_booking"),
     users: change("total_users"),
@@ -759,6 +762,8 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const kpis = [
     { label: "Total Bookings", value: fmtInt(cur.bookings), delta: toDelta(pct.bookings), icon: CalendarCheck, tint: "#EDE7FF", color: BRAND },
     { label: "Total Revenue", value: fmtInr(cur.revenue), delta: toDelta(pct.revenue), icon: IndianRupee, tint: "#E1F7EC", color: GREEN },
+    // Whole rupees: seven tiles share the row, so paise would overflow.
+    { label: "Total GMV", value: cur.gmv == null ? DASH : inr(Math.round(cur.gmv)), delta: toDelta(pct.gmv), icon: ShoppingBag, tint: "#E0F2FE", color: "#0284C7" },
     { label: "Total Users", value: fmtCompact(cur.total_users), delta: toDelta(pct.users), icon: Users, tint: "#FFF2DC", color: "#E08700" },
     { label: "Total Partners", value: fmtInt(cur.total_partners), delta: toDelta(pct.partners), icon: Store, tint: "#E6EFFF", color: BLUE },
     { label: "Total Subscriptions", value: fmtInt(cur.active_subscriptions), delta: toDelta(pct.subscriptions), icon: Gift, tint: "#FDE6F0", color: PINK },
@@ -768,6 +773,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const scorecard = [
     { metric: "Bookings Growth", value: fmtInt(cur.bookings), delta: toDelta(pct.bookings), ...growthStatus(pct.bookings) },
     { metric: "Revenue Growth", value: fmtInr(cur.revenue), delta: toDelta(pct.revenue), ...growthStatus(pct.revenue) },
+    { metric: "GMV Growth", value: cur.gmv == null ? DASH : inr(Math.round(cur.gmv)), delta: toDelta(pct.gmv), ...growthStatus(pct.gmv) },
     { metric: "CAC efficiency (per booking)", value: fmtInr(cur.cac_per_booking), delta: toDelta(pct.cac), invert: true, ...lowerBetterStatus(pct.cac) },
     { metric: "Cancellation Rate", value: fmtPct(cur.rate), delta: toDelta(pct.rate), invert: true, ...lowerBetterStatus(pct.rate) },
     { metric: "User Growth", value: fmtCompact(cur.total_users), delta: toDelta(pct.users), ...growthStatus(pct.users) },
@@ -999,7 +1005,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                 */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-7 ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             <div
               key={kpi.label}

@@ -18,7 +18,6 @@ import {
   Gauge,
   MessageSquareText,
   Users,
-  UserRound,
   Activity,
   MapPinned,
   TrendingUp,
@@ -112,7 +111,6 @@ const Sidebar = ({ collapsed, isMobileOpen, setIsMobileOpen }) => {
     { path: "/reviews-ratings-v2", icon: <Star size={18} />, text: "Reviews & Ratings V2" },
     { path: "/marketing-sms-v2", icon: <MessageSquareText size={18} />, text: "Marketing SMS V2" },
     { path: "/users-v2", icon: <Users size={18} />, text: "Users V2" },
-    { path: "/user-details-v2", icon: <UserRound size={18} />, text: "User Profile V2" },
   ];
 
   const renderLink = (item, nested = false) => {
