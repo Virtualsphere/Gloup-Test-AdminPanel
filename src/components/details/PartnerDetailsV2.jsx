@@ -592,7 +592,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const quickActions = [
     { icon: MessageSquare, label: "Send Message", color: BRAND, onClick: () => setMessageOpen(true) },
     { icon: Gift, label: "Create Offer", color: BRAND, onClick: () => navigate("/category-discount") },
-    { icon: Star, label: "View Reviews", color: "#475569", onClick: () => navigate("/reviews-ratings-v2") },
+    { icon: Star, label: "View Reviews", color: "#475569", onClick: () => navigate("/review") },
     { icon: FileDown, label: "Download Report", color: "#475569", onClick: exportReport },
     { icon: ExternalLink, label: "Open Classic Page", color: "#475569", onClick: classic },
     { icon: active ? ShieldOff : ShieldCheck, label: active ? "Deactivate Partner" : "Activate Partner", color: active ? RED : "#16A34A", onClick: toggleStatus, disabled: statusBusy || !p },
@@ -987,7 +987,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                   </Card>
 
                   <Card className={PAD}>
-                    <CardHeader title="Ratings & Reviews" right={<ViewAll onClick={() => navigate("/reviews-ratings-v2")} />} />
+                    <CardHeader title="Ratings & Reviews" right={<ViewAll onClick={() => navigate("/review")} />} />
                     {ratings?.total ? (
                       <div className="flex flex-1 items-center gap-6 pt-2">
                         <div className="flex shrink-0 flex-col items-center">
