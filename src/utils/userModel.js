@@ -2,7 +2,7 @@ import moment from "moment";
 import { pick, rupees, titleCase, toDate } from "./format";
 import { loyaltyLabel } from "./loyalty";
 
-// Maps the admin user APIs onto the shapes the Users / User Details pages render.
+// Maps the admin user APIs onto the shapes UsersV2 / UserDetailsV2 render.
 // Pure functions only - no React, no Redux - so they can be unit-tested.
 //
 // normalizeUser: one row of /getUsersListV2 (also tolerates the older

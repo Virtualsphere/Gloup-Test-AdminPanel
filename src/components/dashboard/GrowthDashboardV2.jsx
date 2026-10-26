@@ -739,7 +739,7 @@ const GrowthDashboardV2 = ({ title = "Dashboard" }) => {
             </div>
             {!frequency.length && <EmptyNote>{loading ? "Loading…" : DASH}</EmptyNote>}
 
-            <ViewLink onClick={() => navigate("/allusers")}>View Full Report</ViewLink>
+            <ViewLink onClick={() => navigate("/users-v2")}>View Full Report</ViewLink>
           </Card>
 
           <Card className={PAD}>
@@ -992,7 +992,7 @@ const GrowthDashboardV2 = ({ title = "Dashboard" }) => {
           columns={listConfig.columns}
           rows={dialog.rows}
           loading={dialog.loading}
-          onRowClick={listConfig.users ? (row) => navigate(`/userdetails/${row.user_id}`) : undefined}
+          onRowClick={listConfig.users ? (row) => navigate(`/user-details-v2/${row.user_id}`) : undefined}
           onExport={() =>
             downloadXlsx(`${dialog.list}_${date}.xlsx`, [{ name: listConfig.title.slice(0, 30), rows: dialog.rows, columns: listConfig.columns }])
           }

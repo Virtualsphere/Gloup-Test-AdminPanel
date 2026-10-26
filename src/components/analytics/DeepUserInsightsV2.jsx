@@ -1005,7 +1005,7 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
                       <tr
                         key={user.user_id}
                         className="h-[26px] cursor-pointer hover:bg-slate-50"
-                        onClick={() => navigate(`/userdetails/${user.user_id}`)}
+                        onClick={() => navigate(`/user-details-v2/${user.user_id}`)}
                       >
                         <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
                           <span className="flex items-center gap-2">
@@ -1177,7 +1177,7 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
           rows={farList.rows}
           loading={farList.loading}
           note="Distance is a straight line from where the customer booked to the salon; travel time is estimated."
-          onRowClick={(row) => navigate(`/userdetails/${row.user_id}`)}
+          onRowClick={(row) => navigate(`/user-details-v2/${row.user_id}`)}
           onExport={() =>
             downloadXlsx(`far_travelling_users_${range.from}_${range.to}.xlsx`, [
               { name: "Far users", rows: farList.rows, columns: FAR_USER_COLUMNS },
