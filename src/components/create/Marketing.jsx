@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useSearchParams } from "react-router-dom";
 import { FileSpreadsheet, Image as ImageIcon, Video as VideoIcon, MessageSquare, X, Send, CheckCircle2, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -345,16 +344,8 @@ const SummaryStat = ({ label, value }) => (
   </div>
 );
 
-const TABS = ["image", "video", "sms"];
-
 const Marketing = () => {
-  // The channel lives in the URL (?tab=sms) so a reload keeps it and it can be linked to.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = TABS.includes(searchParams.get("tab")) ? searchParams.get("tab") : "image";
-  const setTab = (next) => setSearchParams(next === "image" ? {} : { tab: next }, { replace: true });
-
-  // The SMS tab is the redesigned full-width page, with its own channel switcher.
-  if (tab === "sms") return <MarketingSMS onChannel={setTab} />;
+  const [tab, setTab] = useState("image");
 
   return (
     <div>
@@ -396,7 +387,13 @@ const Marketing = () => {
         </div>
       </div>
 
-      {tab === "image" ? <MarketingImage /> : <MarketingVideo />}
+      {tab === "image" ? (
+        <MarketingImage />
+      ) : tab === "video" ? (
+        <MarketingVideo />
+      ) : (
+        <MarketingSMS />
+      )}
     </div>
   );
 };

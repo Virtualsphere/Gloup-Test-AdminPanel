@@ -42,6 +42,7 @@ const CategoryDiscount = lazy(() => import("../components/data/CategoryDiscount"
 const AnalyticsIntelligence = lazy(() => import("../components/analytics/AnalyticsIntelligence"));
 const AnalyticsIntelligenceV2 = lazy(() => import("../components/analytics/AnalyticsIntelligenceV2"));
 const DashboardV2 = lazy(() => import("../components/dashboard/DashboardV2"));
+const MarketingSMSV2 = lazy(() => import("../components/create/MarketingSMSV2"));
 const UserAnalyticsV2 = lazy(() => import("../components/analytics/UserAnalyticsV2"));
 const DeepUserInsightsV2 = lazy(() => import("../components/analytics/DeepUserInsightsV2"));
 const GrowthDashboardV2 = lazy(() => import("../components/dashboard/GrowthDashboardV2"));
@@ -72,6 +73,7 @@ const AppRoutes = () => {
           <Route path="/analytics-intelligence" element={<AnalyticsIntelligence title="Analytics Intelligence" />} />
           <Route path="/analytics-intelligence-v2" element={<AnalyticsIntelligenceV2 title="Analytics Intelligence V2" />} />
           <Route path="/dashboard-v2" element={<DashboardV2 title="Dashboard" />} />
+          <Route path="/marketing-sms-v2" element={<MarketingSMSV2 title="Send Marketing SMS" />} />
           <Route path="/user-analytics-v2" element={<UserAnalyticsV2 title="User Analytics Dashboard" />} />
           <Route path="/deep-user-insights-v2" element={<DeepUserInsightsV2 title="Deep User Insights" />} />
           <Route path="/growth-dashboard-v2" element={<GrowthDashboardV2 title="Dashboard" />} />
