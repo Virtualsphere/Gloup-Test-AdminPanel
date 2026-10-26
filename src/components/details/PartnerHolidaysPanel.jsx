@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import DatePicker from "react-datepicker";
 import { format, startOfDay, isBefore } from "date-fns";
@@ -26,9 +27,11 @@ export const WEEKDAY_LABELS = [
 
 const formatYmd = (d) => format(d, "yyyy-MM-dd");
 
+// Portalled to <body> so it stays a viewport overlay even when the panel sits
+// inside a scaled V2 canvas (a transformed ancestor would trap `fixed`).
 const ConfirmModal = ({ open, title, message, confirmLabel, onConfirm, onCancel, busy }) => {
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
@@ -52,7 +55,8 @@ const ConfirmModal = ({ open, title, message, confirmLabel, onConfirm, onCancel,
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

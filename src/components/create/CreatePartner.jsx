@@ -104,7 +104,8 @@ const CreatePartner = () => {
 
  useEffect(() => {
     dispatch(getLanguageList()).then((res) => {
-      if (res.payload) {
+      // A failed request leaves the error message (a string) in payload.
+      if (Array.isArray(res.payload)) {
         setLanguageOptions(res.payload);
       }
     });
@@ -112,7 +113,8 @@ const CreatePartner = () => {
 
   useEffect(() => {
     dispatch(getServiceProvidedForOptions()).then((res) => {
-      if (res.payload) {
+      // A failed request leaves the error message (a string) in payload.
+      if (Array.isArray(res.payload)) {
         setServicesProvidedFor(res.payload);
       }
     });

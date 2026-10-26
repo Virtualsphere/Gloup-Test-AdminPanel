@@ -862,7 +862,7 @@ const BehaviorAnalyticsV2 = ({ title = "Advanced Behavior Analytics" }) => {
           columns={CONTACT_COLUMNS}
           rows={dialog.rows}
           loading={dialog.loading}
-          onRowClick={(row) => navigate(`/user-details-v2/${row.user_id}`)}
+          onRowClick={(row) => navigate(`/userdetails/${row.user_id}`)}
           onExport={() => downloadXlsx(`${dialog.key}_${range.to}.xlsx`, [{ name: "Users", rows: dialog.rows, columns: CONTACT_COLUMNS }])}
           onClose={() => setDialog(null)}
         />

@@ -364,11 +364,12 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
 
   useEffect(() => {
     dispatch(getServiceProvidedForOptions()).then((res) => {
-      setServicesProvidedFor(res.payload || []);
+      // A failed request leaves the error message (a string) in payload.
+      setServicesProvidedFor(Array.isArray(res.payload) ? res.payload : []);
     });
 
     dispatch(getLanguageList()).then((res) => {
-      setLanguageOptions(res.payload || []);
+      setLanguageOptions(Array.isArray(res.payload) ? res.payload : []);
     });
   }, [dispatch]);
 
@@ -686,6 +687,207 @@ export const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave, saving 
   );
 };
 
+const urlToFile = async (url, filename) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(new File([blob], filename, { type: blob.type }));
+        } else {
+          reject(new Error("Canvas toBlob failed"));
+        }
+      });
+    };
+    img.onerror = reject;
+    // Add a cache buster because the browser might have cached the old response without CORS headers
+    const cacheBusterUrl = url.includes("?") ? `${url}&t=${new Date().getTime()}` : `${url}?t=${new Date().getTime()}`;
+    img.src = cacheBusterUrl;
+  });
+};
+
+const fetchWithFallback = async (img) => {
+  try {
+    const url = getImageUrl(img);
+    return await urlToFile(url, img);
+  } catch (error) {
+    console.error("Failed to convert image:", error);
+    return null;
+  }
+};
+
+// Validates the Edit Salon form and saves it (/editpartner). Alerts and returns
+// false on invalid input; throws if the save fails. Shared with the redesigned
+// Partner Details page (PartnerDetailsV2), so both save exactly the same way.
+export const savePartnerEdit = async (dispatch, id, updatedData) => {
+  // -----------------------------
+  // 1️⃣ BASIC REQUIRED VALIDATION
+  // -----------------------------
+  const requiredFields = [
+    "name",
+    "email",
+    "phone",
+    "addressLine1",
+    "state",
+    "district",
+    "city",
+    "status",
+  ];
+
+  for (let field of requiredFields) {
+    if (!updatedData[field]?.toString().trim()) {
+      alert(`Please enter ${field}`);
+      return false;
+    }
+  }
+
+  // -----------------------------
+  // 2️⃣ EMAIL VALIDATION
+  // -----------------------------
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(updatedData.email)) {
+    alert("Please enter a valid email address");
+    return false;
+  }
+
+  // -----------------------------
+  // 3️⃣ PHONE VALIDATION (India)
+  // -----------------------------
+  const phoneRegex = /^[6-9]\d{9}$/;
+  if (!phoneRegex.test(updatedData.phone)) {
+    alert("Please enter a valid 10-digit mobile number");
+    return false;
+  }
+
+  // -----------------------------
+  // 4️⃣ NUMERIC VALIDATION
+  // -----------------------------
+  if (!updatedData.income && isNaN(updatedData.income)) {
+    alert("Income must be a number");
+    return false;
+  }
+
+  if (
+    !updatedData.latitude ||
+    !updatedData.longitude ||
+    isNaN(updatedData.latitude) ||
+    isNaN(updatedData.longitude)
+  ) {
+    alert("Please select a valid location on map");
+    return false;
+  }
+
+  if (updatedData.radius && isNaN(updatedData.radius)) {
+    alert("Radius must be a number");
+    return false;
+  }
+
+  // -----------------------------
+  // 5️⃣ IMAGE VALIDATION
+  // -----------------------------
+  if (
+    (!updatedData.images || updatedData.images.length === 0)
+  ) {
+    alert("Please upload at least one image");
+    return false;
+  }
+
+  const formData = new FormData();
+  formData.append("id", id);
+  formData.append("name", updatedData.name);
+  formData.append("email", updatedData.email);
+  formData.append("phone", updatedData.phone);
+  formData.append("whatsapp_number", updatedData.whatsapp_number || "");
+  formData.append("income", updatedData.income);
+  formData.append("description", updatedData.description);
+  formData.append("addressLine1", updatedData.addressLine1);
+  formData.append("state", updatedData.state);
+  formData.append("district", updatedData.district);
+  formData.append("city", updatedData.city);
+  formData.append("area", updatedData.area);
+  formData.append("zipcode", updatedData.zipcode);
+  formData.append("landmark", updatedData.landmark);
+  formData.append("latitude", updatedData.latitude);
+  formData.append("longitude", updatedData.longitude);
+  formData.append("location", `${updatedData.longitude},${updatedData.latitude}`);
+  formData.append("radius", updatedData.radius);
+  formData.append("servicesProvidedFor", JSON.stringify(updatedData.servicesProvidedFor));
+  formData.append("languages", JSON.stringify(updatedData.languages));
+  formData.append("isPremium", updatedData.isPremium);
+
+  // -----------------------------
+  // LOGO HANDLING
+  // -----------------------------
+
+  // New logo uploaded
+  if (updatedData.logo instanceof File) {
+    formData.append("logo", updatedData.logo);
+  }
+
+  // Logo removed
+  if (!updatedData.logo && updatedData.newLogoAdded) {
+    formData.append("removeLogo", "true");
+  }
+
+  // Keep existing logo
+  if (typeof updatedData.logo === "string") {
+    formData.append("oldLogo", updatedData.logo);
+  }
+
+
+  // -----------------------------
+  // IMAGE HANDLING
+  // -----------------------------
+
+  const oldImages = [];
+  const newImages = [];
+
+  (updatedData.images || []).forEach((img) => {
+    if (img instanceof File) {
+      newImages.push(img);
+    } else {
+      oldImages.push(img);
+    }
+  });
+
+  const oldFiles = await Promise.all(
+    oldImages.map((img) => fetchWithFallback(img))
+  );
+
+  // ✅ send old images as JSON
+  oldFiles.forEach((file) => {
+    console.log("File Info:", {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+
+    formData.append("images", file);
+  });
+
+  // ✅ send full files (already correct)
+  newImages.forEach((file) => {
+    formData.append("images", file);
+  });
+
+  console.log('formdata: ', formData)
+
+  await dispatch(updatePartnerDetail(formData)).unwrap();
+  return true;
+};
+
+// "YYYY-MM-DD" of the LOCAL calendar day. toISOString() is UTC, so in IST it
+// gives the previous day before 05:30 - and the slot calendar would then load
+// and block slots for the wrong date.
+const toLocalYmd = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 const PartnerDetails = ({ title }) => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -711,6 +913,12 @@ const PartnerDetails = ({ title }) => {
   const [isDeleteServiceModalOpen, setIsDeleteServiceModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  // Bumped when a service modal closes, to refetch the list below.
+  const [servicesReload, setServicesReload] = useState(0);
+  const serviceModalSetter = (setOpen) => (open) => {
+    setOpen(open);
+    if (!open) setServicesReload((k) => k + 1);
+  };
 
   const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -751,7 +959,7 @@ const PartnerDetails = ({ title }) => {
       })
       .catch((err) => console.error(err));
 
-  }, [dispatch, id, selectedCategory]);
+  }, [dispatch, id, selectedCategory, servicesReload]);
 
   //console.log('Services Data: ', servicesData);
 
@@ -829,9 +1037,10 @@ const PartnerDetails = ({ title }) => {
 
   const handleDeleteConfirm = async () => {
     try {
-      await dispatch(deletePartner({ id })).unwrap();
+      // The thunk wraps the id itself ({ id }), as the Partners list calls it.
+      await dispatch(deletePartner(id)).unwrap();
       setShowDeleteModal(false);
-      navigate("/partners");
+      navigate("/partner");
     } catch {
       alert("Failed to delete partner.");
       setShowDeleteModal(false);
@@ -961,199 +1170,10 @@ const PartnerDetails = ({ title }) => {
     });
   };
 
-  const urlToFile = async (url, filename) => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(new File([blob], filename, { type: blob.type }));
-          } else {
-            reject(new Error("Canvas toBlob failed"));
-          }
-        });
-      };
-      img.onerror = reject;
-      // Add a cache buster because the browser might have cached the old response without CORS headers
-      const cacheBusterUrl = url.includes("?") ? `${url}&t=${new Date().getTime()}` : `${url}?t=${new Date().getTime()}`;
-      img.src = cacheBusterUrl;
-    });
-  };
-
-  const fetchWithFallback = async (img) => {
-    try {
-      const url = getImageUrl(img);
-      return await urlToFile(url, img);
-    } catch (error) {
-      console.error("Failed to convert image:", error);
-      return null;
-    }
-  };
-
   const handleSaveEdit = async (updatedData) => {
     try {
-      // debugger;
       setSaving(true);
-      console.log('handling save', updatedData);
-      // -----------------------------
-      // 1️⃣ BASIC REQUIRED VALIDATION
-      // -----------------------------
-      const requiredFields = [
-        "name",
-        "email",
-        "phone",
-        "addressLine1",
-        "state",
-        "district",
-        "city",
-        "status",
-      ];
-
-      for (let field of requiredFields) {
-        if (!updatedData[field]?.toString().trim()) {
-          alert(`Please enter ${field}`);
-          return;
-        }
-      }
-
-      // -----------------------------
-      // 2️⃣ EMAIL VALIDATION
-      // -----------------------------
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(updatedData.email)) {
-        alert("Please enter a valid email address");
-        return;
-      }
-
-      // -----------------------------
-      // 3️⃣ PHONE VALIDATION (India)
-      // -----------------------------
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(updatedData.phone)) {
-        alert("Please enter a valid 10-digit mobile number");
-        return;
-      }
-
-      // -----------------------------
-      // 4️⃣ NUMERIC VALIDATION
-      // -----------------------------
-      if (!updatedData.income && isNaN(updatedData.income)) {
-        alert("Income must be a number");
-        return;
-      }
-
-      if (
-        !updatedData.latitude ||
-        !updatedData.longitude ||
-        isNaN(updatedData.latitude) ||
-        isNaN(updatedData.longitude)
-      ) {
-        alert("Please select a valid location on map");
-        return;
-      }
-
-      if (updatedData.radius && isNaN(updatedData.radius)) {
-        alert("Radius must be a number");
-        return;
-      }
-
-      // -----------------------------
-      // 5️⃣ IMAGE VALIDATION
-      // -----------------------------
-      if (
-        (!updatedData.images || updatedData.images.length === 0)
-      ) {
-        alert("Please upload at least one image");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("id", id);
-      formData.append("name", updatedData.name);
-      formData.append("email", updatedData.email);
-      formData.append("phone", updatedData.phone);
-      formData.append("whatsapp_number", updatedData.whatsapp_number || "");
-      formData.append("income", updatedData.income);
-      formData.append("description", updatedData.description);
-      formData.append("addressLine1", updatedData.addressLine1);
-      formData.append("state", updatedData.state);
-      formData.append("district", updatedData.district);
-      formData.append("city", updatedData.city);
-      formData.append("area", updatedData.area);
-      formData.append("zipcode", updatedData.zipcode);
-      formData.append("landmark", updatedData.landmark);
-      formData.append("latitude", updatedData.latitude);
-      formData.append("longitude", updatedData.longitude);
-      formData.append("location", `${updatedData.longitude},${updatedData.latitude}`);
-      formData.append("radius", updatedData.radius);
-      formData.append("servicesProvidedFor", JSON.stringify(updatedData.servicesProvidedFor));
-      formData.append("languages", JSON.stringify(updatedData.languages));
-      formData.append("isPremium", updatedData.isPremium);
-
-      // -----------------------------
-      // LOGO HANDLING
-      // -----------------------------
-
-      // New logo uploaded
-      if (updatedData.logo instanceof File) {
-        formData.append("logo", updatedData.logo);
-      }
-
-      // Logo removed
-      if (!updatedData.logo && updatedData.newLogoAdded) {
-        formData.append("removeLogo", "true");
-      }
-
-      // Keep existing logo
-      if (typeof updatedData.logo === "string") {
-        formData.append("oldLogo", updatedData.logo);
-      }
-
-
-      // -----------------------------
-      // IMAGE HANDLING
-      // -----------------------------
-
-      const oldImages = [];
-      const newImages = [];
-
-      (updatedData.images || []).forEach((img) => {
-        if (img instanceof File) {
-          newImages.push(img);
-        } else {
-          oldImages.push(img);
-        }
-      });
-
-      const oldFiles = await Promise.all(
-        oldImages.map((img) => fetchWithFallback(img))
-      );
-
-      // ✅ send old images as JSON
-      oldFiles.forEach((file) => {
-        console.log("File Info:", {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-        });
-
-        formData.append("images", file);
-      });
-
-      // ✅ send full files (already correct)
-      newImages.forEach((file) => {
-        formData.append("images", file);
-      });
-
-      console.log('formdata: ', formData)
-
-      await dispatch(updatePartnerDetail(formData)).unwrap();
+      if (!(await savePartnerEdit(dispatch, id, updatedData))) return;
 
       alert("Partner Updated Successfully ✅");
       dispatch(getPartnerDetail({ id }));
@@ -1195,7 +1215,7 @@ const PartnerDetails = ({ title }) => {
         label: d.toLocaleDateString("en-US", { weekday: "short" }),
         number: i,
         day: d.toLocaleDateString("en-US", { weekday: "long" }),
-        full: d.toISOString().split("T")[0],
+        full: toLocalYmd(d),
         isPast: d < todayStart,
         isToday: d.toDateString() === today.toDateString()
       });
@@ -1221,7 +1241,7 @@ const PartnerDetails = ({ title }) => {
         label: d.toLocaleDateString("en-US", { weekday: "short" }),
         number: d.getDate(),
         day: d.toLocaleDateString("en-US", { weekday: "long" }),
-        full: d.toISOString().split("T")[0],
+        full: toLocalYmd(d),
         isPast: d < todayStart,
         isToday: d.toDateString() === today.toDateString()
       });
@@ -2014,12 +2034,12 @@ const PartnerDetails = ({ title }) => {
                 </div>
 
                 {showCreateModal && (
-                  <CreateServiceModal setShowModal={setShowCreateModal} storeId={id} />
+                  <CreateServiceModal setShowModal={serviceModalSetter(setShowCreateModal)} storeId={id} />
                 )}
 
                 {showUpdateModal && (
                   <EditServiceModal
-                    setShowModal={setShowUpdateModal}
+                    setShowModal={serviceModalSetter(setShowUpdateModal)}
                     storeId={id}
                     serviceId={serviceId}
                     serviceData={serviceData}
@@ -2028,7 +2048,7 @@ const PartnerDetails = ({ title }) => {
 
                 {showBulkUploadModal && (
                   <BulkUploadServiceModal
-                    setShowModal={setShowBulkUploadModal}
+                    setShowModal={serviceModalSetter(setShowBulkUploadModal)}
                     storeId={id}
                   />
                 )}

@@ -73,7 +73,7 @@ export const updateUserStatus = createAsyncThunk(
   }
 );
 
-// ---- Users V2 (UsersV2 / UserDetailsV2) ------------------------------------
+// ---- Users V2 (AllUsers / UserDetails) ------------------------------------
 
 const postAdmin = async (path, body, fallback, rejectWithValue) => {
   try {
@@ -118,6 +118,14 @@ export const getUsersSummaryV2 = createAsyncThunk(
 // Profile for any status + bookings with real status and amounts paid: { id }
 export const getUserProfileV2 = createAsyncThunk(
   "allUsers/getUserProfileV2",
+  (id, { rejectWithValue }) =>
+    postAdmin("getUserProfileV2", { id }, "Failed to fetch user profile", rejectWithValue)
+);
+
+// Same profile, returned to the caller only (the booking page's customer card)
+// so the User Details page's stored profile isn't replaced.
+export const fetchUserProfileV2 = createAsyncThunk(
+  "allUsers/fetchUserProfileV2",
   (id, { rejectWithValue }) =>
     postAdmin("getUserProfileV2", { id }, "Failed to fetch user profile", rejectWithValue)
 );
