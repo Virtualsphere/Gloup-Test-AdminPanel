@@ -28,6 +28,7 @@ import { fetchClickInteractionV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
+import { WRAP, WRAP_WIDE } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -56,6 +57,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B3FF0";
 const INDIGO = "#4F46E5";
@@ -63,19 +66,21 @@ const GREEN = "#22C55E";
 const ORANGE = "#F59E0B";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW2_COLS = "grid-cols-[598fr_449fr_281fr]";
-const ROW3_COLS = "grid-cols-[395fr_372fr_254fr_295fr]";
-const ROW4_COLS = "grid-cols-[327fr_328fr_323fr_341fr]";
+const ROW2_COLS = `grid-cols-[598fr_449fr_281fr] ${WRAP.wide}`;
+const ROW3_COLS = `grid-cols-[395fr_372fr_254fr_295fr] ${WRAP[4]}`;
+const ROW4_COLS = `grid-cols-[327fr_328fr_323fr_341fr] ${WRAP[4]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1344px of content, so measured sizes carry over at ~1.13x.
+// This mockup's type is smaller than the other V2 pages'; in the wrapped
+// layout, where the cards are wider than drawn, it steps up to match them.
 const T = {
-  nano: "text-[8.5px]", // column headers
-  micro: "text-[9.5px]", // captions, glossary
-  xs: "text-[10.5px]", // table cells
-  sm: "text-[11.5px]", // body, tabs
-  title: "text-[13px]", // card titles
-  kpi: "text-[22px]", // KPI values
+  nano: "text-[8.5px] wrapped:text-[10px]", // column headers
+  micro: "text-[9.5px] wrapped:text-[10.5px]", // captions, glossary
+  xs: "text-[10.5px] wrapped:text-[12px]", // table cells
+  sm: "text-[11.5px] wrapped:text-[13px]", // body, tabs
+  title: "text-[13px] wrapped:text-[14.5px]", // card titles
+  kpi: "text-[22px] wrapped:text-[24px]", // KPI values
 };
 
 const GAP = "gap-3";
@@ -568,9 +573,9 @@ const ClickInteractionV2 = ({ title = "User Click & Interaction Analytics" }) =>
         onExport={exportReport}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {kpis.map(({ color, ...tile }) => (
             <KpiTile key={tile.label} {...tile} footer={<span className="mt-2 block h-[3px] rounded-full" style={{ background: color, opacity: 0.5 }} />} />
           ))}
@@ -578,7 +583,7 @@ const ClickInteractionV2 = ({ title = "User Click & Interaction Analytics" }) =>
 
         {/* Row 2 - Heatmap / distribution by screen / top elements */}
         <div className={`grid ${ROW2_COLS} ${GAP}`}>
-          <Card className="p-4">
+          <Card className={`p-4 ${WRAP_WIDE}`}>
             <CardHeader title="1. Screen Tap Heatmap" subtitle={hasTaps ? "Busiest tap spots per screen" : `Tap positions come from the app · ${appNote}`} />
 
             <div className="mt-2.5 flex items-center gap-2">
@@ -877,7 +882,7 @@ const ClickInteractionV2 = ({ title = "User Click & Interaction Analytics" }) =>
         {/* Row 5 - Glossary */}
         <Card className="px-4 py-3">
           <CardHeader title="What do these metrics mean?" />
-          <div className="mt-2 grid grid-cols-5 gap-3">
+          <div className={`mt-2 grid grid-cols-5 ${WRAP[5]} gap-3`}>
             {glossary.map((item) => {
               const Icon = item.icon;
               return (

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* V2 pages: ScaledCanvas sets data-wrapped when the screen is too narrow for
+   the mockup's width, and `wrapped:` classes re-flow the card rows. */
+@custom-variant wrapped (&:where([data-wrapped], [data-wrapped] *));
+
 body {
    font-family: "Outfit", sans-serif;
 }

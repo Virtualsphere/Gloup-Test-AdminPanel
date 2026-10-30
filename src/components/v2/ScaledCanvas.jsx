@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { CanvasScaleContext, useCanvasScale } from "./canvasScaleContext";
 
-// Every V2 page is laid out once on a fixed `width` design canvas that is then
-// uniformly scaled down to the available width, so the arrangement matches the
-// approved mockup at every screen size - nothing reflows, nothing clips, the
-// page never scrolls sideways.
+// Every V2 page is laid out on a `width` design canvas that is uniformly
+// scaled down to the available width, so the arrangement matches the approved
+// mockup - nothing clips, the page never scrolls sideways. (With `minWidth`,
+// see below, narrow screens get a re-flowed arrangement instead.)
 //
 // Because the whole canvas scales, raising a page's px type sizes does NOT make
 // its text bigger on screen: it forces a wider canvas, which then scales down
@@ -13,9 +13,20 @@ import { CanvasScaleContext, useCanvasScale } from "./canvasScaleContext";
 // Render anything `position: fixed` (modals) outside this component - a
 // transformed ancestor becomes the containing block for fixed descendants.
 // Third-party widgets that do their own pointer math (maps) go in <Unscaled>.
-const ScaledCanvas = ({ width, className = "", children }) => {
+//
+// A page that passes `minWidth` opts out of most of the shrinking. The mockup
+// layout is only ever laid out at `width` and shrunk to MIN_DESIGN_SCALE at
+// most; on a narrower screen the canvas takes the available width (but not
+// less than `minWidth`) and gets `data-wrapped`, and the page's `wrapped:`
+// classes (see WRAP in tokens.js) re-flow its card rows. Cards keep their
+// mockup type size and the page grows taller instead.
+const MIN_DESIGN_SCALE = 0.92;
+
+const ScaledCanvas = ({ width, minWidth = width, className = "", children }) => {
   const outerRef = useRef(null);
   const canvasRef = useRef(null);
+  const [canvasWidth, setCanvasWidth] = useState(width);
+  const [wrapped, setWrapped] = useState(false);
   const [scale, setScale] = useState(1);
   const [boxHeight, setBoxHeight] = useState(undefined);
 
@@ -24,7 +35,12 @@ const ScaledCanvas = ({ width, className = "", children }) => {
     const canvas = canvasRef.current;
 
     const measure = () => {
-      const next = Math.min(1, outer.clientWidth / width);
+      const available = outer.clientWidth;
+      const wrap = minWidth < width && available < width * MIN_DESIGN_SCALE;
+      const nextWidth = wrap ? Math.max(minWidth, available) : width;
+      const next = Math.min(1, available / nextWidth);
+      setCanvasWidth(nextWidth);
+      setWrapped(wrap);
       // Guard against feedback loops when the height change moves a scrollbar.
       setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
       setBoxHeight((prev) => {
@@ -38,14 +54,15 @@ const ScaledCanvas = ({ width, className = "", children }) => {
     ro.observe(outer);
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, [width]);
+  }, [width, minWidth]);
 
   return (
     <div ref={outerRef} className="w-full" style={{ height: boxHeight }}>
       <div
         ref={canvasRef}
+        data-wrapped={wrapped || undefined}
         className={className}
-        style={{ width, transform: `scale(${scale})`, transformOrigin: "top left" }}
+        style={{ width: canvasWidth, transform: `scale(${scale})`, transformOrigin: "top left" }}
       >
         <CanvasScaleContext.Provider value={scale}>{children}</CanvasScaleContext.Provider>
       </div>

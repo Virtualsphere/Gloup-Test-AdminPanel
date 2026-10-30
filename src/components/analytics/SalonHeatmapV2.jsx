@@ -26,6 +26,7 @@ import { rupees } from "../../utils/format";
 import { GOOGLE_MAPS_LOADER } from "../../utils/googleMaps";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas, { Unscaled } from "../v2/ScaledCanvas";
+import { WRAP } from "../v2/tokens";
 import { useCanvasScale } from "../v2/canvasScaleContext";
 import { Card, DateRangeButton, Delta, HeaderSelect, KpiTile as BaseKpiTile, ListDialog, Select as BaseSelect } from "../v2/ui";
 
@@ -48,12 +49,14 @@ import { Card, DateRangeButton, Delta, HeaderSelect, KpiTile as BaseKpiTile, Lis
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const GREEN = "#22C55E";
 const INDIGO = "#4F46E5";
 
 // Map | ranking panel, as measured from the mockup.
-const MAP_COLS = "grid-cols-[961fr_331fr]";
+const MAP_COLS = `grid-cols-[961fr_331fr] ${WRAP[2]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1292px of content, so measured sizes carry over at ~1.18x.
@@ -467,9 +470,9 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
         onRefresh={load}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-5 ${GAP}`}>
+        <div className={`grid grid-cols-5 ${WRAP[5]} ${GAP}`}>
           {kpis.map(({ icon, tint, ...kpi }) => (
             <KpiTile key={kpi.label} {...kpi} icon={icon} iconTint={tint} />
           ))}

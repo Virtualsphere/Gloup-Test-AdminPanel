@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CARD } from "../v2/tokens";
+import { CARD, WRAP } from "../v2/tokens";
 import { Card, Chip as BaseChip, HeaderBell, HeaderSearch } from "../v2/ui";
 import { useListUiState } from "../../hooks/useListUiState";
 import { downloadCsv } from "../../utils/format";
@@ -64,6 +64,8 @@ import { fetchServiceCategories } from "../../redux/slices/partnersSlice";
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1320;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B21F0";
 const GREEN = "#12B76A";
@@ -74,8 +76,8 @@ const VIOLET = "#7C3AED";
 const SLATE = "#94A3B8";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const MAIN_COLS = "grid-cols-[1040fr_267fr]";
-const BOTTOM_COLS = "grid-cols-[372fr_356fr_592fr]";
+const MAIN_COLS = `grid-cols-[1040fr_267fr] ${WRAP[2]}`;
+const BOTTOM_COLS = `grid-cols-[372fr_356fr_592fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1320px canvas. See the note above before
 // changing these.
@@ -931,7 +933,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
         setSearch={(v) => setFilter("search", v)}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Export / refresh                                                  */}
         {/* ---------------------------------------------------------------- */}
@@ -964,7 +966,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* KPI row                                                           */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             <Card key={kpi.label} className="p-3.5">
               <div className="flex items-center gap-2">
@@ -1410,8 +1412,8 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
             </div>
           </Card>
 
-          {/* Right rail */}
-          <div className={`flex min-w-0 flex-col ${GAP}`}>
+          {/* Right rail - its two cards sit side by side once wrapped */}
+          <div className={`flex min-w-0 flex-col ${GAP} wrapped:grid wrapped:grid-cols-2`}>
             <DonutCard title="Bookings by Status" total={fmtInt(rangeTotal)} slices={statusSlices} />
 
             <Card className="p-3.5">

@@ -36,7 +36,7 @@ import { fetchSalonCategoryV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, CARD } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, CARD, WRAP } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -64,6 +64,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#6D4AE0";
 const INDIGO = "#4F46E5";
@@ -72,9 +74,9 @@ const UNISEX = "#22C55E";
 const WOMEN = "#F0527E";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW1_COLS = "grid-cols-[432fr_410fr_449fr]";
-const ROW2_COLS = "grid-cols-[377fr_287fr_308fr_312fr]";
-const ROW3_COLS = "grid-cols-[865fr_436fr]";
+const ROW1_COLS = `grid-cols-[432fr_410fr_449fr] ${WRAP[3]}`;
+const ROW2_COLS = `grid-cols-[377fr_287fr_308fr_312fr] ${WRAP[4]}`;
+const ROW3_COLS = `grid-cols-[865fr_436fr] ${WRAP[2]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1314px of content, so measured sizes carry over at ~1.16x.
@@ -386,7 +388,7 @@ const SalonCategoryIntelligenceV2 = ({ title = "Salon Category Intelligence" }) 
         onExport={exportDetail}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - Category summaries */}
         <div className={`grid ${ROW1_COLS} ${GAP}`}>
           {(ordered.length ? ordered : PLACEHOLDER_COLUMNS.slice(0, 3)).map((cat) => (

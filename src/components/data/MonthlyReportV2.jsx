@@ -40,7 +40,7 @@ import { downloadCsv } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CARD, initials } from "../v2/tokens";
+import { CARD, initials, WRAP } from "../v2/tokens";
 import { Card, Chip as BaseChip, HeaderBell } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
@@ -60,6 +60,8 @@ import { Card, Chip as BaseChip, HeaderBell } from "../v2/ui";
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1460;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B21F0";
 const GREEN = "#12B76A";
@@ -544,7 +546,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
     <>
       <PageHeader title={title} subtitle={`Salon wise appointment summary for ${monthLabel(month)}`} />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {error && (
           <div className={`flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 ${T.sm}`}>
             <AlertTriangle size={16} className="shrink-0" />
@@ -593,7 +595,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* KPI row                                                           */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-8 ${GAP}`}>
+        <div className={`grid grid-cols-8 ${WRAP[8]} ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             // p-3 / 32px icon / gap-1.5 rather than p-3.5 / 36 / gap-2: the 10px
             // reclaimed is what keeps "Avg. Bookings / Partner" on one line.
@@ -621,7 +623,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Toolbar - search, filters, sort, export                           */}
         {/* ---------------------------------------------------------------- */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 wrapped:flex-wrap">
           <span className="relative block w-[440px] shrink-0">
             <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -721,7 +723,10 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Money summary strip                                               */}
         {/* ---------------------------------------------------------------- */}
-        <div className="grid grid-cols-8 divide-x divide-[#E6E8F0] rounded-2xl border border-[#E6E8F0] bg-[#F8F9FC]">
+        {/* Wrapped it goes 4 + 4: no divider after the 4th cell, a rule under the first row. */}
+        <div
+          className={`grid grid-cols-8 ${WRAP[8]} divide-x divide-[#E6E8F0] rounded-2xl border border-[#E6E8F0] bg-[#F8F9FC] wrapped:[&>:nth-child(4)]:border-e-0 wrapped:[&>:nth-child(-n+4)]:border-b`}
+        >
           {strip.map((item) => (
             <div key={item.label} className="min-w-0 px-4 py-3">
               <p className={`truncate font-medium text-slate-500 ${T.xxs}`}>{item.label}</p>
@@ -743,220 +748,222 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
         {/* Salon table                                                       */}
         {/* ---------------------------------------------------------------- */}
         <Card>
-          <table className={`w-full table-fixed border-collapse text-left transition-opacity ${salonsV2Loading && rows.length ? "opacity-60" : ""}`}>
-            <colgroup>
-              {COLS.map((width, index) => (
-                <col key={`${width}-${index}`} style={{ width }} />
-              ))}
-            </colgroup>
-
-            <thead>
-              <tr className="border-b border-[#EDEFF5]">
-                <th />
-                {COLUMNS.map((column) => (
-                  <th key={column.label} className={`whitespace-nowrap py-3 pr-1.5 font-semibold uppercase tracking-wide text-slate-400 ${T.th}`}>
-                    {column.sort ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleSort(column.sort)}
-                        className={`flex items-center gap-1 uppercase ${sort.startsWith(column.sort) ? "text-violet-600" : ""}`}
-                      >
-                        {column.label}
-                        <ArrowUpDown size={9} className="shrink-0" />
-                      </button>
-                    ) : (
-                      column.label
-                    )}
-                  </th>
+          <div className="wrapped:overflow-x-auto">
+            <table className={`w-full table-fixed border-collapse text-left transition-opacity ${salonsV2Loading && rows.length ? "opacity-60" : ""}`}>
+              <colgroup>
+                {COLS.map((width, index) => (
+                  <col key={`${width}-${index}`} style={{ width }} />
                 ))}
-                <th />
-              </tr>
-            </thead>
+              </colgroup>
 
-            <tbody>
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={COLS.length} className={`py-10 text-center text-slate-400 ${T.sm}`}>
-                    {salonsV2Loading ? "Loading report…" : `No bookings in ${monthLabel(month)}${search || city ? " match these filters" : ""}.`}
-                  </td>
-                </tr>
-              )}
-
-              {rows.map((row) => (
-                <tr key={row.store_id} className="border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60">
-                  <td />
-
-                  {/* Partner / Salon Details */}
-                  <td className="py-3 pr-1.5 align-middle">
-                    <span className="flex items-center gap-2.5">
-                      <SalonLogo name={row.partner_name} logo={row.partner_logo} />
-                      <span className="min-w-0 flex-1 leading-tight">
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <span className={`truncate font-bold text-slate-800 ${T.xs}`}>{row.partner_name}</span>
-                          {row.salon_deleted ? (
-                            <Chip className="bg-slate-100 text-slate-500">Deleted</Chip>
-                          ) : (
-                            <Chip className="bg-[#EDE7FF] text-[#5B21F0]">Partner</Chip>
-                          )}
-                        </span>
-                        <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>{row.store_type || DASH}</span>
-                        <span className={`mt-0.5 block truncate text-slate-400 ${T.tiny}`}>Partner ID: #{row.store_id}</span>
-                      </span>
-                    </span>
-                  </td>
-
-                  {/* Contact */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`flex items-center gap-1.5 text-slate-600 ${T.xxs}`}>
-                      <Phone size={11} className="shrink-0" style={{ color: GREEN }} />
-                      <span className="truncate">{row.partner_phone || DASH}</span>
-                    </span>
-                    <span className={`mt-1 flex items-center gap-1.5 text-slate-400 ${T.tiny}`}>
-                      <Mail size={11} className="shrink-0" />
-                      <span className="truncate">{row.partner_email || DASH}</span>
-                    </span>
-                  </td>
-
-                  {/* Location */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`flex items-center gap-1.5 text-slate-600 ${T.xxs}`}>
-                      <MapPin size={11} className="shrink-0" style={{ color: RED }} />
-                      <span className="truncate">{row.area || DASH}</span>
-                    </span>
-                    <span className={`mt-1 block truncate pl-[17px] text-slate-400 ${T.tiny}`}>
-                      {[row.city, row.state].filter(Boolean).join(", ") || DASH}
-                    </span>
-                  </td>
-
-                  {/* Total Bookings */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`block font-extrabold text-slate-900 ${T.md}`}>{fmtInt(row.total_bookings)}</span>
-                    <Chip className="mt-1 bg-[#EAF2FE] text-[#2E90FA]">Bookings</Chip>
-                  </td>
-
-                  {/* Completed */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`block font-bold text-slate-800 ${T.md}`}>{fmtInt(row.completed)}</span>
-                    <span className={`mt-1 block font-semibold ${T.tiny}`} style={{ color: GREEN }}>{fmtPct(row.completed_pct)}</span>
-                  </td>
-
-                  {/* Cancelled */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`block font-bold text-slate-800 ${T.md}`}>{fmtInt(row.cancelled)}</span>
-                    <span className={`mt-1 block font-semibold ${T.tiny}`} style={{ color: RED }}>{fmtPct(row.cancelled_pct)}</span>
-                  </td>
-
-                  {/* Amount Paid In */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.gross)}</span>
-                    <span className={`mt-1 block truncate text-slate-400 ${T.tiny}`}>({fmtInt(row.orders)} Orders)</span>
-                  </td>
-
-                  {/* Payout */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.payout)}</span>
-                    {row.subscription_deducted > 0 && (
-                      <span className={`mt-1 block truncate text-slate-400 ${T.tiny}`} title="Subscription fee deducted from payouts">
-                        −{fmtMoney(row.subscription_deducted)} sub.
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Platform Fee */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.platform_fee)}</span>
-                    <span className={`mt-1 block truncate text-slate-400 ${T.tiny}`}>
-                      ({fmtInt(row.active_bookings)} served)
-                    </span>
-                  </td>
-
-                  {/* CAC */}
-                  <td className={`whitespace-nowrap py-3 pr-1.5 align-middle font-semibold text-slate-700 ${T.xs}`} title={`Total CAC spend: ${fmtMoney(row.cac_spend, 2)}`}>
-                    {fmtMoney(row.cac_per_booking, 2)}
-                  </td>
-
-                  {/* Avg. Order Value */}
-                  <td className={`whitespace-nowrap py-3 pr-1.5 align-middle font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.avg_order_value)}</td>
-
-                  {/* Rating */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    {row.average_rating == null ? (
-                      <span className={`text-slate-300 ${T.xs}`}>{DASH}</span>
-                    ) : (
-                      <>
-                        <span className="flex items-center gap-1">
-                          <Star size={11} className="shrink-0" fill={AMBER} strokeWidth={0} />
-                          <span className={`font-bold text-slate-800 ${T.xs}`}>{row.average_rating.toFixed(1)}</span>
-                        </span>
-                        <span className={`mt-1 block text-slate-400 ${T.tiny}`}>({fmtInt(row.review_count)})</span>
-                      </>
-                    )}
-                  </td>
-
-                  {/* Last Booking */}
-                  <td className="py-3 pr-1.5 align-middle leading-tight">
-                    {row.last_booking_at ? (
-                      <>
-                        <span className={`block whitespace-nowrap font-semibold text-slate-700 ${T.xs}`}>
-                          {moment(row.last_booking_at.slice(0, 10), "YYYY-MM-DD").format("DD MMM YYYY")}
-                        </span>
-                        {row.last_booking_at.length > 10 && (
-                          <span className={`mt-1 block whitespace-nowrap text-slate-400 ${T.tiny}`}>
-                            {moment.parseZone(row.last_booking_at).format("hh:mm A")}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className={`text-slate-300 ${T.xs}`}>{DASH}</span>
-                    )}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="py-3 pr-1.5 align-middle">
-                    <span className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/monthly-report/${row.store_id}?month=${month}`)}
-                        disabled={row.salon_deleted}
-                        className={`whitespace-nowrap rounded-md border border-[#E6E8F0] bg-white px-2 py-1 font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 ${T.tiny}`}
-                      >
-                        View Details
-                      </button>
-                      <span data-report-menu className="relative">
+              <thead>
+                <tr className="border-b border-[#EDEFF5]">
+                  <th />
+                  {COLUMNS.map((column) => (
+                    <th key={column.label} className={`whitespace-nowrap py-3 pr-1.5 font-semibold uppercase tracking-wide text-slate-400 ${T.th}`}>
+                      {column.sort ? (
                         <button
                           type="button"
-                          onClick={() => setMenuFor(menuFor === row.store_id ? null : row.store_id)}
-                          disabled={row.salon_deleted}
-                          className="shrink-0 text-slate-300 transition-colors hover:text-slate-500 disabled:opacity-40"
-                          aria-label="More actions"
-                          aria-expanded={menuFor === row.store_id}
+                          onClick={() => toggleSort(column.sort)}
+                          className={`flex items-center gap-1 uppercase ${sort.startsWith(column.sort) ? "text-violet-600" : ""}`}
                         >
-                          <MoreVertical size={13} />
+                          {column.label}
+                          <ArrowUpDown size={9} className="shrink-0" />
                         </button>
-                        {menuFor === row.store_id && (
-                          <span role="menu" className={`absolute right-0 top-6 z-20 flex w-[200px] flex-col rounded-xl border border-[#E6E8F0] bg-white py-1 shadow-lg ${T.xs}`}>
-                            <button type="button" role="menuitem" onClick={() => downloadPdf(row)} className="px-3 py-2 text-left font-semibold text-slate-700 hover:bg-slate-50">
-                              Download monthly invoice PDF
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={() => navigate(`/partnerdetails/${row.store_id}`)}
-                              className="px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
-                            >
-                              Open partner profile
-                            </button>
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  </td>
-
-                  <td />
+                      ) : (
+                        column.label
+                      )}
+                    </th>
+                  ))}
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={COLS.length} className={`py-10 text-center text-slate-400 ${T.sm}`}>
+                      {salonsV2Loading ? "Loading report…" : `No bookings in ${monthLabel(month)}${search || city ? " match these filters" : ""}.`}
+                    </td>
+                  </tr>
+                )}
+
+                {rows.map((row) => (
+                  <tr key={row.store_id} className="border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60">
+                    <td />
+
+                    {/* Partner / Salon Details */}
+                    <td className="py-3 pr-1.5 align-middle">
+                      <span className="flex items-center gap-2.5">
+                        <SalonLogo name={row.partner_name} logo={row.partner_logo} />
+                        <span className="min-w-0 flex-1 leading-tight">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className={`truncate font-bold text-slate-800 ${T.xs}`}>{row.partner_name}</span>
+                            {row.salon_deleted ? (
+                              <Chip className="bg-slate-100 text-slate-500">Deleted</Chip>
+                            ) : (
+                              <Chip className="bg-[#EDE7FF] text-[#5B21F0]">Partner</Chip>
+                            )}
+                          </span>
+                          <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>{row.store_type || DASH}</span>
+                          <span className={`mt-0.5 block truncate text-slate-400 ${T.tiny}`}>Partner ID: #{row.store_id}</span>
+                        </span>
+                      </span>
+                    </td>
+
+                    {/* Contact */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`flex items-center gap-1.5 text-slate-600 ${T.xxs}`}>
+                        <Phone size={11} className="shrink-0" style={{ color: GREEN }} />
+                        <span className="truncate">{row.partner_phone || DASH}</span>
+                      </span>
+                      <span className={`mt-1 flex items-center gap-1.5 text-slate-400 ${T.tiny}`}>
+                        <Mail size={11} className="shrink-0" />
+                        <span className="truncate">{row.partner_email || DASH}</span>
+                      </span>
+                    </td>
+
+                    {/* Location */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`flex items-center gap-1.5 text-slate-600 ${T.xxs}`}>
+                        <MapPin size={11} className="shrink-0" style={{ color: RED }} />
+                        <span className="truncate">{row.area || DASH}</span>
+                      </span>
+                      <span className={`mt-1 block truncate pl-[17px] text-slate-400 ${T.tiny}`}>
+                        {[row.city, row.state].filter(Boolean).join(", ") || DASH}
+                      </span>
+                    </td>
+
+                    {/* Total Bookings */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`block font-extrabold text-slate-900 ${T.md}`}>{fmtInt(row.total_bookings)}</span>
+                      <Chip className="mt-1 bg-[#EAF2FE] text-[#2E90FA]">Bookings</Chip>
+                    </td>
+
+                    {/* Completed */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`block font-bold text-slate-800 ${T.md}`}>{fmtInt(row.completed)}</span>
+                      <span className={`mt-1 block font-semibold ${T.tiny}`} style={{ color: GREEN }}>{fmtPct(row.completed_pct)}</span>
+                    </td>
+
+                    {/* Cancelled */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`block font-bold text-slate-800 ${T.md}`}>{fmtInt(row.cancelled)}</span>
+                      <span className={`mt-1 block font-semibold ${T.tiny}`} style={{ color: RED }}>{fmtPct(row.cancelled_pct)}</span>
+                    </td>
+
+                    {/* Amount Paid In */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.gross)}</span>
+                      <span className={`mt-1 block truncate text-slate-400 ${T.tiny}`}>({fmtInt(row.orders)} Orders)</span>
+                    </td>
+
+                    {/* Payout */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.payout)}</span>
+                      {row.subscription_deducted > 0 && (
+                        <span className={`mt-1 block truncate text-slate-400 ${T.tiny}`} title="Subscription fee deducted from payouts">
+                          −{fmtMoney(row.subscription_deducted)} sub.
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Platform Fee */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.platform_fee)}</span>
+                      <span className={`mt-1 block truncate text-slate-400 ${T.tiny}`}>
+                        ({fmtInt(row.active_bookings)} served)
+                      </span>
+                    </td>
+
+                    {/* CAC */}
+                    <td className={`whitespace-nowrap py-3 pr-1.5 align-middle font-semibold text-slate-700 ${T.xs}`} title={`Total CAC spend: ${fmtMoney(row.cac_spend, 2)}`}>
+                      {fmtMoney(row.cac_per_booking, 2)}
+                    </td>
+
+                    {/* Avg. Order Value */}
+                    <td className={`whitespace-nowrap py-3 pr-1.5 align-middle font-bold text-slate-900 ${T.xs}`}>{fmtMoney(row.avg_order_value)}</td>
+
+                    {/* Rating */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      {row.average_rating == null ? (
+                        <span className={`text-slate-300 ${T.xs}`}>{DASH}</span>
+                      ) : (
+                        <>
+                          <span className="flex items-center gap-1">
+                            <Star size={11} className="shrink-0" fill={AMBER} strokeWidth={0} />
+                            <span className={`font-bold text-slate-800 ${T.xs}`}>{row.average_rating.toFixed(1)}</span>
+                          </span>
+                          <span className={`mt-1 block text-slate-400 ${T.tiny}`}>({fmtInt(row.review_count)})</span>
+                        </>
+                      )}
+                    </td>
+
+                    {/* Last Booking */}
+                    <td className="py-3 pr-1.5 align-middle leading-tight">
+                      {row.last_booking_at ? (
+                        <>
+                          <span className={`block whitespace-nowrap font-semibold text-slate-700 ${T.xs}`}>
+                            {moment(row.last_booking_at.slice(0, 10), "YYYY-MM-DD").format("DD MMM YYYY")}
+                          </span>
+                          {row.last_booking_at.length > 10 && (
+                            <span className={`mt-1 block whitespace-nowrap text-slate-400 ${T.tiny}`}>
+                              {moment.parseZone(row.last_booking_at).format("hh:mm A")}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className={`text-slate-300 ${T.xs}`}>{DASH}</span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3 pr-1.5 align-middle">
+                      <span className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/monthly-report/${row.store_id}?month=${month}`)}
+                          disabled={row.salon_deleted}
+                          className={`whitespace-nowrap rounded-md border border-[#E6E8F0] bg-white px-2 py-1 font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 ${T.tiny}`}
+                        >
+                          View Details
+                        </button>
+                        <span data-report-menu className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setMenuFor(menuFor === row.store_id ? null : row.store_id)}
+                            disabled={row.salon_deleted}
+                            className="shrink-0 text-slate-300 transition-colors hover:text-slate-500 disabled:opacity-40"
+                            aria-label="More actions"
+                            aria-expanded={menuFor === row.store_id}
+                          >
+                            <MoreVertical size={13} />
+                          </button>
+                          {menuFor === row.store_id && (
+                            <span role="menu" className={`absolute right-0 top-6 z-20 flex w-[200px] flex-col rounded-xl border border-[#E6E8F0] bg-white py-1 shadow-lg ${T.xs}`}>
+                              <button type="button" role="menuitem" onClick={() => downloadPdf(row)} className="px-3 py-2 text-left font-semibold text-slate-700 hover:bg-slate-50">
+                                Download monthly invoice PDF
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => navigate(`/partnerdetails/${row.store_id}`)}
+                                className="px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
+                              >
+                                Open partner profile
+                              </button>
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </td>
+
+                    <td />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
 
         {/* ---------------------------------------------------------------- */}

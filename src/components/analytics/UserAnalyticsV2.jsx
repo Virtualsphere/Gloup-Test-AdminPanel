@@ -24,7 +24,7 @@ import { fetchUserAnalyticsOverviewV2, fetchUserRetentionV2 } from "../../redux/
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark } from "../v2/tokens";
+import { CHART_AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark, WRAP } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -59,6 +59,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const VIOLET = "#5236E8";
 const GREEN = "#22C55E";
@@ -70,9 +72,9 @@ const SLATE = "#CBD5E1";
 // Measured card widths from the mockup, used directly as grid fr units. The
 // mockup leaves the right third of the funnel row empty; the funnel card spans
 // the full row instead.
-const ROW3_COLS = "grid-cols-[331fr_279fr_341fr_356fr]";
-const ROW4_COLS = "grid-cols-[331fr_326fr_293fr_356fr]";
-const ROW5_COLS = "grid-cols-[316fr_376fr_343fr_266fr]";
+const ROW3_COLS = `grid-cols-[331fr_279fr_341fr_356fr] ${WRAP[4]}`;
+const ROW4_COLS = `grid-cols-[331fr_326fr_293fr_356fr] ${WRAP[4]}`;
+const ROW5_COLS = `grid-cols-[316fr_376fr_343fr_266fr] ${WRAP[4]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1338px of content, so measured sizes carry over at ~1.14x.
@@ -590,11 +592,11 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
         onExport={exportKeyMetrics}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {kpis.map(({ icon, color, tint, spark: trend, ...tile }) => (
             <KpiTile
               key={tile.label}

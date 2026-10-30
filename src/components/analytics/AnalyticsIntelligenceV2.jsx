@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
+import { WRAP, WRAP_WIDE } from "../v2/tokens";
 import { DateRangeButton, HeaderBell, HeaderSelect, ListDialog } from "../v2/ui";
 import {
   exportAnalyticsUninstalledV2,
@@ -41,11 +42,13 @@ import { downloadXlsx } from "../../utils/excelExport";
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 const BRAND = "#5B21F0";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW1_COLS = "grid-cols-[1811fr_1383fr_1923fr]";
-const ROW2_COLS = "grid-cols-[1740fr_1888fr_1454fr]";
+const ROW1_COLS = `grid-cols-[1811fr_1383fr_1923fr] ${WRAP[3]}`;
+const ROW2_COLS = `grid-cols-[1740fr_1888fr_1454fr] ${WRAP.wide}`;
 
 // Type scale in design px on the 1520px canvas. See the note above before
 // changing these - bigger numbers here make the rendered text smaller.
@@ -687,7 +690,7 @@ const AnalyticsIntelligenceV2 = () => {
         </div>
       </PageHeaderPortal>
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {errors.length > 0 && (
           <div className={`flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 ${T.md}`}>
             <AlertTriangle size={16} className="shrink-0" />
@@ -943,7 +946,7 @@ const AnalyticsIntelligenceV2 = () => {
           </Card>
 
           {/* 5. Uninstalled Users — Re-engagement */}
-          <Card>
+          <Card className={WRAP_WIDE}>
             <CardTitle index={5}>Uninstalled Users — Re-engagement</CardTitle>
 
             <div
@@ -1106,7 +1109,7 @@ const AnalyticsIntelligenceV2 = () => {
         {/* ------------------------------------------------------------------ */}
         {/* Row 3 — Summary tables                                              */}
         {/* ------------------------------------------------------------------ */}
-        <div className={`grid grid-cols-4 ${GAP}`}>
+        <div className={`grid grid-cols-4 ${WRAP[4]} ${GAP}`}>
           <Card>
             <h2 className={`mb-3 font-extrabold text-slate-900 ${T.xl}`}>
               Top Profitable Salons

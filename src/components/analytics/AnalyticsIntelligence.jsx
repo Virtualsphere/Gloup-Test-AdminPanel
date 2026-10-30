@@ -224,7 +224,7 @@ const AnalyticsIntelligence = () => {
   const [messageType, setMessageType] = useState("WhatsApp");
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+    <div className="@container min-h-screen bg-gray-50 p-4 sm:p-6">
       {/* Page header / filter bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-6">
         <div>
@@ -472,8 +472,10 @@ const AnalyticsIntelligence = () => {
         </div>
       </div>
 
-      {/* Row 3: Today's snapshot + mini tables */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6">
+      {/* Row 3: Today's snapshot + mini tables. Keyed to the page's own width
+          (container query), not the window's, so the sidebar is accounted for:
+          the mini tables need ~280px a card before five fit in a row. */}
+      <div className="grid grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3 @min-[1440px]:grid-cols-5 gap-6">
         {/* Today's Snapshot */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Today's Snapshot</h3>

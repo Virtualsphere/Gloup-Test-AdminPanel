@@ -36,7 +36,7 @@ import { fetchGrowthDashboardV2, fetchGrowthListV2, sendBulkUserPushV2 } from ".
 import { downloadXlsx } from "../../utils/excelExport";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
 import {
   Card,
   Donut as BaseDonut,
@@ -66,6 +66,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B3FF0";
 const BLUE = "#2E6CF0";
@@ -75,7 +77,7 @@ const RED = "#F04438";
 const PINK = "#EC4899";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW_COLS = "grid-cols-[472fr_399fr_416fr]";
+const ROW_COLS = `grid-cols-[472fr_399fr_416fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1313px of content, so measured sizes carry over at ~1.16x.
@@ -537,11 +539,11 @@ const GrowthDashboardV2 = ({ title = "Dashboard" }) => {
         alertCount={alerts.length}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - Action tiles                                              */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
             return (

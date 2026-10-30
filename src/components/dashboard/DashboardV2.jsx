@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
 import { HeaderBell, HeaderSelect } from "../v2/ui";
 import {
   getDashboardV2Alerts,
@@ -44,9 +44,11 @@ import {
 } from "../../redux/slices/dashboardSlice";
 
 // ---------------------------------------------------------------------------
-// 1:1 reproduction of the approved executive dashboard mockup, on a fixed
-// DESIGN_WIDTH canvas that ScaledCanvas scales to the available width (see
-// there for why bigger px sizes in T read smaller on screen).
+// 1:1 reproduction of the approved executive dashboard mockup, on a
+// DESIGN_WIDTH canvas (see ScaledCanvas for why bigger px sizes in T read
+// smaller on screen). Narrower screens keep the mockup's type size: down to
+// MIN_WIDTH the card rows wrap and the page grows taller, and only below that
+// does ScaledCanvas scale it down.
 //
 // Data: one /getDashboardV2Metrics call returns the same metrics for every
 // date range the page needs (the selected period, the two before it, and
@@ -55,6 +57,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B21F0";
 const GREEN = "#12B76A";
@@ -63,10 +67,11 @@ const RED = "#F04438";
 const PINK = "#EC4899";
 const AMBER = "#F5A623";
 
-// Measured card widths from the mockup, used directly as grid fr units.
-const ROW2_COLS = "grid-cols-[541fr_528fr_571fr]";
-const ROW3_COLS = "grid-cols-[606fr_451fr_571fr]";
-const ROW4_COLS = "grid-cols-[651fr_606fr_383fr]";
+// Measured card widths from the mockup, used directly as grid fr units; WRAP
+// re-flows each row on screens too narrow for the mockup.
+const ROW2_COLS = `grid-cols-[541fr_528fr_571fr] ${WRAP[3]}`;
+const ROW3_COLS = `grid-cols-[606fr_451fr_571fr] ${WRAP[3]}`;
+const ROW4_COLS = `grid-cols-[651fr_606fr_383fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1520px canvas. See the note above before
 // changing these.
@@ -993,7 +998,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
       </div>
     </PageHeaderPortal>
 
-    <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+    <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {failed.length > 0 && (
           <div
             className={`rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 font-medium text-rose-600 ${T.base}`}
@@ -1005,7 +1010,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                 */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-7 ${GAP}`}>
+        <div className={`grid grid-cols-7 ${WRAP[7]} ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             <div
               key={kpi.label}

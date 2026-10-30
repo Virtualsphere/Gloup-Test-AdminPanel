@@ -56,7 +56,7 @@ import { downloadCsv } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
 import {
   Card,
   Chip,
@@ -96,6 +96,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#7C3AED";
 const GREEN = "#22C55E";
@@ -106,7 +108,7 @@ const SLATE = "#CBD5E1";
 const PLAN_COLORS = ["#FACC15", BRAND, GREEN, "#F97316", BLUE, "#EC4899", "#14B8A6"];
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const PANEL_COLS = "grid-cols-[378fr_398fr_355fr_346fr]";
+const PANEL_COLS = `grid-cols-[378fr_398fr_355fr_346fr] ${WRAP[4]}`;
 
 // Type scale in design px on the 1520px canvas. See the note above before
 // changing these. The mockup screenshot was 1536px wide with 1328px of
@@ -1039,7 +1041,7 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
         setSearch={setSearchInput}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {error && (
           <div
             className={`flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 ${T.xs}`}
@@ -1100,7 +1102,7 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* KPI row                                                          */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             <Card key={kpi.label} className="p-3.5">
               <div className="flex items-center gap-2">
@@ -1319,242 +1321,244 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
           </div>
 
           {/* Table ------------------------------------------------------ */}
-          <table
-            className={`w-full table-fixed border-collapse text-left transition-opacity ${
-              listV2Loading && rows.length ? "opacity-60" : ""
-            }`}
-          >
-            <colgroup>
-              <col style={{ width: 15 }} />
-              <col style={{ width: 52 }} />
-              <col style={{ width: 242 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 175 }} />
-              <col style={{ width: 105 }} />
-              <col style={{ width: 167 }} />
-              <col style={{ width: 125 }} />
-              <col style={{ width: 125 }} />
-              <col style={{ width: 176 }} />
-              <col style={{ width: 153 }} />
-              <col style={{ width: 25 }} />
-            </colgroup>
+          <div className="wrapped:overflow-x-auto">
+            <table
+              className={`w-full table-fixed border-collapse text-left transition-opacity ${
+                listV2Loading && rows.length ? "opacity-60" : ""
+              }`}
+            >
+              <colgroup>
+                <col style={{ width: 15 }} />
+                <col style={{ width: 52 }} />
+                <col style={{ width: 242 }} />
+                <col style={{ width: 160 }} />
+                <col style={{ width: 175 }} />
+                <col style={{ width: 105 }} />
+                <col style={{ width: 167 }} />
+                <col style={{ width: 125 }} />
+                <col style={{ width: 125 }} />
+                <col style={{ width: 176 }} />
+                <col style={{ width: 153 }} />
+                <col style={{ width: 25 }} />
+              </colgroup>
 
-            <thead>
-              <tr className="border-y border-[#EDEFF5] bg-[#F9FAFC]">
-                <th />
-                {["#", "Partner", "Contact", "Plan", "Bookings", "Amount (+18% GST)", "Status", "Start Date", "Next Fee"].map(
-                  (column) => (
-                    <th
-                      key={column}
-                      className={`whitespace-nowrap py-2.5 pr-2 font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
-                    >
-                      {column}
-                    </th>
-                  )
-                )}
-                <th
-                  className={`whitespace-nowrap py-2.5 pr-2 text-center font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
-                >
-                  Actions
-                </th>
-                <th />
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={12} className={`py-10 text-center text-slate-400 ${T.xs}`}>
-                    {listV2Loading ? "Loading subscriptions…" : "No partners match these filters."}
-                  </td>
-                </tr>
-              )}
-
-              {rows.map((row, index) => {
-                const live = row.status === "active" || row.status === "due";
-                return (
-                  <tr
-                    key={row.key}
-                    className="border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60"
+              <thead>
+                <tr className="border-y border-[#EDEFF5] bg-[#F9FAFC]">
+                  <th />
+                  {["#", "Partner", "Contact", "Plan", "Bookings", "Amount (+18% GST)", "Status", "Start Date", "Next Fee"].map(
+                    (column) => (
+                      <th
+                        key={column}
+                        className={`whitespace-nowrap py-2.5 pr-2 font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
+                      >
+                        {column}
+                      </th>
+                    )
+                  )}
+                  <th
+                    className={`whitespace-nowrap py-2.5 pr-2 text-center font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
                   >
-                    <td />
+                    Actions
+                  </th>
+                  <th />
+                </tr>
+              </thead>
 
-                    <td className={`py-2.5 pr-2 align-middle text-slate-400 ${T.xs}`}>
-                      {(currentPage - 1) * size + index + 1}
+              <tbody>
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={12} className={`py-10 text-center text-slate-400 ${T.xs}`}>
+                      {listV2Loading ? "Loading subscriptions…" : "No partners match these filters."}
                     </td>
-
-                    <td className="py-2.5 pr-2 align-middle">
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        <SalonLogo name={row.name} logo={row.logo} />
-                        <span className="min-w-0 leading-tight">
-                          <span className={`block truncate font-semibold text-slate-800 ${T.xs}`}>{row.name}</span>
-                          <span className={`block truncate text-slate-400 ${T.tiny}`}>
-                            {row.email || `Partner #${row.storeId}`}
-                          </span>
-                        </span>
-                      </span>
-                    </td>
-
-                    <td className="py-2.5 pr-2 align-middle leading-tight">
-                      <span className={`block whitespace-nowrap text-slate-600 ${T.xs}`}>{row.phone}</span>
-                      {row.city && <span className={`block truncate text-slate-400 ${T.tiny}`}>{row.city}</span>}
-                    </td>
-
-                    <td className="py-2.5 pr-2 align-middle leading-tight">
-                      {row.planAmount ? (
-                        <Chip className="bg-violet-50 text-violet-600">{planLabel(row.planAmount)}</Chip>
-                      ) : (
-                        <span className={`text-slate-400 ${T.xs}`}>No plan yet</span>
-                      )}
-                      {row.needsSubscription && (
-                        <span className={`mt-1 block truncate text-violet-500 ${T.tiny}`}>Over free limit</span>
-                      )}
-                    </td>
-
-                    <td
-                      className={`whitespace-nowrap py-2.5 pr-2 align-middle font-semibold text-slate-700 ${T.xs}`}
-                      title="Lifetime paid bookings"
-                    >
-                      {fmtInt(row.bookings)}
-                    </td>
-
-                    <td className="py-2.5 pr-2 align-middle leading-tight">
-                      {row.planAmount ? (
-                        <>
-                          <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.sm}`}>
-                            {fmtMoney(row.cycleFee)}
-                          </span>
-                          <span className={`block truncate text-slate-400 ${T.tiny}`}>
-                            {fmtMoney(row.planAmount)} + GST
-                          </span>
-                        </>
-                      ) : (
-                        <span className={`text-slate-400 ${T.xs}`}>{DASH}</span>
-                      )}
-                    </td>
-
-                    <td className="py-2.5 pr-2 align-middle">
-                      <Chip className={STATUS[row.status].chip}>{STATUS[row.status].label}</Chip>
-                    </td>
-
-                    <td className={`whitespace-nowrap py-2.5 pr-2 align-middle text-slate-600 ${T.xs}`}>
-                      {fmtDay(row.start)}
-                    </td>
-
-                    <td className="py-2.5 pr-2 align-middle leading-tight">
-                      {live && row.owed > 0 ? (
-                        <>
-                          <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>Collecting fee</span>
-                          <span className={`block whitespace-nowrap font-semibold ${T.tiny}`} style={{ color: RED }}>
-                            {fmtMoney(row.owed)} owed now
-                          </span>
-                        </>
-                      ) : live ? (
-                        <>
-                          <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>
-                            Renews {fmtDay(row.nextDue)}
-                          </span>
-                          <span
-                            className={`block whitespace-nowrap font-semibold ${T.tiny}`}
-                            style={{ color: freeBookingsUsed(row) || row.daysToDue <= 7 ? AMBER : GREEN }}
-                          >
-                            {row.cycle?.bookings_in_cycle ?? 0}/{row.renewalLimit ?? DASH} free bookings
-                          </span>
-                        </>
-                      ) : row.status === "pending" ? (
-                        <span className={`text-slate-400 ${T.tiny}`}>Needs a subscription</span>
-                      ) : (
-                        <span className={`block text-slate-400 ${T.tiny}`}>
-                          Deactivated {row.deactivatedAt ? fmtDay(row.deactivatedAt) : ""}
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="py-2.5 pr-2 align-middle">
-                      <span className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setDialog({ type: "view", row })}
-                          disabled={row.status === "pending"}
-                          className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
-                          aria-label="View subscription"
-                          title="View dues and deductions"
-                        >
-                          <Eye size={13} />
-                        </button>
-
-                        {row.status === "pending" ? (
-                          <button
-                            type="button"
-                            onClick={() => setDialog({ type: "plan", mode: "assign", row })}
-                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white transition-colors hover:bg-slate-50"
-                            style={{ color: BRAND }}
-                            aria-label="Assign subscription"
-                            title="Assign subscription"
-                          >
-                            <Plus size={13} />
-                          </button>
-                        ) : row.status === "inactive" ? (
-                          <button
-                            type="button"
-                            onClick={() => setDialog({ type: "plan", mode: "renew", row })}
-                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white transition-colors hover:bg-slate-50"
-                            style={{ color: BLUE }}
-                            aria-label="Renew subscription"
-                            title="Renew subscription"
-                          >
-                            <RefreshCw size={13} />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setDialog({ type: "plan", mode: "edit", row })}
-                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-500 transition-colors hover:bg-slate-50"
-                            aria-label="Edit subscription"
-                            title="Edit amount"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                        )}
-
-                        <span data-sub-menu className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setMenuFor(menuFor === row.key ? null : row.key)}
-                            disabled={!live}
-                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
-                            aria-label="More actions"
-                            aria-expanded={menuFor === row.key}
-                          >
-                            <MoreVertical size={13} />
-                          </button>
-                          {menuFor === row.key && (
-                            <span
-                              role="menu"
-                              className={`absolute right-0 top-8 z-20 flex w-[170px] flex-col rounded-xl border border-[#E6E8F0] bg-white py-1 shadow-lg ${T.xs}`}
-                            >
-                              <button
-                                type="button"
-                                role="menuitem"
-                                disabled={actionLoading}
-                                onClick={() => deactivate(row)}
-                                className="flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50"
-                              >
-                                <Power size={14} />
-                                Deactivate
-                              </button>
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                    </td>
-
-                    <td />
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                )}
+
+                {rows.map((row, index) => {
+                  const live = row.status === "active" || row.status === "due";
+                  return (
+                    <tr
+                      key={row.key}
+                      className="border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60"
+                    >
+                      <td />
+
+                      <td className={`py-2.5 pr-2 align-middle text-slate-400 ${T.xs}`}>
+                        {(currentPage - 1) * size + index + 1}
+                      </td>
+
+                      <td className="py-2.5 pr-2 align-middle">
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <SalonLogo name={row.name} logo={row.logo} />
+                          <span className="min-w-0 leading-tight">
+                            <span className={`block truncate font-semibold text-slate-800 ${T.xs}`}>{row.name}</span>
+                            <span className={`block truncate text-slate-400 ${T.tiny}`}>
+                              {row.email || `Partner #${row.storeId}`}
+                            </span>
+                          </span>
+                        </span>
+                      </td>
+
+                      <td className="py-2.5 pr-2 align-middle leading-tight">
+                        <span className={`block whitespace-nowrap text-slate-600 ${T.xs}`}>{row.phone}</span>
+                        {row.city && <span className={`block truncate text-slate-400 ${T.tiny}`}>{row.city}</span>}
+                      </td>
+
+                      <td className="py-2.5 pr-2 align-middle leading-tight">
+                        {row.planAmount ? (
+                          <Chip className="bg-violet-50 text-violet-600">{planLabel(row.planAmount)}</Chip>
+                        ) : (
+                          <span className={`text-slate-400 ${T.xs}`}>No plan yet</span>
+                        )}
+                        {row.needsSubscription && (
+                          <span className={`mt-1 block truncate text-violet-500 ${T.tiny}`}>Over free limit</span>
+                        )}
+                      </td>
+
+                      <td
+                        className={`whitespace-nowrap py-2.5 pr-2 align-middle font-semibold text-slate-700 ${T.xs}`}
+                        title="Lifetime paid bookings"
+                      >
+                        {fmtInt(row.bookings)}
+                      </td>
+
+                      <td className="py-2.5 pr-2 align-middle leading-tight">
+                        {row.planAmount ? (
+                          <>
+                            <span className={`block whitespace-nowrap font-bold text-slate-900 ${T.sm}`}>
+                              {fmtMoney(row.cycleFee)}
+                            </span>
+                            <span className={`block truncate text-slate-400 ${T.tiny}`}>
+                              {fmtMoney(row.planAmount)} + GST
+                            </span>
+                          </>
+                        ) : (
+                          <span className={`text-slate-400 ${T.xs}`}>{DASH}</span>
+                        )}
+                      </td>
+
+                      <td className="py-2.5 pr-2 align-middle">
+                        <Chip className={STATUS[row.status].chip}>{STATUS[row.status].label}</Chip>
+                      </td>
+
+                      <td className={`whitespace-nowrap py-2.5 pr-2 align-middle text-slate-600 ${T.xs}`}>
+                        {fmtDay(row.start)}
+                      </td>
+
+                      <td className="py-2.5 pr-2 align-middle leading-tight">
+                        {live && row.owed > 0 ? (
+                          <>
+                            <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>Collecting fee</span>
+                            <span className={`block whitespace-nowrap font-semibold ${T.tiny}`} style={{ color: RED }}>
+                              {fmtMoney(row.owed)} owed now
+                            </span>
+                          </>
+                        ) : live ? (
+                          <>
+                            <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>
+                              Renews {fmtDay(row.nextDue)}
+                            </span>
+                            <span
+                              className={`block whitespace-nowrap font-semibold ${T.tiny}`}
+                              style={{ color: freeBookingsUsed(row) || row.daysToDue <= 7 ? AMBER : GREEN }}
+                            >
+                              {row.cycle?.bookings_in_cycle ?? 0}/{row.renewalLimit ?? DASH} free bookings
+                            </span>
+                          </>
+                        ) : row.status === "pending" ? (
+                          <span className={`text-slate-400 ${T.tiny}`}>Needs a subscription</span>
+                        ) : (
+                          <span className={`block text-slate-400 ${T.tiny}`}>
+                            Deactivated {row.deactivatedAt ? fmtDay(row.deactivatedAt) : ""}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-2.5 pr-2 align-middle">
+                        <span className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setDialog({ type: "view", row })}
+                            disabled={row.status === "pending"}
+                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                            aria-label="View subscription"
+                            title="View dues and deductions"
+                          >
+                            <Eye size={13} />
+                          </button>
+
+                          {row.status === "pending" ? (
+                            <button
+                              type="button"
+                              onClick={() => setDialog({ type: "plan", mode: "assign", row })}
+                              className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white transition-colors hover:bg-slate-50"
+                              style={{ color: BRAND }}
+                              aria-label="Assign subscription"
+                              title="Assign subscription"
+                            >
+                              <Plus size={13} />
+                            </button>
+                          ) : row.status === "inactive" ? (
+                            <button
+                              type="button"
+                              onClick={() => setDialog({ type: "plan", mode: "renew", row })}
+                              className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white transition-colors hover:bg-slate-50"
+                              style={{ color: BLUE }}
+                              aria-label="Renew subscription"
+                              title="Renew subscription"
+                            >
+                              <RefreshCw size={13} />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setDialog({ type: "plan", mode: "edit", row })}
+                              className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-500 transition-colors hover:bg-slate-50"
+                              aria-label="Edit subscription"
+                              title="Edit amount"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+
+                          <span data-sub-menu className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setMenuFor(menuFor === row.key ? null : row.key)}
+                              disabled={!live}
+                              className="grid h-7 w-7 place-items-center rounded-lg border border-[#E6E8F0] bg-white text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                              aria-label="More actions"
+                              aria-expanded={menuFor === row.key}
+                            >
+                              <MoreVertical size={13} />
+                            </button>
+                            {menuFor === row.key && (
+                              <span
+                                role="menu"
+                                className={`absolute right-0 top-8 z-20 flex w-[170px] flex-col rounded-xl border border-[#E6E8F0] bg-white py-1 shadow-lg ${T.xs}`}
+                              >
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  disabled={actionLoading}
+                                  onClick={() => deactivate(row)}
+                                  className="flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Power size={14} />
+                                  Deactivate
+                                </button>
+                              </span>
+                            )}
+                          </span>
+                        </span>
+                      </td>
+
+                      <td />
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           {/* Footer ----------------------------------------------------- */}
           <div className="flex items-center gap-4 border-t border-[#EDEFF5] px-3.5 py-3">

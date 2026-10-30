@@ -57,6 +57,7 @@ import {
   CHART_TOOLTIP as TOOLTIP,
   initials,
   toSpark as spark,
+  WRAP,
 } from "../v2/tokens";
 import {
   Card,
@@ -86,6 +87,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 const UI_KEY = "usersV2";
 
 const VIOLET = "#7C3AED";
@@ -95,7 +98,7 @@ const PINK = "#EC4899";
 const ORANGE = "#F59E0B";
 
 // Main column vs the right-hand rail (User Growth / Top Cities / Quick Actions).
-const MAIN_COLS = "grid-cols-[1fr_296px]";
+const MAIN_COLS = `grid-cols-[1fr_296px] ${WRAP[2]}`;
 
 // Type scale in design px on the 1520px canvas.
 const T = {
@@ -809,7 +812,7 @@ const UsersV2 = ({ title = "Users" }) => {
         setSearch={setFilter("headerSearch")}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Page actions - no backend endpoints for these yet                */}
         {/* ---------------------------------------------------------------- */}
@@ -838,7 +841,7 @@ const UsersV2 = ({ title = "Users" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* KPI row                                                          */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {stats.kpis.map((kpi) => (
             <KpiCard key={kpi.label} kpi={kpi} />
           ))}
@@ -986,185 +989,187 @@ const UsersV2 = ({ title = "Users" }) => {
 
             {/* Users table ----------------------------------------------- */}
             <Card>
-              <table className="w-full table-fixed border-collapse text-left">
-                <colgroup>
-                  <col style={{ width: 16 }} />
-                  <col style={{ width: 208 }} />
-                  <col style={{ width: 96 }} />
-                  <col style={{ width: 124 }} />
-                  <col style={{ width: 66 }} />
-                  <col style={{ width: 96 }} />
-                  <col style={{ width: 94 }} />
-                  <col style={{ width: 96 }} />
-                  <col style={{ width: 106 }} />
-                  <col style={{ width: 106 }} />
-                  <col style={{ width: 88 }} />
-                  <col style={{ width: 84 }} />
-                  <col style={{ width: 12 }} />
-                </colgroup>
+              <div className="wrapped:overflow-x-auto">
+                <table className="w-full table-fixed border-collapse text-left">
+                  <colgroup>
+                    <col style={{ width: 16 }} />
+                    <col style={{ width: 208 }} />
+                    <col style={{ width: 96 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 66 }} />
+                    <col style={{ width: 96 }} />
+                    <col style={{ width: 94 }} />
+                    <col style={{ width: 96 }} />
+                    <col style={{ width: 106 }} />
+                    <col style={{ width: 106 }} />
+                    <col style={{ width: 88 }} />
+                    <col style={{ width: 84 }} />
+                    <col style={{ width: 12 }} />
+                  </colgroup>
 
-                <thead>
-                  <tr className="border-b border-[#EDEFF5] bg-[#F9FAFC]">
-                    <th className="rounded-tl-2xl" />
-                    {[
-                      ["User"],
-                      ["User ID"],
-                      ["Phone"],
-                      ["Gender", "text-center"],
-                      ["City"],
-                      ["Status", "text-center"],
-                      ["Join Date"],
-                      ["Last App Open"],
-                      ["Last Booking"],
-                      ["Total Bookings", "text-center"],
-                      ["Actions", "text-center"],
-                    ].map(([column, align = ""]) => (
-                      <th
-                        key={column}
-                        className={`whitespace-nowrap py-3.5 pr-3 font-semibold uppercase tracking-wide text-slate-500 ${T.th} ${align}`}
-                      >
-                        {column}
-                      </th>
-                    ))}
-                    <th className="rounded-tr-2xl" />
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {tableMessage && (
-                    <tr>
-                      <td colSpan={13} className={`py-10 text-center text-slate-400 ${T.xs}`}>
-                        {tableMessage}
-                      </td>
+                  <thead>
+                    <tr className="border-b border-[#EDEFF5] bg-[#F9FAFC]">
+                      <th className="rounded-tl-2xl" />
+                      {[
+                        ["User"],
+                        ["User ID"],
+                        ["Phone"],
+                        ["Gender", "text-center"],
+                        ["City"],
+                        ["Status", "text-center"],
+                        ["Join Date"],
+                        ["Last App Open"],
+                        ["Last Booking"],
+                        ["Total Bookings", "text-center"],
+                        ["Actions", "text-center"],
+                      ].map(([column, align = ""]) => (
+                        <th
+                          key={column}
+                          className={`whitespace-nowrap py-3.5 pr-3 font-semibold uppercase tracking-wide text-slate-500 ${T.th} ${align}`}
+                        >
+                          {column}
+                        </th>
+                      ))}
+                      <th className="rounded-tr-2xl" />
                     </tr>
-                  )}
+                  </thead>
 
-                  {!tableMessage &&
-                    pageRows.map((row) => (
-                      <tr
-                        key={row.id}
-                        className="border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60"
-                      >
-                        <td />
+                  <tbody>
+                    {tableMessage && (
+                      <tr>
+                        <td colSpan={13} className={`py-10 text-center text-slate-400 ${T.xs}`}>
+                          {tableMessage}
+                        </td>
+                      </tr>
+                    )}
 
-                        <td className="py-3 pr-3 align-middle">
-                          <span className="flex min-w-0 items-center gap-3">
-                            <Avatar name={row.name} gender={row.gender} src={row.avatar} />
-                            <span className="min-w-0 flex-1 leading-tight">
-                              <span
-                                className={`block truncate font-semibold capitalize text-slate-900 ${T.xs}`}
-                              >
-                                {row.name}
-                              </span>
-                              <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
-                                {row.email || "—"}
+                    {!tableMessage &&
+                      pageRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60"
+                        >
+                          <td />
+
+                          <td className="py-3 pr-3 align-middle">
+                            <span className="flex min-w-0 items-center gap-3">
+                              <Avatar name={row.name} gender={row.gender} src={row.avatar} />
+                              <span className="min-w-0 flex-1 leading-tight">
+                                <span
+                                  className={`block truncate font-semibold capitalize text-slate-900 ${T.xs}`}
+                                >
+                                  {row.name}
+                                </span>
+                                <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
+                                  {row.email || "—"}
+                                </span>
                               </span>
                             </span>
-                          </span>
-                        </td>
+                          </td>
 
-                        <td className={`truncate py-3 pr-3 align-middle text-slate-700 ${T.tiny}`}>
-                          {row.id}
-                        </td>
+                          <td className={`truncate py-3 pr-3 align-middle text-slate-700 ${T.tiny}`}>
+                            {row.id}
+                          </td>
 
-                        <td
-                          className={`truncate whitespace-nowrap py-3 pr-3 align-middle text-slate-700 ${T.tiny}`}
-                        >
-                          {row.phone || "—"}
-                        </td>
+                          <td
+                            className={`truncate whitespace-nowrap py-3 pr-3 align-middle text-slate-700 ${T.tiny}`}
+                          >
+                            {row.phone || "—"}
+                          </td>
 
-                        <td className="py-3 pr-3 align-middle">
-                          <span className="grid place-items-center">
-                            <GenderIcon gender={row.gender} />
-                          </span>
-                        </td>
+                          <td className="py-3 pr-3 align-middle">
+                            <span className="grid place-items-center">
+                              <GenderIcon gender={row.gender} />
+                            </span>
+                          </td>
 
-                        <td className={`truncate py-3 pr-3 align-middle text-slate-700 ${T.tiny}`}>
-                          {row.city || "—"}
-                        </td>
+                          <td className={`truncate py-3 pr-3 align-middle text-slate-700 ${T.tiny}`}>
+                            {row.city || "—"}
+                          </td>
 
-                        <td className="py-3 pr-3 text-center align-middle">
-                          {row.status ? (
-                            <Chip className={STATUS_TONES[row.status] || "bg-slate-100 text-slate-500"}>
-                              {titleCase(row.status)}
-                            </Chip>
-                          ) : (
-                            <span className={`text-slate-400 ${T.tiny}`}>—</span>
-                          )}
-                        </td>
-
-                        <td className="py-3 pr-3 align-middle">
-                          <Stamp date={row.joined} />
-                        </td>
-
-                        <td className="py-3 pr-3 align-middle">
-                          <Stamp date={row.lastOpen} live={isToday(row.lastOpen)} dot={GREEN} />
-                        </td>
-
-                        <td className="py-3 pr-3 align-middle">
-                          <Stamp date={row.lastBooking} live={isToday(row.lastBooking)} dot={VIOLET} />
-                        </td>
-
-                        <td
-                          className={`py-3 pr-3 text-center align-middle font-medium text-slate-800 ${T.xs}`}
-                        >
-                          {row.bookings ?? "—"}
-                        </td>
-
-                        <td className="py-3 pr-3 align-middle">
-                          <span className="relative flex items-center justify-center gap-1.5" data-user-menu>
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/user-details-v2/${row.id}`)}
-                              className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] text-slate-700 transition-colors hover:bg-slate-100"
-                              aria-label="View user"
-                              title="View user"
-                            >
-                              <Eye size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setMenuFor((open) => (open === row.id ? null : row.id))}
-                              className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] text-slate-700 transition-colors hover:bg-slate-100"
-                              aria-label="More actions"
-                              aria-expanded={menuFor === row.id}
-                            >
-                              <MoreVertical size={15} />
-                            </button>
-
-                            {menuFor === row.id && (
-                              <span className="absolute right-0 top-full z-20 mt-1 flex w-[150px] flex-col rounded-lg border border-[#E6E8F0] bg-white p-1 shadow-lg">
-                                <button
-                                  type="button"
-                                  onClick={() => navigate(`/user-details-v2/${row.id}`)}
-                                  className={`rounded-md px-3 py-2 text-left text-slate-700 hover:bg-slate-50 ${T.xxs}`}
-                                >
-                                  View details
-                                </button>
-                                {STATUS_ACTIONS.filter((action) => action.value !== row.status).map(
-                                  (action) => (
-                                    <button
-                                      key={action.value}
-                                      type="button"
-                                      onClick={() => handleStatusChange(row.id, action.value)}
-                                      className={`rounded-md px-3 py-2 text-left hover:bg-slate-50 ${T.xxs} ${
-                                        action.value === "terminated" ? "text-rose-600" : "text-slate-700"
-                                      }`}
-                                    >
-                                      {action.label}
-                                    </button>
-                                  )
-                                )}
-                              </span>
+                          <td className="py-3 pr-3 text-center align-middle">
+                            {row.status ? (
+                              <Chip className={STATUS_TONES[row.status] || "bg-slate-100 text-slate-500"}>
+                                {titleCase(row.status)}
+                              </Chip>
+                            ) : (
+                              <span className={`text-slate-400 ${T.tiny}`}>—</span>
                             )}
-                          </span>
-                        </td>
+                          </td>
 
-                        <td />
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+                          <td className="py-3 pr-3 align-middle">
+                            <Stamp date={row.joined} />
+                          </td>
+
+                          <td className="py-3 pr-3 align-middle">
+                            <Stamp date={row.lastOpen} live={isToday(row.lastOpen)} dot={GREEN} />
+                          </td>
+
+                          <td className="py-3 pr-3 align-middle">
+                            <Stamp date={row.lastBooking} live={isToday(row.lastBooking)} dot={VIOLET} />
+                          </td>
+
+                          <td
+                            className={`py-3 pr-3 text-center align-middle font-medium text-slate-800 ${T.xs}`}
+                          >
+                            {row.bookings ?? "—"}
+                          </td>
+
+                          <td className="py-3 pr-3 align-middle">
+                            <span className="relative flex items-center justify-center gap-1.5" data-user-menu>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/user-details-v2/${row.id}`)}
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] text-slate-700 transition-colors hover:bg-slate-100"
+                                aria-label="View user"
+                                title="View user"
+                              >
+                                <Eye size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMenuFor((open) => (open === row.id ? null : row.id))}
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-[#E6E8F0] text-slate-700 transition-colors hover:bg-slate-100"
+                                aria-label="More actions"
+                                aria-expanded={menuFor === row.id}
+                              >
+                                <MoreVertical size={15} />
+                              </button>
+
+                              {menuFor === row.id && (
+                                <span className="absolute right-0 top-full z-20 mt-1 flex w-[150px] flex-col rounded-lg border border-[#E6E8F0] bg-white p-1 shadow-lg">
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate(`/user-details-v2/${row.id}`)}
+                                    className={`rounded-md px-3 py-2 text-left text-slate-700 hover:bg-slate-50 ${T.xxs}`}
+                                  >
+                                    View details
+                                  </button>
+                                  {STATUS_ACTIONS.filter((action) => action.value !== row.status).map(
+                                    (action) => (
+                                      <button
+                                        key={action.value}
+                                        type="button"
+                                        onClick={() => handleStatusChange(row.id, action.value)}
+                                        className={`rounded-md px-3 py-2 text-left hover:bg-slate-50 ${T.xxs} ${
+                                          action.value === "terminated" ? "text-rose-600" : "text-slate-700"
+                                        }`}
+                                      >
+                                        {action.label}
+                                      </button>
+                                    )
+                                  )}
+                                </span>
+                              )}
+                            </span>
+                          </td>
+
+                          <td />
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Footer ------------------------------------------------- */}
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-t border-[#EDEFF5] px-4 py-3.5">

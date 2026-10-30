@@ -41,7 +41,7 @@ import { downloadCsv } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CARD } from "../v2/tokens";
+import { CARD, WRAP } from "../v2/tokens";
 import { Card, Chip as BaseChip, HeaderBell, SalonLogo as BaseSalonLogo } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,8 @@ import { Card, Chip as BaseChip, HeaderBell, SalonLogo as BaseSalonLogo } from "
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B21F0";
 const GREEN = "#12B76A";
@@ -79,7 +81,7 @@ const VIOLET = "#7C3AED";
 const INDIGO = "#4F46E5";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const MAIN_COLS = "grid-cols-[918fr_587fr]";
+const MAIN_COLS = `grid-cols-[918fr_587fr] ${WRAP[2]}`;
 
 // Type scale in design px on the 1520px canvas. See the note above before
 // changing these.
@@ -805,7 +807,7 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
     <>
       <PageHeader title={title} trackingStart={trackingStart} />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {error && (
           <div className={`flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 ${T.xs}`}>
             <AlertTriangle size={16} className="shrink-0" />
@@ -875,7 +877,7 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* KPI row                                                          */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-8 ${GAP}`}>
+        <div className={`grid grid-cols-8 ${WRAP[8]} ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             <Card key={kpi.label} className="p-3">
               <div className="flex items-start gap-1.5">
@@ -912,7 +914,7 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Filter bar                                                        */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`flex items-end gap-4 px-4 py-3 ${CARD}`}>
+        <div className={`flex items-end gap-4 px-4 py-3 wrapped:flex-wrap ${CARD}`}>
           <label className="w-[300px] shrink-0">
             <FieldLabel>Date Range (visit days)</FieldLabel>
             <span className={`flex items-center gap-1.5 rounded-lg border border-[#E6E8F0] bg-white px-2 py-1.5 text-slate-700 ${T.xs}`}>
@@ -1034,9 +1036,10 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
                 </div>
 
                 <table className={`w-full table-fixed border-collapse text-left transition-opacity ${partnersV2Loading && rows.length ? "opacity-60" : ""}`}>
+                  {/* Adds up to the 918px inside the card's border at DESIGN_WIDTH. */}
                   <colgroup>
                     <col style={{ width: 20 }} />
-                    <col style={{ width: 240 }} />
+                    <col style={{ width: 198 }} />
                     <col style={{ width: 160 }} />
                     <col style={{ width: 118 }} />
                     <col style={{ width: 112 }} />

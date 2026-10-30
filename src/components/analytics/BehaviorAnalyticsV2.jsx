@@ -48,7 +48,7 @@ import { downloadXlsx } from "../../utils/excelExport";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -79,6 +79,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B3FF0";
 const INDIGO = "#4F46E5";
@@ -88,21 +90,23 @@ const AMBER = "#F5A524";
 const PINK = "#F0507A";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW2_COLS = "grid-cols-[430fr_464fr_435fr]";
-const ROW3_COLS = "grid-cols-[430fr_442fr_452fr]";
-const ROW4_COLS = "grid-cols-[430fr_368fr_532fr]";
-const ROW5_COLS = "grid-cols-[512fr_380fr_432fr]";
+const ROW2_COLS = `grid-cols-[430fr_464fr_435fr] ${WRAP[3]}`;
+const ROW3_COLS = `grid-cols-[430fr_442fr_452fr] ${WRAP[3]}`;
+const ROW4_COLS = `grid-cols-[430fr_368fr_532fr] ${WRAP[3]}`;
+const ROW5_COLS = `grid-cols-[512fr_380fr_432fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1349px of content, so measured sizes carry over at ~1.13x.
+// This mockup's type is smaller than the other V2 pages'; in the wrapped
+// layout, where the cards are wider than drawn, it steps up to match them.
 const T = {
-  nano: "text-[8.5px]", // column headers, sub-lines
-  micro: "text-[9.5px]", // notes, subtitles
-  xs: "text-[10px]", // table cells
-  sm: "text-[11px]", // legend rows, links
-  title: "text-[13px]", // card titles
-  kpi: "text-[21px]", // KPI values
-  donut: "text-[17px]", // donut centre total
+  nano: "text-[8.5px] wrapped:text-[10px]", // column headers, sub-lines
+  micro: "text-[9.5px] wrapped:text-[10.5px]", // notes, subtitles
+  xs: "text-[10px] wrapped:text-[11.5px]", // table cells
+  sm: "text-[11px] wrapped:text-[12.5px]", // legend rows, links
+  title: "text-[13px] wrapped:text-[14.5px]", // card titles
+  kpi: "text-[21px] wrapped:text-[23px]", // KPI values
+  donut: "text-[17px] wrapped:text-[19px]", // donut centre total
 };
 
 const GAP = "gap-3";
@@ -474,9 +478,9 @@ const BehaviorAnalyticsV2 = ({ title = "Advanced Behavior Analytics" }) => {
         onExport={exportReport}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {kpis.map(({ icon, color, tint, ...tile }) => (
             <KpiTile key={tile.label} {...tile} icon={icon} iconColor={color} iconTint={tint} />
           ))}
