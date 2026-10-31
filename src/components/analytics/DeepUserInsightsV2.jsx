@@ -41,7 +41,7 @@ import { GOOGLE_MAPS_LOADER } from "../../utils/googleMaps";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas, { Unscaled } from "../v2/ScaledCanvas";
 import { useCanvasScale } from "../v2/canvasScaleContext";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, initials, rampColor } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, initials, rampColor, WRAP, WRAP_FLOW, WRAP_WIDE } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -77,6 +77,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#6D4AE0";
 const INDIGO = "#4F5BE8";
@@ -87,8 +89,8 @@ const RED = "#EF4444";
 const ROSE = "#F0445F";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW2_COLS = "grid-cols-[484fr_403fr_399fr]";
-const ROW34_COLS = "grid-cols-[400fr_443fr_443fr]";
+const ROW2_COLS = `grid-cols-[484fr_403fr_399fr] ${WRAP.flow}`;
+const ROW34_COLS = `grid-cols-[400fr_443fr_443fr] ${WRAP.flow}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1313px of content, so measured sizes carry over at ~1.16x.
@@ -779,11 +781,11 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
         onExport={exportReport}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${WRAP_FLOW} ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${WRAP_WIDE} ${GAP}`}>
           {kpis.map(({ icon, color, tint, filled, ...tile }) => (
             <KpiTile key={tile.label} {...tile} icon={icon} iconColor={color} iconTint={tint} iconFill={filled} />
           ))}
@@ -1158,7 +1160,7 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
         {/* ---------------------------------------------------------------- */}
         <Card className="px-4 pb-4 pt-3.5">
           <CardHeader title="Key Insights & Recommendations" />
-          <div className={`mt-2.5 grid grid-cols-4 ${GAP}`}>
+          <div className={`mt-2.5 grid grid-cols-4 ${WRAP[4]} ${GAP}`}>
             {insights.map((item) => (
               <InsightTile key={item.title} icon={item.icon} color={item.color} tint={item.tint} title={item.title} titleSize={T.sm} textSize={T.xs}>
                 {item.text}

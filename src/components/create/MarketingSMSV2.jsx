@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CARD } from "../v2/tokens";
+import { CARD, WRAP } from "../v2/tokens";
 import { Card, HeaderBell, SectionTitle as BaseSectionTitle } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
@@ -53,11 +53,13 @@ import { Card, HeaderBell, SectionTitle as BaseSectionTitle } from "../v2/ui";
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1240;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const VIOLET = "#5B4BF5";
 const GREEN = "#16A34A";
 
-const MAIN_COLS = "grid-cols-[808fr_408fr]";
+const MAIN_COLS = `grid-cols-[808fr_408fr] ${WRAP[2]}`;
 
 // Type scale in design px on the 1240px canvas.
 const T = {
@@ -542,7 +544,7 @@ const MarketingSMSV2 = ({ title = "Send Marketing SMS" }) => {
     <>
       <PageHeader title={title} />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`grid ${MAIN_COLS} items-start gap-5 pb-4`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`grid ${MAIN_COLS} items-start gap-5 pb-4`}>
         {/* ================================================================ */}
         {/* Left column - the four composition steps                         */}
         {/* ================================================================ */}
@@ -766,9 +768,9 @@ const MarketingSMSV2 = ({ title = "Send Marketing SMS" }) => {
         </div>
 
         {/* ================================================================ */}
-        {/* Right column - live preview + summary                            */}
+        {/* Right column - live preview + summary, side by side once wrapped  */}
         {/* ================================================================ */}
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4 wrapped:grid wrapped:grid-cols-2">
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <SectionTitle>Message Preview</SectionTitle>
@@ -804,8 +806,8 @@ const MarketingSMSV2 = ({ title = "Send Marketing SMS" }) => {
             </div>
 
             {/* Phone - the frame runs past the bottom edge and is clipped, as in the mockup. */}
-            <div className="mt-4 h-[410px] overflow-hidden border-b border-[#EEF0F5]">
-              <div className="mx-auto h-[470px] w-[322px] rounded-[46px] border-[5px] border-slate-900 bg-white px-4 pt-3 shadow-[0_0_0_2px_#CBD5E1]">
+            <div className="mt-4 h-[410px] overflow-hidden border-b border-[#EEF0F5] wrapped:h-[350px]">
+              <div className="mx-auto h-[470px] w-[322px] origin-top wrapped:scale-[0.85] rounded-[46px] border-[5px] border-slate-900 bg-white px-4 pt-3 shadow-[0_0_0_2px_#CBD5E1]">
                 <div className="flex items-center justify-between px-4 text-[13px] font-semibold text-slate-900">
                   <span>9:41</span>
                   <span className="h-[26px] w-[92px] rounded-full bg-slate-900" />

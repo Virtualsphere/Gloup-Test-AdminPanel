@@ -3,6 +3,34 @@
 
 export const CARD = "rounded-2xl border border-[#E6E8F0] bg-white";
 
+// Classes for a grid row of n cards, keyed by n, in a page's wrapped layout
+// (ScaledCanvas `minWidth`): fewer columns at full type size, and the page
+// grows taller instead of shrinking. 3 -> 2 + 1 full width, 5 -> 3 + 2,
+// 7 -> 4 + 3; 2 stacks.
+export const WRAP = {
+  2: "wrapped:grid-cols-1",
+  3: "wrapped:grid-cols-2 wrapped:[&>:last-child]:col-span-2",
+  4: "wrapped:grid-cols-2",
+  5: "wrapped:grid-cols-6 wrapped:[&>*]:col-span-2 wrapped:[&>:nth-child(n+4)]:col-span-3",
+  6: "wrapped:grid-cols-3",
+  7: "wrapped:grid-cols-12 wrapped:[&>*]:col-span-3 wrapped:[&>:nth-child(n+5)]:col-span-4",
+  8: "wrapped:grid-cols-4",
+  // A row of three whose widest card needs a full row once wrapped: that
+  // card takes WRAP_WIDE and the other two share a row (dense, so they move
+  // up beside each other).
+  wide: "wrapped:grid-cols-2 wrapped:grid-flow-row-dense",
+  // Rows whose cards pair up with the rows around them instead: the row
+  // dissolves into a canvas that has WRAP_FLOW, so three rows of three and a
+  // closing card come out as five pairs rather than three stretched cards.
+  flow: "wrapped:contents",
+};
+
+// A card or row that takes a full row once wrapped (also inside WRAP_FLOW).
+export const WRAP_WIDE = "wrapped:col-span-2";
+
+// For the ScaledCanvas className of a page whose rows use WRAP.flow.
+export const WRAP_FLOW = "wrapped:grid wrapped:grid-cols-2";
+
 export const CHART_AXIS = { fontSize: 11, fill: "#94A3B8" };
 
 export const CHART_TOOLTIP = {

@@ -57,7 +57,7 @@ import { downloadCsv, toDate } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark, WRAP } from "../v2/tokens";
 import {
   Card,
   Chip,
@@ -95,6 +95,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const ROSE = "#F0445F";
 const GREEN = "#22C55E";
@@ -108,8 +110,8 @@ const VIOLET = "#6D4AE0";
 // Measured card widths from the mockup, used directly as grid fr units. The
 // sixth KPI column is deliberately wider: it has to hold the two page action
 // buttons side by side above "Salons Reviewed".
-const KPI_COLS = "grid-cols-[196fr_200fr_198fr_196fr_200fr_239fr]";
-const PANEL_COLS = "grid-cols-[338fr_382fr_294fr_256fr]";
+const KPI_COLS = `grid-cols-[196fr_200fr_198fr_196fr_200fr_239fr] ${WRAP[6]}`;
+const PANEL_COLS = `grid-cols-[338fr_382fr_294fr_256fr] ${WRAP[4]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup screenshot was
 // 1536px wide with ~1306px of content, so every measured size is carried
@@ -1101,7 +1103,7 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
         setSearch={setSearchInput}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {error && (
           <div
             className={`flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 ${T.xs}`}
@@ -1569,255 +1571,257 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
         {/* Reviews table                                                    */}
         {/* ---------------------------------------------------------------- */}
         <Card>
-          <table
-            className={`w-full table-fixed border-collapse text-left transition-opacity ${
-              listLoading && rows.length ? "opacity-60" : ""
-            }`}
-          >
-            <colgroup>
-              <col style={{ width: 40 }} />
-              <col style={{ width: 48 }} />
-              <col style={{ width: 252 }} />
-              <col style={{ width: 210 }} />
-              <col style={{ width: 176 }} />
-              <col style={{ width: 256 }} />
-              <col style={{ width: 118 }} />
-              <col style={{ width: 128 }} />
-              <col style={{ width: 132 }} />
-              <col style={{ width: 136 }} />
-              <col style={{ width: 20 }} />
-            </colgroup>
+          <div className="wrapped:overflow-x-auto">
+            <table
+              className={`w-full table-fixed border-collapse text-left transition-opacity ${
+                listLoading && rows.length ? "opacity-60" : ""
+              }`}
+            >
+              <colgroup>
+                <col style={{ width: 40 }} />
+                <col style={{ width: 48 }} />
+                <col style={{ width: 252 }} />
+                <col style={{ width: 210 }} />
+                <col style={{ width: 176 }} />
+                <col style={{ width: 256 }} />
+                <col style={{ width: 118 }} />
+                <col style={{ width: 128 }} />
+                <col style={{ width: 132 }} />
+                <col style={{ width: 136 }} />
+                <col style={{ width: 20 }} />
+              </colgroup>
 
-            <thead>
-              <tr className="border-b border-[#EDEFF5] bg-[#F9FAFC]">
-                <th className="rounded-tl-2xl pl-4">
-                  <input
-                    type="checkbox"
-                    checked={allOnPageSelected}
-                    onChange={() =>
-                      setSelected(allOnPageSelected ? new Set() : new Set(rows.map((row) => row.id)))
-                    }
-                    aria-label="Select all reviews on this page"
-                    className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
-                  />
-                </th>
-                {["#", "Salon", "Customer", "Rating", "Review", "Status", "Response", "Date"].map(
-                  (column) => (
-                    <th
-                      key={column}
-                      className={`whitespace-nowrap py-3.5 pr-3 font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
-                    >
-                      {column}
-                    </th>
-                  )
-                )}
-                <th
-                  className={`whitespace-nowrap py-3.5 pr-3 text-center font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
-                >
-                  Actions
-                </th>
-                <th className="rounded-tr-2xl" />
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className={`py-10 text-center text-slate-400 ${T.xs}`}>
-                    {listLoading
-                      ? "Loading reviews…"
-                      : tab === "reported"
-                        ? "No pending removal requests."
-                        : tab === "awaiting"
-                          ? "Every review has a reply."
-                          : "No reviews match these filters."}
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row, index) => (
-                  <tr
-                    key={row.id}
-                    className={`border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60 ${
-                      selected.has(row.id) ? "bg-rose-50/40" : ""
-                    }`}
+              <thead>
+                <tr className="border-b border-[#EDEFF5] bg-[#F9FAFC]">
+                  <th className="rounded-tl-2xl pl-4">
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      onChange={() =>
+                        setSelected(allOnPageSelected ? new Set() : new Set(rows.map((row) => row.id)))
+                      }
+                      aria-label="Select all reviews on this page"
+                      className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
+                    />
+                  </th>
+                  {["#", "Salon", "Customer", "Rating", "Review", "Status", "Response", "Date"].map(
+                    (column) => (
+                      <th
+                        key={column}
+                        className={`whitespace-nowrap py-3.5 pr-3 font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
+                      >
+                        {column}
+                      </th>
+                    )
+                  )}
+                  <th
+                    className={`whitespace-nowrap py-3.5 pr-3 text-center font-semibold uppercase tracking-wide text-slate-500 ${T.th}`}
                   >
-                    <td className="pl-4 align-middle">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={() => toggleRow(row.id)}
-                        aria-label={`Select review ${row.id}`}
-                        className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
-                      />
-                    </td>
+                    Actions
+                  </th>
+                  <th className="rounded-tr-2xl" />
+                </tr>
+              </thead>
 
-                    <td className={`py-3.5 pr-3 align-middle text-slate-700 ${T.xs}`}>
-                      {(currentPage - 1) * size + index + 1}
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className={`py-10 text-center text-slate-400 ${T.xs}`}>
+                      {listLoading
+                        ? "Loading reviews…"
+                        : tab === "reported"
+                          ? "No pending removal requests."
+                          : tab === "awaiting"
+                            ? "Every review has a reply."
+                            : "No reviews match these filters."}
                     </td>
+                  </tr>
+                ) : (
+                  rows.map((row, index) => (
+                    <tr
+                      key={row.id}
+                      className={`border-b border-[#F3F5F9] transition-colors last:border-0 hover:bg-slate-50/60 ${
+                        selected.has(row.id) ? "bg-rose-50/40" : ""
+                      }`}
+                    >
+                      <td className="pl-4 align-middle">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(row.id)}
+                          onChange={() => toggleRow(row.id)}
+                          aria-label={`Select review ${row.id}`}
+                          className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
+                        />
+                      </td>
 
-                    <td className="py-3.5 pr-3 align-middle leading-tight">
-                      <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
-                        {row.salon}
-                      </span>
-                      <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
-                        {row.salonContact}
-                      </span>
-                    </td>
+                      <td className={`py-3.5 pr-3 align-middle text-slate-700 ${T.xs}`}>
+                        {(currentPage - 1) * size + index + 1}
+                      </td>
 
-                    <td className="py-3.5 pr-3 align-middle">
-                      <span className="flex min-w-0 items-center gap-3">
-                        <span className="min-w-0 flex-1 leading-tight">
-                          {row.userId ? (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/user-details-v2/${row.userId}`)}
-                              className={`block max-w-full truncate text-left font-semibold text-slate-900 hover:underline ${T.xs}`}
-                            >
-                              {row.customer}
-                            </button>
-                          ) : (
-                            <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
-                              {row.customer}
-                            </span>
-                          )}
-                          <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
-                            {row.customerContact}
-                          </span>
+                      <td className="py-3.5 pr-3 align-middle leading-tight">
+                        <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
+                          {row.salon}
                         </span>
-                        {row.tag && (
-                          <span
-                            title={`${row.completedBookings} completed visit${row.completedBookings === 1 ? "" : "s"}`}
-                          >
-                            <Chip className={TAG_TONES[row.tag]}>{TAG_LABELS[row.tag]}</Chip>
-                          </span>
-                        )}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 pr-3 align-middle">
-                      <span className="flex items-center gap-2.5">
-                        <Stars value={row.rating} size={15} gap="gap-1.5" />
-                        <span className={`font-medium text-slate-700 ${T.xs}`}>
-                          {row.rating || DASH}
+                        <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
+                          {row.salonContact}
                         </span>
-                      </span>
-                    </td>
+                      </td>
 
-                    <td className={`py-3.5 pr-3 align-middle leading-snug text-slate-700 ${T.xs}`}>
-                      <span className={`line-clamp-2 ${row.review ? "" : "text-slate-400"}`}>
-                        {row.review || "Rating only"}
-                      </span>
-                      {row.request && row.status === "Reported" && (
-                        <span className={`mt-1 block truncate text-rose-600 ${T.tiny}`}>
-                          Removal requested: {row.request.reason || "no reason given"}
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 pr-3 align-middle">
-                      <Chip className={STATUS_TONES[row.status]}>{row.status}</Chip>
-                    </td>
-
-                    <td className="py-3.5 pr-3 align-middle">
-                      {row.reply ? (
-                        <span title={row.reply.text}>
-                          <Chip className={RESPONSE_TONES.Responded}>Responded</Chip>
-                        </span>
-                      ) : row.status === "Hidden" ? (
-                        <span className={`text-slate-400 ${T.xs}`}>{DASH}</span>
-                      ) : (
-                        <Chip className={RESPONSE_TONES.Pending}>Pending</Chip>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 pr-3 align-middle leading-tight">
-                      <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>
-                        {row.created ? row.created.format("D MMM YYYY") : DASH}
-                      </span>
-                      <span className={`mt-0.5 block whitespace-nowrap text-slate-700 ${T.xs}`}>
-                        {row.created ? row.created.format("hh:mm A") : ""}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 pr-3 align-middle">
-                      <span className="relative flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setViewing({ row, startEditing: false })}
-                          className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-slate-100 ${
-                            row.status === "Reported" ? "text-rose-600" : "text-slate-700"
-                          }`}
-                          aria-label={row.status === "Reported" ? "Review removal request" : "View review"}
-                          title={row.status === "Reported" ? "Review removal request" : "View review"}
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setViewing({ row, startEditing: true })}
-                          className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-slate-100 ${
-                            row.reply ? "text-violet-500" : "text-slate-700"
-                          }`}
-                          aria-label={row.reply ? "Edit reply" : "Reply to review"}
-                          title={row.reply ? "Edit reply" : "Reply to review"}
-                        >
-                          <Reply size={16} />
-                        </button>
-                        <span data-review-menu className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setMenuFor(menuFor === row.id ? null : row.id)}
-                            className="grid h-8 w-8 place-items-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100"
-                            aria-label="More actions"
-                            aria-expanded={menuFor === row.id}
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-                          {menuFor === row.id && (
-                            <span
-                              role="menu"
-                              className={`absolute right-0 top-9 z-20 flex w-[168px] flex-col rounded-xl border border-[#E6E8F0] bg-white py-1 shadow-lg ${T.xs}`}
-                            >
+                      <td className="py-3.5 pr-3 align-middle">
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="min-w-0 flex-1 leading-tight">
+                            {row.userId ? (
                               <button
                                 type="button"
-                                role="menuitem"
-                                disabled={busy}
-                                onClick={() => {
-                                  setMenuFor(null);
-                                  setStatusFor([row.id], row.status === "Hidden" ? "active" : "inactive");
-                                }}
-                                className="flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
+                                onClick={() => navigate(`/user-details-v2/${row.userId}`)}
+                                className={`block max-w-full truncate text-left font-semibold text-slate-900 hover:underline ${T.xs}`}
                               >
-                                {row.status === "Hidden" ? <Eye size={14} /> : <EyeOff size={14} />}
-                                {row.status === "Hidden" ? "Restore review" : "Hide review"}
+                                {row.customer}
                               </button>
-                              {row.reply && (
+                            ) : (
+                              <span className={`block truncate font-semibold text-slate-900 ${T.xs}`}>
+                                {row.customer}
+                              </span>
+                            )}
+                            <span className={`mt-0.5 block truncate text-slate-500 ${T.tiny}`}>
+                              {row.customerContact}
+                            </span>
+                          </span>
+                          {row.tag && (
+                            <span
+                              title={`${row.completedBookings} completed visit${row.completedBookings === 1 ? "" : "s"}`}
+                            >
+                              <Chip className={TAG_TONES[row.tag]}>{TAG_LABELS[row.tag]}</Chip>
+                            </span>
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 pr-3 align-middle">
+                        <span className="flex items-center gap-2.5">
+                          <Stars value={row.rating} size={15} gap="gap-1.5" />
+                          <span className={`font-medium text-slate-700 ${T.xs}`}>
+                            {row.rating || DASH}
+                          </span>
+                        </span>
+                      </td>
+
+                      <td className={`py-3.5 pr-3 align-middle leading-snug text-slate-700 ${T.xs}`}>
+                        <span className={`line-clamp-2 ${row.review ? "" : "text-slate-400"}`}>
+                          {row.review || "Rating only"}
+                        </span>
+                        {row.request && row.status === "Reported" && (
+                          <span className={`mt-1 block truncate text-rose-600 ${T.tiny}`}>
+                            Removal requested: {row.request.reason || "no reason given"}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 pr-3 align-middle">
+                        <Chip className={STATUS_TONES[row.status]}>{row.status}</Chip>
+                      </td>
+
+                      <td className="py-3.5 pr-3 align-middle">
+                        {row.reply ? (
+                          <span title={row.reply.text}>
+                            <Chip className={RESPONSE_TONES.Responded}>Responded</Chip>
+                          </span>
+                        ) : row.status === "Hidden" ? (
+                          <span className={`text-slate-400 ${T.xs}`}>{DASH}</span>
+                        ) : (
+                          <Chip className={RESPONSE_TONES.Pending}>Pending</Chip>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 pr-3 align-middle leading-tight">
+                        <span className={`block whitespace-nowrap text-slate-700 ${T.xs}`}>
+                          {row.created ? row.created.format("D MMM YYYY") : DASH}
+                        </span>
+                        <span className={`mt-0.5 block whitespace-nowrap text-slate-700 ${T.xs}`}>
+                          {row.created ? row.created.format("hh:mm A") : ""}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 pr-3 align-middle">
+                        <span className="relative flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setViewing({ row, startEditing: false })}
+                            className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-slate-100 ${
+                              row.status === "Reported" ? "text-rose-600" : "text-slate-700"
+                            }`}
+                            aria-label={row.status === "Reported" ? "Review removal request" : "View review"}
+                            title={row.status === "Reported" ? "Review removal request" : "View review"}
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setViewing({ row, startEditing: true })}
+                            className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-slate-100 ${
+                              row.reply ? "text-violet-500" : "text-slate-700"
+                            }`}
+                            aria-label={row.reply ? "Edit reply" : "Reply to review"}
+                            title={row.reply ? "Edit reply" : "Reply to review"}
+                          >
+                            <Reply size={16} />
+                          </button>
+                          <span data-review-menu className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setMenuFor(menuFor === row.id ? null : row.id)}
+                              className="grid h-8 w-8 place-items-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100"
+                              aria-label="More actions"
+                              aria-expanded={menuFor === row.id}
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                            {menuFor === row.id && (
+                              <span
+                                role="menu"
+                                className={`absolute right-0 top-9 z-20 flex w-[168px] flex-col rounded-xl border border-[#E6E8F0] bg-white py-1 shadow-lg ${T.xs}`}
+                              >
                                 <button
                                   type="button"
                                   role="menuitem"
                                   disabled={busy}
                                   onClick={() => {
                                     setMenuFor(null);
-                                    deleteReply(row);
+                                    setStatusFor([row.id], row.status === "Hidden" ? "active" : "inactive");
                                   }}
-                                  className="flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50"
+                                  className="flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
                                 >
-                                  <Trash2 size={14} />
-                                  Delete reply
+                                  {row.status === "Hidden" ? <Eye size={14} /> : <EyeOff size={14} />}
+                                  {row.status === "Hidden" ? "Restore review" : "Hide review"}
                                 </button>
-                              )}
-                            </span>
-                          )}
+                                {row.reply && (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setMenuFor(null);
+                                      deleteReply(row);
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50"
+                                  >
+                                    <Trash2 size={14} />
+                                    Delete reply
+                                  </button>
+                                )}
+                              </span>
+                            )}
+                          </span>
                         </span>
-                      </span>
-                    </td>
+                      </td>
 
-                    <td />
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      <td />
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {/* Footer ----------------------------------------------------- */}
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-t border-[#EDEFF5] px-4 py-3.5">

@@ -58,7 +58,7 @@ import { getImageUrl } from "../../utils/image";
 import { buildUserProfile, normalizeUser, spendSeries } from "../../utils/userModel";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, CARD, initials } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, CARD, initials, WRAP } from "../v2/tokens";
 import { Card, Chip } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
@@ -81,14 +81,16 @@ import { Card, Chip } from "../v2/ui";
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const VIOLET = "#6D4AE0";
 const GREEN = "#16A34A";
 
 // Measured column ratios from the mockup.
-const TOP_COLS = "grid-cols-[1fr_476px]";
-const MID_COLS = "grid-cols-[510fr_410fr_380fr]";
-const BOTTOM_COLS = "grid-cols-[670fr_620fr]";
+const TOP_COLS = `grid-cols-[1fr_476px] ${WRAP[2]}`;
+const MID_COLS = `grid-cols-[510fr_410fr_380fr] ${WRAP[3]}`;
+const BOTTOM_COLS = `grid-cols-[670fr_620fr] ${WRAP[2]}`;
 
 const T = {
   tiny: "text-[11px]",
@@ -1230,7 +1232,7 @@ const UserDetailsV2 = () => {
     <>
       <PageHeader onBack={goBack} />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 ${GAP}`}>
         {/* Page actions -------------------------------------------------- */}
         <div className="flex justify-end gap-3">
           <Dropdown

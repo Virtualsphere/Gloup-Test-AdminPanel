@@ -30,7 +30,7 @@ import { getUsersSummaryV2 } from "../../redux/slices/allUsersSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP, WRAP_FLOW, WRAP_WIDE } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -62,6 +62,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const VIOLET = "#6D4AE0";
 const BLUE = "#3B82F6";
@@ -73,7 +75,7 @@ const PINK = "#F25C8A";
 const SLATE = "#CBD5E1";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW_COLS = "grid-cols-[435fr_414fr_423fr]";
+const ROW_COLS = `grid-cols-[435fr_414fr_423fr] ${WRAP.flow}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1300px of content, so measured sizes carry over at ~1.17x.
@@ -583,11 +585,11 @@ const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
         onExport={exportReport}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${WRAP_FLOW} ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-5 ${GAP}`}>
+        <div className={`grid grid-cols-5 ${WRAP[5]} ${WRAP_WIDE} ${GAP}`}>
           {kpis.map(({ icon, color, ...kpi }) => (
             <KpiTile key={kpi.label} {...kpi} icon={icon} iconTint={color} iconColor="#fff" />
           ))}
@@ -844,7 +846,7 @@ const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
         {/* ---------------------------------------------------------------- */}
         <Card className="px-4 pb-4 pt-3.5">
           <CardHeader title="Key Insights" />
-          <div className={`mt-2.5 grid grid-cols-4 ${GAP}`}>
+          <div className={`mt-2.5 grid grid-cols-4 ${WRAP[4]} ${GAP}`}>
             {insights.map((item) => (
               <StatInsight key={item.title} item={item} />
             ))}

@@ -19,7 +19,7 @@ import { fetchBookingIntelligenceV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, rampColor } from "../v2/tokens";
+import { CHART_AXIS as AXIS, rampColor, WRAP } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -47,6 +47,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#6D4AE0";
 const INDIGO = "#4F46E5";
@@ -55,8 +57,8 @@ const ORANGE = "#F59E0B";
 const PINK = "#F0527E";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW2_COLS = "grid-cols-[520fr_443fr_320fr]";
-const ROW3_COLS = "grid-cols-[405fr_446fr_432fr]";
+const ROW2_COLS = `grid-cols-[520fr_443fr_320fr] ${WRAP[3]}`;
+const ROW3_COLS = `grid-cols-[405fr_446fr_432fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1307px of content, so measured sizes carry over at ~1.16x.
@@ -415,9 +417,9 @@ const BookingIntelligenceV2 = ({ title = "Booking Intelligence" }) => {
         onExport={exportReport}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-5 ${GAP}`}>
+        <div className={`grid grid-cols-5 ${WRAP[5]} ${GAP}`}>
           {kpis.map(({ icon, tint, ...tile }) => (
             <KpiTile key={tile.label} {...tile} icon={icon} iconTint={tint} />
           ))}

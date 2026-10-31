@@ -16,6 +16,7 @@ import moment from "moment";
 import { getAllRefundsList, updateRefundRequest } from "../../redux/slices/refundSlice";
 import { useDispatch } from "react-redux";
 import Select from "react-select";
+import toast from "react-hot-toast";
 const CouponTable = ({ data, title }) => {
 
   const dispatch = useDispatch();
@@ -270,8 +271,13 @@ const CouponTable = ({ data, title }) => {
 
   const handleStatusChange = (id,  newStatus) => {
     dispatch(updateRefundRequest({ id: id, status: newStatus }))
+      .unwrap()
       .then(() => {
+        toast.success(`Refund request ${newStatus}`, { id: "updaterefund-toast" });
         dispatch(getAllRefundsList());
+      })
+      .catch((message) => {
+        toast.error(message || "Failed to update refund request", { id: "updaterefund-toast" });
       });
   };
 

@@ -54,7 +54,7 @@ import { downloadCsv, pick } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS, CARD, initials, toSpark } from "../v2/tokens";
+import { CHART_AXIS as AXIS, CARD, initials, toSpark, WRAP } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -93,6 +93,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B3FF0";
 const INDIGO = "#4F46E5";
@@ -102,10 +104,10 @@ const BLUE = "#3B82F6";
 const RED = "#EF4444";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const HERO_COLS = "grid-cols-[791fr_493fr]";
-const ROW2_COLS = "grid-cols-[399fr_430fr_450fr]";
-const ROW3_COLS = "grid-cols-[290fr_290fr_305fr_375fr]";
-const ROW4_COLS = "grid-cols-[592fr_418fr_261fr]";
+const HERO_COLS = `grid-cols-[791fr_493fr] ${WRAP[2]}`;
+const ROW2_COLS = `grid-cols-[399fr_430fr_450fr] ${WRAP[3]}`;
+const ROW3_COLS = `grid-cols-[290fr_290fr_305fr_375fr] ${WRAP[4]}`;
+const ROW4_COLS = `grid-cols-[592fr_418fr_261fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1297px of content, so measured sizes carry over at ~1.17x.
@@ -589,7 +591,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
     return (
       <>
         <PageHeader onPick={pick} />
-        <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+        <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
           {breadcrumb}
           <SalonPicker onPick={pick} />
         </ScaledCanvas>
@@ -773,7 +775,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
     <>
       <PageHeader onPick={pick} />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Breadcrumb + actions */}
         <div className="flex items-center justify-between gap-3">
           {breadcrumb}
@@ -951,7 +953,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
             ) : (
               <>
                 {/* KPI tiles */}
-                <div className={`grid grid-cols-6 ${GAP}`}>
+                <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
                   {kpis.map(({ icon, color, tint, ...kpi }) => (
                     <KpiTile key={kpi.label} {...kpi} icon={icon} iconColor={color} iconTint={tint} />
                   ))}

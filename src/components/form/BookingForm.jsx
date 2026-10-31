@@ -154,6 +154,7 @@ const downloadPDF = async () => {
       .unwrap()
       .then(() => {
         toast.success(`Booking ${status} successfully`);
+        dispatch(getBookingById(id));
       })
       .catch(() => {
         toast.error("Failed to update booking status");
@@ -166,6 +167,7 @@ const downloadPDF = async () => {
       .then(() => {
         toast.success("Booking cancelled successfully");
         setShowCancel(false);
+        dispatch(getBookingById(id));
       })
       .catch(() => toast.error("Cancel failed"));
   };
@@ -176,6 +178,7 @@ const downloadPDF = async () => {
       .then(() => {
         toast.success("Refund processed successfully");
         setShowRefund(false);
+        dispatch(getBookingById(id));
       })
       .catch(() => toast.error("Refund failed"));
   };
@@ -294,8 +297,8 @@ const downloadPDF = async () => {
                 </button>
               )}
 
-              {/* REFUND */}
-              {bookingView.payment_status === "success" && (
+              {/* REFUND — the backend only refunds completed, paid bookings */}
+              {bookingView.status === "completed" && bookingView.payment_status === "success" && (
                 <button
                   onClick={() => setShowRefund(true)}
                   className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm"

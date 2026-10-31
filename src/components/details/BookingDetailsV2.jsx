@@ -38,7 +38,7 @@ import { getImageUrl } from "../../utils/image";
 import { buildUserProfile } from "../../utils/userModel";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { initials } from "../v2/tokens";
+import { initials, WRAP } from "../v2/tokens";
 import { Card, Chip as BaseChip } from "../v2/ui";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +64,8 @@ import { Card, Chip as BaseChip } from "../v2/ui";
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1320;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B21F0";
 const GREEN = "#12B76A";
@@ -72,9 +74,9 @@ const RED = "#F04438";
 const VIOLET = "#7C3AED";
 
 // Measured column widths from the mockup, used directly as grid fr units.
-const TOP_COLS = "grid-cols-[292fr_1016fr]";
-const DETAIL_COLS = "grid-cols-[692fr_288fr]";
-const BOTTOM_COLS = "grid-cols-[1006fr_302fr]";
+const TOP_COLS = `grid-cols-[292fr_1016fr] ${WRAP[2]}`;
+const DETAIL_COLS = `grid-cols-[692fr_288fr] ${WRAP[2]}`;
+const BOTTOM_COLS = `grid-cols-[1006fr_302fr] ${WRAP[2]}`;
 
 // Type scale in design px on the 1320px canvas. See the note above before
 // changing these.
@@ -660,7 +662,7 @@ const BookingDetailsV2 = () => {
     <>
       <PageHeader id={booking.id} status={status} onNavigate={navigate} />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* More actions / edit                                               */}
         {/* ---------------------------------------------------------------- */}

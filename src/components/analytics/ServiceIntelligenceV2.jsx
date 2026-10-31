@@ -33,7 +33,7 @@ import { fetchServiceIntelligenceV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
-import { CHART_AXIS as AXIS } from "../v2/tokens";
+import { CHART_AXIS as AXIS, WRAP } from "../v2/tokens";
 import {
   Card,
   CardHeader as BaseCardHeader,
@@ -64,6 +64,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
+// Narrowest canvas the wrapped layout still fits at full type size.
+const MIN_WIDTH = 1000;
 
 const BRAND = "#5B3FF0";
 const INDIGO = "#4F46E5";
@@ -73,7 +75,7 @@ const RED = "#EF4444";
 const BLUE = "#3B82F6";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW_COLS = "grid-cols-[460fr_392fr_450fr]";
+const ROW_COLS = `grid-cols-[460fr_392fr_450fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1327px of content, so measured sizes carry over at ~1.15x.
@@ -439,9 +441,9 @@ const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => 
         onExport={exportReport}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-6 ${GAP}`}>
+        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
           {kpis.map(({ icon, color, tint, filled, ...tile }) => (
             <KpiTile key={tile.label} {...tile} icon={icon} iconColor={color} iconTint={tint} iconFill={filled} />
           ))}
