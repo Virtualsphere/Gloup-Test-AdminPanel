@@ -180,7 +180,7 @@ const downloadPDF = async () => {
         setShowRefund(false);
         dispatch(getBookingById(id));
       })
-      .catch(() => toast.error("Refund failed"));
+      .catch((message) => toast.error(message || "Refund failed"));
   };
 
 
@@ -297,8 +297,8 @@ const downloadPDF = async () => {
                 </button>
               )}
 
-              {/* REFUND — the backend only refunds completed, paid bookings */}
-              {bookingView.status === "completed" && bookingView.payment_status === "success" && (
+              {/* REFUND — the backend only refunds paid bookings that are cancelled or completed */}
+              {["cancelled", "completed"].includes(bookingView.status) && ["success", "sucssess"].includes(bookingView.payment_status) && (
                 <button
                   onClick={() => setShowRefund(true)}
                   className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm"

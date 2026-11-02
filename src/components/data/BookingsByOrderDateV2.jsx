@@ -142,13 +142,13 @@ const paymentLabel = (row) => {
 
 // Row menu, mirroring the booking detail page (BookingForm) and the backend's
 // rules: ALLOWED_STATUS_TRANSITIONS for status changes, and refunds only for
-// completed bookings whose payment_status is exactly "success".
+// paid bookings that are cancelled or completed (/refundbookings).
 const rowActions = (row) => [
   { key: "view", label: "View details", icon: Eye },
   row.status === "booked" && { key: "confirmed", label: "Confirm booking", icon: CheckCircle2 },
   row.status === "confirmed" && { key: "completed", label: "Mark completed", icon: CheckCircle2 },
   ["booked", "confirmed"].includes(row.status) && { key: "cancel", label: "Cancel booking", icon: XCircle, danger: true },
-  row.status === "completed" && row.payment_status === "success" && { key: "refund", label: "Mark refunded", icon: Wallet, danger: true },
+  ["cancelled", "completed"].includes(row.status) && PAID_STATUSES.includes(row.payment_status) && { key: "refund", label: "Mark refunded", icon: Wallet, danger: true },
   { key: "pdf", label: "Download PDF", icon: FileDown },
 ].filter(Boolean);
 
@@ -375,16 +375,20 @@ const CONFIRM_COPY = {
     body: (row) => `Booking #${row.id} for ${row.user_name || "this customer"} at ${row.salon_name || "the salon"} will be cancelled. This can't be undone.`,
     action: "Cancel booking",
   },
+  // Refunds are manual: card / UPI on the Razorpay dashboard, wallet-paid
+  // bookings credited back to the wallet by /refundbookings.
   refund: {
     title: "Mark this booking as refunded?",
-    body: (row) => `Booking #${row.id} will be set to Refunded and the customer gets a WhatsApp refund message. No money is sent - the Razorpay refund isn't built in the backend yet, so refund the payment separately.`,
+    body: (row) => row.wallet_paid
+      ? `Booking #${row.id} was paid from the Gloup wallet. The amount paid goes back to the customer's wallet, the booking is set to Refunded and the customer gets a WhatsApp refund message.`
+      : `Refund the payment on the Razorpay dashboard first - no money is sent from here. Booking #${row.id} is then set to Refunded and the customer gets a WhatsApp refund message.`,
     action: "Mark refunded",
   },
 };
 
 // Rendered outside ScaledCanvas - a fixed overlay inside the transformed
 // canvas would be positioned (and scaled) relative to it.
-const ConfirmDialog = ({ confirming, busy, onCancel, onConfirm }) => {
+const ConfirmDialog = ({ confirming, busy, reference, onReference, onCancel, onConfirm }) => {
   const copy = CONFIRM_COPY[confirming.key];
   return (
     <div
@@ -400,6 +404,20 @@ const ConfirmDialog = ({ confirming, busy, onCancel, onConfirm }) => {
       >
         <h2 className="text-base font-extrabold text-slate-900">{copy.title}</h2>
         <p className="mt-2 text-sm text-slate-600">{copy.body(confirming.row)}</p>
+        {confirming.key === "refund" && !confirming.row.wallet_paid && (
+          <label className="mt-4 block text-xs font-semibold text-slate-600">
+            Razorpay refund ID <span className="font-normal text-slate-400">(optional)</span>
+            <input
+              type="text"
+              value={reference}
+              onChange={(e) => onReference(e.target.value)}
+              placeholder="rfnd_..."
+              maxLength={100}
+              disabled={busy}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-violet-400"
+            />
+          </label>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -568,6 +586,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
   const [exporting, setExporting] = useState(false);
   const [menuFor, setMenuFor] = useState(null);
   const [confirming, setConfirming] = useState(null);
+  const [refundReference, setRefundReference] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [topSalon, setTopSalon] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -774,12 +793,13 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
     }
     setActionBusy(true);
     try {
-      await dispatch(refundBooking({ id: row.id })).unwrap();
-      toast.success(`Booking #${row.id} marked refunded`, { id: "booking-action-toast" });
+      const res = await dispatch(refundBooking({ id: row.id, refund_reference: refundReference })).unwrap();
+      toast.success(typeof res?.data === "string" ? res.data : `Booking #${row.id} marked refunded`, { id: "booking-action-toast" });
       setConfirming(null);
+      setRefundReference("");
       refresh();
-    } catch {
-      toast.error(`Couldn't refund booking #${row.id}`, { id: "booking-action-toast" });
+    } catch (message) {
+      toast.error(message || `Couldn't refund booking #${row.id}`, { id: "booking-action-toast" });
     } finally {
       setActionBusy(false);
     }
@@ -1561,6 +1581,8 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
         <ConfirmDialog
           confirming={confirming}
           busy={actionBusy}
+          reference={refundReference}
+          onReference={setRefundReference}
           onCancel={() => setConfirming(null)}
           onConfirm={confirmAction}
         />

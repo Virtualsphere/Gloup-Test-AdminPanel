@@ -277,10 +277,10 @@ export const updateBookingStatus = createAsyncThunk(
 
 export const refundBooking = createAsyncThunk(
   "allBookings/refund",
-  async ({ id }, { rejectWithValue }) => {
+  async ({ id, refund_reference }, { rejectWithValue }) => {
     try {
       const res = await api.post(`/admin/app/refundbookings`,
-        {id},
+        { id, refund_reference },
         {
           headers: {
             "Content-Type": "application/json",
@@ -288,8 +288,8 @@ export const refundBooking = createAsyncThunk(
           withCredentials: false,
         });
       return res.data;
-    } catch {
-      return rejectWithValue("Refund failed");
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.error?.message || error.message || "Refund failed");
     }
   }
 );
