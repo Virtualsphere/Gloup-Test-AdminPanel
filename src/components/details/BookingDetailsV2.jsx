@@ -129,9 +129,13 @@ const CONFIRM_COPY = {
     body: (b) => `Booking #${b.id} for ${b.user_name || "this customer"} at ${b.salon_name || "the salon"} will be cancelled. This can't be undone.`,
     action: "Cancel booking",
   },
+  // Refunds are manual: card / UPI on the Razorpay dashboard, wallet-paid
+  // bookings credited back to the wallet by /refundbookings.
   refund: {
     title: "Mark this booking as refunded?",
-    body: (b) => `Booking #${b.id} will be set to Refunded and the customer gets a WhatsApp refund message. No money is sent - the Razorpay refund isn't built in the backend yet, so refund the payment separately.`,
+    body: (b) => b.wallet_paid
+      ? `Booking #${b.id} was paid from the Gloup wallet. ${inr(b.payable_amount)} goes back to the customer's wallet, the booking is set to Refunded and the customer gets a WhatsApp refund message.`
+      : `Refund ${inr(b.payable_amount)} on the Razorpay dashboard first - no money is sent from here. Booking #${b.id} is then set to Refunded and the customer gets a WhatsApp refund message.`,
     action: "Mark refunded",
   },
 };
@@ -328,7 +332,7 @@ const Timeline = ({ steps }) => (
 
 // Rendered outside ScaledCanvas - a fixed overlay inside the transformed
 // canvas would be positioned (and scaled) relative to it.
-const ConfirmDialog = ({ kind, booking, busy, onCancel, onConfirm }) => {
+const ConfirmDialog = ({ kind, booking, busy, reference, onReference, onCancel, onConfirm }) => {
   const copy = CONFIRM_COPY[kind];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={busy ? undefined : onCancel}>
@@ -341,6 +345,20 @@ const ConfirmDialog = ({ kind, booking, busy, onCancel, onConfirm }) => {
       >
         <h2 className="text-base font-extrabold text-slate-900">{copy.title}</h2>
         <p className="mt-2 text-sm text-slate-600">{copy.body(booking)}</p>
+        {kind === "refund" && !booking.wallet_paid && (
+          <label className="mt-4 block text-xs font-semibold text-slate-600">
+            Razorpay refund ID <span className="font-normal text-slate-400">(optional)</span>
+            <input
+              type="text"
+              value={reference}
+              onChange={(e) => onReference(e.target.value)}
+              placeholder="rfnd_..."
+              maxLength={100}
+              disabled={busy}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-violet-400"
+            />
+          </label>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -417,6 +435,7 @@ const BookingDetailsV2 = () => {
   const [tab, setTab] = useState(TABS[0]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState(null); // "cancel" | "refund"
+  const [refundReference, setRefundReference] = useState("");
   const [busy, setBusy] = useState(false);
   const [customer, setCustomer] = useState(null); // { id, data } | { id: null } | { failed }
   const menuRef = useRef(null);
@@ -513,9 +532,14 @@ const BookingDetailsV2 = () => {
   const canConfirm = status === "booked";
   const canComplete = status === "confirmed";
   const canCancel = ["booked", "confirmed"].includes(status);
-  const canRefund = booking.payment_status === "success" && status !== "refunded";
+  // Same rule as /refundbookings: paid, and cancelled or completed.
+  const isPaid = PAID_STATUSES.includes(booking.payment_status);
+  const canRefund = isPaid && ["cancelled", "completed"].includes(status);
   const refundBlocked =
-    status === "refunded" ? "Already refunded" : canRefund ? undefined : "Only paid bookings can be refunded";
+    status === "refunded" ? "Already refunded"
+    : !isPaid ? "Only paid bookings can be refunded"
+    : canRefund ? undefined
+    : "Cancel the booking first - only cancelled or completed bookings can be refunded";
 
   // Timeline: what the status implies. Times only where the API has them.
   const timeline = (() => {
@@ -559,12 +583,13 @@ const BookingDetailsV2 = () => {
     }
     setBusy(true);
     try {
-      await dispatch(refundBooking({ id: booking.id })).unwrap();
-      toast.success(`Booking #${booking.id} marked refunded`, { id: "booking-detail-action" });
+      const res = await dispatch(refundBooking({ id: booking.id, refund_reference: refundReference })).unwrap();
+      toast.success(typeof res?.data === "string" ? res.data : `Booking #${booking.id} marked refunded`, { id: "booking-detail-action" });
       setConfirming(null);
+      setRefundReference("");
       reload();
-    } catch {
-      toast.error(`Couldn't refund booking #${booking.id}`, { id: "booking-detail-action" });
+    } catch (message) {
+      toast.error(message || `Couldn't refund booking #${booking.id}`, { id: "booking-detail-action" });
     } finally {
       setBusy(false);
     }
@@ -1004,6 +1029,21 @@ const BookingDetailsV2 = () => {
                       <td className="truncate px-3 py-3">{transactionId || DASH}</td>
                       <td className="px-3 py-3">{fmtDateTime(bookedOn)}</td>
                     </tr>
+                    {status === "refunded" && (
+                      <tr className={`border-t border-slate-100 text-slate-800 ${T.sm}`}>
+                        <td className="px-3 py-3 font-semibold">
+                          {booking.refund_amount == null ? DASH : `- ${inr(booking.refund_amount)}`}
+                        </td>
+                        <td className="px-3 py-3">
+                          <Chip className={PAYMENT_STYLES.Refunded}>Refunded</Chip>
+                        </td>
+                        <td className="truncate px-3 py-3">
+                          {booking.refund_method === "wallet" ? "Gloup wallet" : booking.refund_method === "manual" ? "Razorpay (manual)" : DASH}
+                        </td>
+                        <td className="truncate px-3 py-3">{booking.refund_reference || DASH}</td>
+                        <td className="px-3 py-3">{fmtDateTime(booking.refunded_at)}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               )}
@@ -1084,6 +1124,8 @@ const BookingDetailsV2 = () => {
           kind={confirming}
           booking={booking}
           busy={busy}
+          reference={refundReference}
+          onReference={setRefundReference}
           onCancel={() => setConfirming(null)}
           onConfirm={confirmAction}
         />
