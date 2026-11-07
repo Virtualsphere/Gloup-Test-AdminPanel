@@ -104,6 +104,12 @@ export const fetchPartnerOverviewV2 = createAsyncThunk(
   "analytics/fetchPartnerOverviewV2",
   post("/admin/app/getPartnerOverviewV2", "Failed to fetch partner overview")
 );
+// The same payload for one card's own date filter on Partner Details. Not stored
+// in state, so a card's window can't replace the data the rest of the page reads.
+export const fetchPartnerCardOverviewV2 = createAsyncThunk(
+  "analytics/fetchPartnerCardOverviewV2",
+  post("/admin/app/getPartnerOverviewV2", "Failed to fetch partner overview")
+);
 export const fetchPartnerPickerV2 = createAsyncThunk(
   "analytics/fetchPartnerPickerV2",
   post("/admin/app/getPartnerPickerV2", "Failed to fetch salons")
@@ -202,6 +208,8 @@ const analyticsSlice = createSlice({
           state[key].data = action.payload;
         })
         .addCase(thunk.rejected, (state, action) => {
+          // A caller aborted this request because a newer one replaced it.
+          if (action.meta.aborted) return;
           state[key].loading = false;
           state[key].error = action.payload || "Failed to load";
         });
