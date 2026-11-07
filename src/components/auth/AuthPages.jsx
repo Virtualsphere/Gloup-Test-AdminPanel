@@ -22,6 +22,27 @@ const AuthPages = () => {
     formState: { errors },
     reset,
   } = useForm();
+  const [sendingReset, setSendingReset] = useState(false);
+
+  const handleForgotPassword = async () => {
+    const toastId = "forgot-password-toast";
+    setSendingReset(true);
+    try {
+      await api.post("/admin/auth/forgot-password", {}, { withCredentials: false });
+      toast.success(
+        "A password reset link has been sent to the admin email. It expires in 30 minutes.",
+        { id: toastId, duration: 8000 }
+      );
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error?.message ||
+          "Could not send the reset email. Please try again.",
+        { id: toastId }
+      );
+    } finally {
+      setSendingReset(false);
+    }
+  };
 
   const onSubmit = async (data) => {
     if (!isSignUp) {
@@ -210,6 +231,17 @@ const AuthPages = () => {
                   {errors.password.message}
                 </p>
               )}
+
+              <div className="mt-2 text-right">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={sendingReset}
+                  className="cursor-pointer text-sm font-medium text-black hover:underline focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sendingReset ? "Sending reset link..." : "Forgot password?"}
+                </button>
+              </div>
             </div>
 
             <div className="pt-2">

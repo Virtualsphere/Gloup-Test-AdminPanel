@@ -53,6 +53,7 @@ Token-based, stored in `localStorage` under the key `"token"` — there is no au
 
 - [utils/api.js](src/utils/api.js) — the single axios instance. A request interceptor attaches the token as the **`adminauth`** header (not `Authorization`). A response interceptor clears the token and hard-redirects to `/auth` when the API returns `error.code === "Authentication Failed"`.
 - [App.jsx](src/App.jsx) — the route gate reads `localStorage.getItem("token")` synchronously and `<Navigate>`s between `/auth` and `/`.
+- Forgot password: the login page's **Forgot password?** button posts to `/admin/auth/forgot-password` with no body, because the panel has one admin account shared by several people. The backend emails a 30-minute, single-use link to one fixed admin mailbox (set on the server, never sent by the panel), and fails if it doesn't find exactly one active admin. The link opens `/reset-password?token=` ([ResetPassword.jsx](src/components/auth/ResetPassword.jsx)), which is reachable with or without a saved token and returns to `/auth` after the reset. The backend must not answer these routes with the `Authentication Failed` code, because the interceptor would redirect before the page could show the error.
 
 ### Routing and layout
 
