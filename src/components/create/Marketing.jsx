@@ -8,6 +8,7 @@ import {
 } from "../../redux/slices/marketingSlice";
 import MarketingVideo from "./MarketingVideo";
 import MarketingSMS from "./MarketingSMS";
+import SelectMenu from "../common/Select";
 
 const GENDER_OPTIONS = [
   { value: "all", label: "Everyone" },
@@ -258,7 +259,7 @@ const MarketingImage = () => {
           <label className="text-sm font-medium text-gray-600">
             Send To
           </label>
-          <select
+          <SelectMenu
             value={gender}
             onChange={(e) => setGender(e.target.value)}
             className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
@@ -268,7 +269,7 @@ const MarketingImage = () => {
                 {opt.label}
               </option>
             ))}
-          </select>
+          </SelectMenu>
           <p className="text-xs text-gray-400 pt-1">
             Filters by the "Gender" column in the sheet. Rows without a gender value are skipped unless "Everyone" is selected.
           </p>

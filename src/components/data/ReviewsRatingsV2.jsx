@@ -68,6 +68,7 @@ import {
   Select as BaseSelect,
   Sparkline as BaseSparkline,
 } from "../v2/ui";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Reviews & Ratings" mockup, on a fixed
@@ -418,7 +419,7 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
       <div className="ml-auto flex shrink-0 items-center gap-3">
         <span className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 xl:flex">
           <CalendarDays size={14} className="shrink-0 text-slate-500" />
-          <select
+          <SelectMenu
             value={range}
             onChange={(e) => setRange(e.target.value)}
             className="cursor-pointer appearance-none bg-transparent pr-1 text-[12px] font-medium text-slate-600 focus:outline-none"
@@ -428,7 +429,7 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
                 {option.label}
               </option>
             ))}
-          </select>
+          </SelectMenu>
           <ArrowRightLeft size={13} className="ml-1 shrink-0 text-slate-500" />
         </span>
 

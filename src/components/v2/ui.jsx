@@ -1,6 +1,5 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import moment from "moment";
-import { toast } from "react-hot-toast";
 import { Area, AreaChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import {
   ArrowDown,
@@ -16,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { CARD, CHART_TOOLTIP, initials, rampColor } from "./tokens";
+import { DateRangePicker } from "../common/DatePicker";
+import SelectMenu from "../common/Select";
 
 // Building blocks shared by the V2 pages. Each page still owns its type scale
 // (the `T` map) because the canvases differ in width - pass the size class in
@@ -59,7 +60,7 @@ export const Chip = ({ children, size = "px-2 py-[3px] text-[11px]", className =
 // Small bordered dropdown. `options` are strings or { value, label }.
 export const Select = ({ value, onChange, options, size, className = "", truncate = false }) => (
   <span className={`relative block shrink-0 ${className}`}>
-    <select
+    <SelectMenu
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={`w-full cursor-pointer appearance-none ${
@@ -67,7 +68,7 @@ export const Select = ({ value, onChange, options, size, className = "", truncat
       }rounded-lg border border-[#E6E8F0] bg-white py-2 pl-3 pr-7 font-medium text-slate-600 focus:outline-none ${size}`}
     >
       {renderOptions(options)}
-    </select>
+    </SelectMenu>
     <ChevronDown
       size={13}
       className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -548,14 +549,14 @@ export const HeaderSelect = ({ icon: Icon, value, onChange, options, label, clas
     className={`relative shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-2 ${className}`}
   >
     {Icon && <Icon size={14} className="shrink-0 text-slate-500" />}
-    <select
+    <SelectMenu
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={label}
       className="cursor-pointer appearance-none bg-transparent pr-5 text-[12px] font-medium text-slate-700 focus:outline-none"
     >
       {renderOptions(options)}
-    </select>
+    </SelectMenu>
     <ChevronDown
       size={13}
       className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
@@ -602,88 +603,34 @@ const fmtDialogRange = (from, to) => {
   return `${a.format(a.year() === b.year() ? "D MMM" : "D MMM YYYY")} – ${b.format("D MMM YYYY")}`;
 };
 
-// Header date button with a "Custom range" popover (from / to, at most
-// `maxDays` days, nothing after today). onApply(from, to) gets YYYY-MM-DD.
+// Header date pill opening the shared range calendar (at most `maxDays`
+// days, nothing after today). onApply(from, to) gets YYYY-MM-DD. The pill is
+// the wrapper's direct child, so callers can style it with [&>button].
 export const DateRangeButton = ({
   from,
   to,
   onApply,
-  color,
   toastId = "v2-date-range",
   maxDays = 366,
   className = "relative hidden md:block",
-}) => {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState({ from: "", to: "" });
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const handle = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
-
-  const toggle = () => {
-    setDraft({ from, to });
-    setOpen((value) => !value);
-  };
-  const apply = () => {
-    if (!draft.from || !draft.to || draft.from > draft.to) {
-      toast.error("Pick a start date on or before the end date", { id: toastId });
-      return;
-    }
-    if (moment(draft.to).diff(moment(draft.from), "days") > maxDays - 1) {
-      toast.error(`The range can be at most ${maxDays} days`, { id: toastId });
-      return;
-    }
-    onApply(draft.from, draft.to);
-    setOpen(false);
-  };
-
-  return (
-    <div className={className} ref={ref}>
-      <button
-        type="button"
-        onClick={toggle}
-        className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300"
-      >
-        {fmtDialogRange(from, to)}
-        <CalendarDays size={14} className="shrink-0 text-slate-500" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-[260px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
-          <p className="text-[13px] font-bold text-slate-800">Custom range</p>
-          {[
-            ["from", "From"],
-            ["to", "To"],
-          ].map(([key, label]) => (
-            <label key={key} className="mt-2 block text-[12px] text-slate-500">
-              {label}
-              <input
-                type="date"
-                value={draft[key]}
-                max={moment().format("YYYY-MM-DD")}
-                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] text-slate-800 focus:outline-none"
-              />
-            </label>
-          ))}
-          <button
-            type="button"
-            onClick={apply}
-            className="mt-3 w-full rounded-lg py-2 text-[13px] font-bold text-white"
-            style={{ backgroundColor: color }}
-          >
-            Apply
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
+}) => (
+  <div className={className}>
+    <DateRangePicker
+      from={from}
+      to={to}
+      onChange={onApply}
+      max={moment().format("YYYY-MM-DD")}
+      maxDays={maxDays}
+      toastId={toastId}
+      align="right"
+      ariaLabel="Custom date range"
+      className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300"
+    >
+      {fmtDialogRange(from, to)}
+      <CalendarDays size={14} className="shrink-0 text-slate-500" />
+    </DateRangePicker>
+  </div>
+);
 
 const dialogCell = (column, row) => {
   if (column.render) return column.render(row);

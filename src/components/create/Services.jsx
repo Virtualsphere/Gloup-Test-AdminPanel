@@ -6,6 +6,7 @@ import {
   getStoreServices,
 } from "../../redux/slices/partnersSlice";
 import { Plus, X } from "lucide-react";
+import SelectMenu from "../common/Select";
 
 const Services = () => {
   const dispatch = useDispatch();
@@ -119,7 +120,7 @@ const Services = () => {
               {/* Store Dropdown */}
               <div className="flex flex-col">
                 <label className="text-sm font-medium">Store</label>
-                <select
+                <SelectMenu
                   value={storeId}
                   onChange={(e) => setStoreId(e.target.value)}
                   className="border px-3 py-2 rounded-md"
@@ -131,7 +132,7 @@ const Services = () => {
                       {store.name}
                     </option>
                   ))}
-                </select>
+                </SelectMenu>
               </div>
 
               {/* Service Name */}
@@ -219,7 +220,7 @@ const Services = () => {
               {/* Store Dropdown */}
               <div className="flex flex-col">
                 <label className="text-sm font-medium">Store</label>
-                <select
+                <SelectMenu
                   value={storeId}
                   onChange={(e) => setStoreId(e.target.value)}
                   className="border px-3 py-2 rounded-md"
@@ -231,7 +232,7 @@ const Services = () => {
                       {store.name}
                     </option>
                   ))}
-                </select>
+                </SelectMenu>
               </div>
 
               {/* Service Name */}

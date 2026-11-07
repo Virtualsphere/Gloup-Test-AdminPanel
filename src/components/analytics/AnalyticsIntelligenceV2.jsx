@@ -24,6 +24,7 @@ import {
   fetchAnalyticsUninstalledV2,
 } from "../../redux/slices/analyticsSlice";
 import { downloadXlsx } from "../../utils/excelExport";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved mockup, on a fixed DESIGN_WIDTH canvas that
@@ -300,13 +301,13 @@ const MiniTable = ({ columns, rows, empty = "No data for this period" }) =>
 
 const Select = ({ value, onChange, children, className = "" }) => (
   <div className="relative mt-2">
-    <select
+    <SelectMenu
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={`w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-2.5 pr-6 text-slate-800 focus:outline-none ${T.md} ${className}`}
     >
       {children}
-    </select>
+    </SelectMenu>
     <ChevronDown
       size={13}
       className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -665,7 +666,7 @@ const AnalyticsIntelligenceV2 = () => {
               <span className="leading-tight">
                 <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-700">Auto refresh</span>
                 <span className="relative block">
-                  <select
+                  <SelectMenu
                     value={refreshMs}
                     onChange={(e) => setRefreshMs(Number(e.target.value))}
                     aria-label="Auto refresh interval"
@@ -676,7 +677,7 @@ const AnalyticsIntelligenceV2 = () => {
                         {o.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectMenu>
                   <ChevronDown
                     size={10}
                     className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"

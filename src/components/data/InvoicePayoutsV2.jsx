@@ -43,6 +43,8 @@ import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CARD, WRAP } from "../v2/tokens";
 import { Card, Chip as BaseChip, HeaderBell, SalonLogo as BaseSalonLogo } from "../v2/ui";
+import { DateRangePicker } from "../common/DatePicker";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Invoices & Payouts" mockup, on a fixed
@@ -915,15 +917,18 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
         {/* Filter bar                                                        */}
         {/* ---------------------------------------------------------------- */}
         <div className={`flex items-end gap-4 px-4 py-3 wrapped:flex-wrap ${CARD}`}>
-          <label className="w-[300px] shrink-0">
+          <div className="w-[300px] shrink-0">
             <FieldLabel>Date Range (visit days)</FieldLabel>
-            <span className={`flex items-center gap-1.5 rounded-lg border border-[#E6E8F0] bg-white px-2 py-1.5 text-slate-700 ${T.xs}`}>
-              <CalendarDays size={14} className="shrink-0 text-slate-400" />
-              <input type="date" value={draft.from} max={draft.to} onChange={(e) => setDraftField("from")(e.target.value)} className="min-w-0 flex-1 bg-transparent focus:outline-none" />
-              <span className="text-slate-400">–</span>
-              <input type="date" value={draft.to} max={today} onChange={(e) => setDraftField("to")(e.target.value)} className="min-w-0 flex-1 bg-transparent focus:outline-none" />
-            </span>
-          </label>
+            <DateRangePicker
+              from={draft.from}
+              to={draft.to}
+              max={today}
+              onChange={(from, to) => setDraft((prev) => ({ ...prev, from, to }))}
+              toastId="invoices-v2-filter"
+              ariaLabel="Date range (visit days)"
+              className={`flex w-full items-center gap-1.5 rounded-lg border border-[#E6E8F0] bg-white px-2 py-1.5 text-left text-slate-700 focus:outline-none ${T.xs}`}
+            />
+          </div>
 
           <label className="w-[300px] shrink-0">
             <FieldLabel>Partner / Salon</FieldLabel>
@@ -946,7 +951,7 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
             <label key={field} className={`${width} shrink-0`}>
               <FieldLabel>{label}</FieldLabel>
               <span className="relative block">
-                <select
+                <SelectMenu
                   value={draft[field]}
                   onChange={(e) => setDraftField(field)(e.target.value)}
                   className={`w-full appearance-none rounded-lg border border-[#E6E8F0] bg-white py-2 pl-3 pr-8 text-slate-700 focus:outline-none ${T.base}`}
@@ -956,7 +961,7 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </SelectMenu>
                 <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               </span>
             </label>

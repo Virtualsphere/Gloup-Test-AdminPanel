@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import Select from "react-select";
+import { DatePicker } from "../common/DatePicker";
 
 const statusOptions = [
     { value: "", label: "All Bookings" },
@@ -173,27 +174,33 @@ const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStat
 
                 {/* From Date */}
                 <div className="w-full md:w-40">
-                    <input
-                        type="date"
+                    <DatePicker
                         value={fromDate}
-                        onChange={(e) => {
+                        onChange={(v) => {
                             setPage(1);
-                            setFromDate(e.target.value);
+                            setFromDate(v);
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        highlight={[fromDate, toDate]}
+                        clearable
+                        placeholder="From date"
+                        ariaLabel="From date"
+                        className="flex w-full items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left focus:outline-none"
                     />
                 </div>
 
                 {/* To Date */}
                 <div className="w-full md:w-40">
-                    <input
-                        type="date"
+                    <DatePicker
                         value={toDate}
-                        onChange={(e) => {
+                        onChange={(v) => {
                             setPage(1);
-                            setToDate(e.target.value);
+                            setToDate(v);
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        highlight={[fromDate, toDate]}
+                        clearable
+                        placeholder="To date"
+                        ariaLabel="To date"
+                        className="flex w-full items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left focus:outline-none"
                     />
                 </div>
             </div>

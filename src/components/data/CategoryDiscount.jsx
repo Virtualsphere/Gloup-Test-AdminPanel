@@ -9,8 +9,9 @@ import {
   endCategoryDiscountNow,
   cancelScheduledCategoryDiscount,
 } from "../../redux/slices/categoryDiscountSlice";
+import { DatePicker } from "../common/DatePicker";
 
-// Browser <input type="datetime-local"> gives "YYYY-MM-DDTHH:MM" with no
+// The date-time picker gives "YYYY-MM-DDTHH:MM" with no
 // timezone — this business runs on IST, so we stamp that offset explicitly
 // (same convention as buildAppointmentDateTime on the backend) rather than
 // trusting whatever timezone the admin's own machine happens to be in.
@@ -237,20 +238,23 @@ const CategoryDiscount = ({ title }) => {
                           </div>
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Starts (IST)</label>
-                            <input
-                              type="datetime-local"
+                            <DatePicker
+                              withTime
                               value={startsAt}
-                              onChange={(e) => setStartsAt(e.target.value)}
-                              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                              onChange={setStartsAt}
+                              ariaLabel="Starts (IST)"
+                              className="flex w-56 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm focus:outline-none"
                             />
                           </div>
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Ends (IST)</label>
-                            <input
-                              type="datetime-local"
+                            <DatePicker
+                              withTime
                               value={endsAt}
-                              onChange={(e) => setEndsAt(e.target.value)}
-                              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                              onChange={setEndsAt}
+                              min={startsAt}
+                              ariaLabel="Ends (IST)"
+                              className="flex w-56 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm focus:outline-none"
                             />
                           </div>
                           <button

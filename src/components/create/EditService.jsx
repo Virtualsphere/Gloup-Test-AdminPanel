@@ -7,6 +7,7 @@ import {
   getStoreServices,
 } from "../../redux/slices/partnersSlice";
 import toast from "react-hot-toast";
+import SelectMenu from "../common/Select";
 
 const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => {
   const dispatch = useDispatch();
@@ -151,7 +152,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
                 Category
               </label>
 
-              <select
+              <SelectMenu
                 value={serviceCategory}
                 onChange={(e) => setServiceCategory(e.target.value)}
                 className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
@@ -164,7 +165,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
                     {cat.name}
                   </option>
                 ))}
-              </select>
+              </SelectMenu>
             </div>
 
             {/* Priority */}
@@ -173,7 +174,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
                 Priority
               </label>
 
-              <select
+              <SelectMenu
                 value={priority}
                 onChange={(e) => setPriority(Number(e.target.value))}
                 className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
@@ -185,7 +186,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
                 <option value={4}>4</option>
                 <option value={5}>5</option>
                 <option value={6}>6</option>
-              </select>
+              </SelectMenu>
             </div>
 
           </div>
@@ -308,7 +309,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
             <label className="text-sm font-medium text-gray-600">
               Service For
             </label>
-            <select
+            <SelectMenu
               value={serviceFor}
               onChange={(e) => setServiceFor(e.target.value)}
               className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
@@ -316,7 +317,7 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
               <option value="male">Male</option>
               <option value="female">Female</option>
               <option value="unisex">Unisex</option>
-            </select>
+            </SelectMenu>
           </div>
 
           {/* Status */}
@@ -324,14 +325,14 @@ const EditServiceModal = ({ setShowModal, storeId, serviceId, serviceData }) => 
             <label className="text-sm font-medium text-gray-600">
               Status
             </label>
-            <select
+            <SelectMenu
               value={serviceStatus}
               onChange={(e) => setServiceStatus(e.target.value)}
               className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-            </select>
+            </SelectMenu>
           </div>
           {/* Submit */}
           <button

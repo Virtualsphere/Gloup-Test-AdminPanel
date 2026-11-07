@@ -60,6 +60,7 @@ import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, CARD, initials, WRAP } from "../v2/tokens";
 import { Card, Chip } from "../v2/ui";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // "User Details" 360° profile, built 1:1 from the approved mockup on a fixed
@@ -265,7 +266,7 @@ const SalonThumb = ({ src }) => {
 
 const Select = ({ value, onChange, options }) => (
   <span className="relative block shrink-0">
-    <select
+    <SelectMenu
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={`cursor-pointer appearance-none rounded-lg border border-[#E6E8F0] bg-white py-1.5 pl-3 pr-7 font-medium text-slate-600 focus:outline-none ${T.xxs}`}
@@ -273,7 +274,7 @@ const Select = ({ value, onChange, options }) => (
       {options.map((option) => (
         <option key={option}>{option}</option>
       ))}
-    </select>
+    </SelectMenu>
     <ChevronDown
       size={13}
       className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"

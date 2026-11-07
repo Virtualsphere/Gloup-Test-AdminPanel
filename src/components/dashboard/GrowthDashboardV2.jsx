@@ -47,6 +47,7 @@ import {
   Meter,
   PushDialog,
 } from "../v2/ui";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // The approved "Dashboard - Real-time intelligence to grow GloUp" mockup (a
@@ -333,7 +334,7 @@ const PageHeader = ({ title, date, setDate, dateOptions, period, setPeriod, refr
           <span className="leading-tight">
             <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-700">Auto refresh</span>
             <span className="relative block">
-              <select
+              <SelectMenu
                 value={refresh}
                 onChange={(e) => setRefresh(e.target.value)}
                 aria-label="Auto refresh interval"
@@ -344,7 +345,7 @@ const PageHeader = ({ title, date, setDate, dateOptions, period, setPeriod, refr
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </SelectMenu>
               <ChevronDown size={10} className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400" />
             </span>
           </span>

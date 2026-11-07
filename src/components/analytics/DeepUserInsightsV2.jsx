@@ -37,7 +37,7 @@ import {
 import { fetchDeepUserInsightsV2, fetchFarTravellingUsersV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv, rupees } from "../../utils/format";
 import { downloadXlsx } from "../../utils/excelExport";
-import { GOOGLE_MAPS_LOADER } from "../../utils/googleMaps";
+import { GOOGLE_MAPS_LOADER, HAS_MAPS_KEY } from "../../utils/googleMaps";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas, { Unscaled } from "../v2/ScaledCanvas";
 import { useCanvasScale } from "../v2/canvasScaleContext";
@@ -400,7 +400,7 @@ const EmptyNote = ({ children, className = "" }) => (
 
 const HeatMapCard = ({ heatmap, loading }) => {
   const [view, setView] = useState("map");
-  const hasKey = Boolean(GOOGLE_MAPS_LOADER.googleMapsApiKey);
+  const hasKey = HAS_MAPS_KEY;
   const spots = heatmap?.cells || [];
   const top = spots.slice(0, 8);
   const bySalon = heatmap?.basis === "salon";
@@ -440,7 +440,7 @@ const HeatMapCard = ({ heatmap, loading }) => {
           <LiveHeatMap spots={spots} />
         ) : (
           <MapUnavailable>
-            No Google Maps key is configured (VITE_GOOGLE_MAPS_KEY). The hotspot breakdown is under List View.
+            No valid Google Maps key is configured (VITE_GOOGLE_MAPS_KEY). The hotspot breakdown is under List View.
           </MapUnavailable>
         )}
 

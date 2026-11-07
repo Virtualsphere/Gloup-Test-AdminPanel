@@ -38,10 +38,12 @@ import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
 import { HeaderBell, HeaderSelect } from "../v2/ui";
+import { DateRangePicker } from "../common/DatePicker";
 import {
   getDashboardV2Alerts,
   getDashboardV2Metrics,
 } from "../../redux/slices/dashboardSlice";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved executive dashboard mockup, on a
@@ -327,7 +329,7 @@ const ViewLink = ({ children, onClick }) => (
 
 const Select = ({ value, onChange, options, compact = false }) => (
   <div className="relative shrink-0">
-    <select
+    <SelectMenu
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={`appearance-none rounded-xl border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none ${compact ? `py-1.5 pl-2.5 pr-6 ${T.base}` : `py-2 pl-3 pr-7 ${T.md}`
@@ -336,7 +338,7 @@ const Select = ({ value, onChange, options, compact = false }) => (
       {options.map((o) => (
         <option key={o}>{o}</option>
       ))}
-    </select>
+    </SelectMenu>
     <ChevronDown
       size={compact ? 11 : 13}
       className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -494,60 +496,6 @@ const lowerBetterStatus = (pct) => {
   return { status: "STABLE", logic: `Within ±${LOWER_BETTER_BAND}%` };
 };
 
-// Popover under the date pill for picking any from/to range. Absolutely
-// positioned inside the canvas (not fixed), so the scaling doesn't trap it.
-const DateRangePicker = ({ initial, today, onApply, onClose }) => {
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
-  const error = !from || !to
-    ? "Pick both dates"
-    : from > to
-      ? "Start date must be before end date"
-      : to > today
-        ? "End date can't be in the future"
-        : null;
-
-  return (
-    <div className="absolute right-0 top-full z-20 mt-2 w-[280px] rounded-2xl border border-[#E3E7EF] bg-white p-4 shadow-lg">
-      <p className={`mb-3 font-bold text-slate-900 ${T.md}`}>Custom date range</p>
-      {[
-        ["From", from, setFrom],
-        ["To", to, setTo],
-      ].map(([label, value, set]) => (
-        <label key={label} className={`mb-2 flex items-center justify-between gap-3 text-slate-600 ${T.base}`}>
-          {label}
-          <input
-            type="date"
-            value={value}
-            max={today}
-            onChange={(e) => set(e.target.value)}
-            className={`rounded-lg border border-slate-200 px-2 py-1.5 text-slate-800 focus:outline-none ${T.base}`}
-          />
-        </label>
-      ))}
-      <p className={`min-h-[16px] text-rose-500 ${T.sm}`}>{error}</p>
-      <div className="mt-2 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className={`rounded-lg px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-100 ${T.base}`}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={!!error}
-          onClick={() => onApply({ from, to })}
-          className={`rounded-lg px-3 py-1.5 font-semibold text-white disabled:opacity-40 ${T.base}`}
-          style={{ background: BRAND }}
-        >
-          Apply
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const HOW_IT_WORKS = [
   {
     title: "Filters",
@@ -656,7 +604,6 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const [bookingsWindow, setBookingsWindow] = useState("This Month");
   const [acquisitionWindow, setAcquisitionWindow] = useState("This Month");
   const [customRange, setCustomRange] = useState(null);
-  const [showRangePicker, setShowRangePicker] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState([]);
@@ -684,7 +631,6 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const applyCustomRange = (range) => {
     setCustomRange(range);
     setPeriod(CUSTOM_PERIOD);
-    setShowRangePicker(false);
   };
   const closeHowItWorks = useCallback(() => setShowHowItWorks(false), []);
 
@@ -930,24 +876,20 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
           <div className="relative hidden md:block">
-            <button
-              type="button"
-              onClick={() => setShowRangePicker((open) => !open)}
+            <DateRangePicker
+              from={curRange.from}
+              to={curRange.to}
+              max={today}
+              onChange={(from, to) => applyCustomRange({ from, to })}
+              align="right"
+              ariaLabel="Custom date range"
               className={`flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300 ${
                 period === CUSTOM_PERIOD ? "border-[#5B21F0]" : "border-gray-200"
               }`}
             >
               {rangeLabel}
               <CalendarDays size={14} className="shrink-0 text-slate-500" />
-            </button>
-            {showRangePicker && (
-              <DateRangePicker
-                initial={curRange}
-                today={today}
-                onApply={applyCustomRange}
-                onClose={() => setShowRangePicker(false)}
-              />
-            )}
+            </DateRangePicker>
           </div>
 
           <HeaderSelect
@@ -964,7 +906,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
             <span className="leading-tight">
               <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-700">Auto refresh</span>
               <span className="relative block">
-                <select
+                <SelectMenu
                   value={refreshInterval}
                   onChange={(e) => setRefreshInterval(e.target.value)}
                   aria-label="Auto refresh interval"
@@ -973,7 +915,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                   {Object.keys(REFRESH_MS).map((o) => (
                     <option key={o}>{o}</option>
                   ))}
-                </select>
+                </SelectMenu>
                 <ChevronDown
                   size={10}
                   className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"

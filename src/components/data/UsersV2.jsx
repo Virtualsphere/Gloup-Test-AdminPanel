@@ -68,6 +68,8 @@ import {
   Select as BaseSelect,
   Sparkline as BaseSparkline,
 } from "../v2/ui";
+import { DatePicker } from "../common/DatePicker";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // "Users" page, built 1:1 from the approved mockup on a fixed DESIGN_WIDTH
@@ -456,7 +458,7 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
           title="Filter users by join date"
         >
           <CalendarDays size={14} className="shrink-0" style={{ color: VIOLET }} />
-          <select
+          <SelectMenu
             value={range}
             onChange={(e) => setRange(e.target.value)}
             className="cursor-pointer appearance-none bg-transparent pr-1 text-[12px] font-medium focus:outline-none"
@@ -465,7 +467,7 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
             {RANGES.map((option) => (
               <option key={option.label}>{option.label}</option>
             ))}
-          </select>
+          </SelectMenu>
           <ChevronDown size={13} className="shrink-0 text-slate-500" />
         </span>
 
@@ -933,13 +935,14 @@ const UsersV2 = ({ title = "Users" }) => {
                 className="w-[118px] [&_select]:py-2.5"
               />
 
-              <input
-                type="date"
+              <DatePicker
                 value={joinedFrom}
-                onChange={(e) => setFilter("joinedFrom")(e.target.value)}
+                onChange={setFilter("joinedFrom")}
+                clearable
+                placeholder="Joined from"
                 title="Joined on or after"
-                aria-label="Joined on or after"
-                className={`w-[136px] shrink-0 rounded-lg border border-[#E6E8F0] bg-white px-3 py-2 text-slate-600 focus:outline-none ${T.xxs}`}
+                ariaLabel="Joined on or after"
+                className={`flex w-[136px] shrink-0 items-center gap-1.5 rounded-lg border border-[#E6E8F0] bg-white px-3 py-2 text-left text-slate-600 focus:outline-none ${T.xxs}`}
               />
 
               <button
