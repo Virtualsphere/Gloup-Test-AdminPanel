@@ -24,10 +24,12 @@ import { fetchSalonHeatmapV2 } from "../../redux/slices/analyticsSlice";
 import { downloadXlsx } from "../../utils/excelExport";
 import { rupees } from "../../utils/format";
 import { GOOGLE_MAPS_LOADER, HAS_MAPS_KEY } from "../../utils/googleMaps";
+import { OVERALL, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas, { Unscaled } from "../v2/ScaledCanvas";
 import { useCanvasScale } from "../v2/canvasScaleContext";
 import { Card, DateRangeButton, Delta, HeaderSelect, KpiTile as BaseKpiTile, ListDialog, Select as BaseSelect } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
 import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
@@ -388,12 +390,13 @@ const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, 
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton active={period === OVERALL} onClick={() => setPeriod(OVERALL)} color={INDIGO} className="hidden lg:flex" />
         <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="heatmap-range" className="relative hidden lg:block" />
         <HeaderSelect
           label="Period"
           value={period}
           onChange={setPeriod}
-          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : [])]}
+          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []), ...(period === OVERALL ? [OVERALL_OPTION] : [])]}
           className="hidden lg:flex"
         />
         <HeaderSelect icon={MapPin} label="City" value={city} onChange={setCity} options={cityOptions} className="hidden xl:flex" />
@@ -423,6 +426,7 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
 
   const range = useMemo(() => {
     if (period === "custom" && custom) return custom;
+    if (period === OVERALL) return overallRange();
     const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[1]).range();
     return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
   }, [period, custom]);

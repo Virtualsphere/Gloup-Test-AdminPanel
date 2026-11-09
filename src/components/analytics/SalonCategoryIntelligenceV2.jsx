@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { fetchSalonCategoryV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
+import { OVERALL, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, CARD, WRAP } from "../v2/tokens";
@@ -48,6 +49,7 @@ import {
   LegendDot,
   Meter,
 } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
 
 // ---------------------------------------------------------------------------
 // The approved "Salon Category Intelligence" mockup, on a fixed DESIGN_WIDTH
@@ -259,12 +261,13 @@ const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, 
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton active={period === OVERALL} onClick={() => setPeriod(OVERALL)} color={INDIGO} className="hidden lg:flex" />
         <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="salon-cat-range" className="relative hidden lg:block" />
         <HeaderSelect
           label="Period"
           value={period}
           onChange={setPeriod}
-          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : [])]}
+          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []), ...(period === OVERALL ? [OVERALL_OPTION] : [])]}
           className="hidden lg:flex"
         />
         <HeaderSelect icon={MapPin} label="City" value={city} onChange={setCity} options={cityOptions} className="hidden xl:flex" />
@@ -292,6 +295,7 @@ const SalonCategoryIntelligenceV2 = ({ title = "Salon Category Intelligence" }) 
 
   const range = useMemo(() => {
     if (period === "custom" && custom) return custom;
+    if (period === OVERALL) return overallRange();
     const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[1]).range();
     return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
   }, [period, custom]);

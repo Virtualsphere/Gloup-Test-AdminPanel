@@ -50,6 +50,7 @@ import { downloadCsv, titleCase, toDate } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
 import { LOYALTY_TIERS, loyaltyLabel } from "../../utils/loyalty";
 import { ONLINE_WINDOW_MINUTES, normalizeUser } from "../../utils/userModel";
+import { OVERALL, OVERALL_FROM, OVERALL_LABEL } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import {
@@ -69,6 +70,7 @@ import {
   Sparkline as BaseSparkline,
 } from "../v2/ui";
 import { DatePicker } from "../common/DatePicker";
+import OverallButton from "../common/OverallButton";
 import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
@@ -453,6 +455,12 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton
+          active={range === OVERALL}
+          onClick={() => setRange(OVERALL)}
+          color={VIOLET}
+          className="hidden xl:flex"
+        />
         <span
           className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 xl:flex"
           title="Filter users by join date"
@@ -467,6 +475,7 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
             {RANGES.map((option) => (
               <option key={option.label}>{option.label}</option>
             ))}
+            {range === OVERALL && <option value={OVERALL}>{OVERALL_LABEL}</option>}
           </SelectMenu>
           <ChevronDown size={13} className="shrink-0 text-slate-500" />
         </span>
@@ -536,7 +545,7 @@ const UsersV2 = ({ title = "Users" }) => {
 
   // Joined-on-or-after: the later of the header preset and the date picker.
   const joinedFromDate = useMemo(() => {
-    const presetStart = RANGES.find((r) => r.label === range)?.start();
+    const presetStart = range === OVERALL ? moment(OVERALL_FROM) : RANGES.find((r) => r.label === range)?.start();
     return [presetStart ? presetStart.format("YYYY-MM-DD") : "", joinedFrom].filter(Boolean).sort().pop() || "";
   }, [range, joinedFrom]);
 

@@ -39,6 +39,8 @@ import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
 import { HeaderBell, HeaderSelect } from "../v2/ui";
 import { DateRangePicker } from "../common/DatePicker";
+import OverallButton from "../common/OverallButton";
+import { OVERALL, OVERALL_FROM, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import {
   getDashboardV2Alerts,
   getDashboardV2Metrics,
@@ -168,10 +170,12 @@ const resolvePeriod = (period, today, custom) => {
   const thisMonth = monthKeyOf(t);
   const year = t.getFullYear();
 
-  if (period === CUSTOM_PERIOD && custom) {
-    const len = daysBetween(custom.from, custom.to);
+  // Overall (OVERALL_FROM to today) compares like a custom range.
+  if ((period === CUSTOM_PERIOD && custom) || period === OVERALL) {
+    const { from: start, to: end } = period === OVERALL ? overallRange(today) : custom;
+    const len = daysBetween(start, end);
     const ranges = [0, 1, 2].map((i) => {
-      const from = addDays(custom.from, -len * i);
+      const from = addDays(start, -len * i);
       const to = addDays(from, len - 1);
       return { from, to, label: `${fmtDay(from)} – ${fmtDay(to)}` };
     });
@@ -500,7 +504,7 @@ const HOW_IT_WORKS = [
   {
     title: "Filters",
     items: [
-      "The period dropdown (or a custom range from the date pill) drives the KPI tiles, the scorecard, the comparison tables and the monthly charts. Every change is compared with the equal period just before it: whole months for This / Last Month, the previous week, the previous 90 days, the previous year, or the same number of days before a custom range.",
+      `The period dropdown (or a custom range from the date pill, or Overall: ${fmtDay(OVERALL_FROM)} ${OVERALL_FROM.slice(0, 4)} to today) drives the KPI tiles, the scorecard, the comparison tables and the monthly charts. Every change is compared with the equal period just before it: whole months for This / Last Month, the previous week, the previous 90 days, the previous year, or the same number of days before a custom range or Overall.`,
       "The Bookings & Revenue and Acquisition cards have their own filter. \"Last 6 Months\" is compared with the 6 months before it.",
       "The growth, partner, subscription and cancellation charts show the 3 calendar months ending with the selected period.",
     ],
@@ -875,6 +879,13 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
+          <OverallButton
+            active={period === OVERALL}
+            onClick={() => selectPeriod(OVERALL)}
+            color={BRAND}
+            className="hidden md:flex"
+          />
+
           <div className="relative hidden md:block">
             <DateRangePicker
               from={curRange.from}
@@ -896,7 +907,13 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
             label="Period"
             value={period}
             onChange={selectPeriod}
-            options={period === CUSTOM_PERIOD ? [...PERIODS, CUSTOM_PERIOD] : PERIODS}
+            options={
+              period === CUSTOM_PERIOD
+                ? [...PERIODS, CUSTOM_PERIOD]
+                : period === OVERALL
+                  ? [...PERIODS, OVERALL_OPTION]
+                  : PERIODS
+            }
           />
 
           <span className="hidden items-center gap-2 xl:flex">

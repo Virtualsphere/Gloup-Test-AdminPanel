@@ -53,6 +53,8 @@ import {
 import { useListUiState } from "../../hooks/useListUiState";
 import { downloadCsv, pick } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
+import { OVERALL, OVERALL_FROM, OVERALL_LABEL } from "../../utils/overall";
+import OverallButton from "../common/OverallButton";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CARD, initials, toSpark, WRAP } from "../v2/tokens";
@@ -151,6 +153,8 @@ const PERIODS = [
 ];
 const DEFAULT_PERIOD = "last_30";
 const CUSTOM_PERIOD = { value: "custom", label: "Custom" };
+// Set by the Overall button; like Custom, the dropdowns list it only while applied.
+const OVERALL_PERIOD = { value: OVERALL, label: OVERALL_LABEL, range: () => [moment(OVERALL_FROM), moment()] };
 const SPLIT_COLORS = [INDIGO, BLUE, GREEN, ORANGE, "#B8BFCE"];
 const PEAK_RAMP = ["#EEF0FD", "#C7CCFA", "#8F95F2", "#5B5FE6", "#4338CA"];
 const TYPE_LABEL = { men: "Men's Salon", women: "Women's Salon", unisex: "Unisex Salon", unknown: "Salon" };
@@ -183,11 +187,13 @@ const fmtPct = (v) => (isNum(v) ? `${Number(v).toFixed(1)}%` : DASH);
 const fmtDate = (d) => (d ? moment(d).format("MMM D, YYYY") : DASH);
 const fmtTime = (t) => (t ? moment(t, "HH:mm").format("h:mm A") : "");
 const change = (cur, prev) => (isNum(cur) && isNum(prev) && prev ? ((cur - prev) / prev) * 100 : null);
+const findPeriod = (value) =>
+  PERIODS.find((p) => p.value === value) || (value === OVERALL_PERIOD.value ? OVERALL_PERIOD : PERIODS[1]);
 const periodRange = (value) => {
-  const [from, to] = (PERIODS.find((p) => p.value === value) || PERIODS[1]).range();
+  const [from, to] = findPeriod(value).range();
   return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
 };
-const periodName = (value) => (PERIODS.find((p) => p.value === value) || PERIODS[1]).label;
+const periodName = (value) => findPeriod(value).label;
 const fmtRange = ({ from, to }) => {
   const a = moment(from);
   const b = moment(to);
@@ -715,7 +721,12 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const pk = data?.previous_kpis || {};
   const shown = (v, fmt = num) => (loading ? "…" : fmt(v));
   const periodLabel = period === CUSTOM_PERIOD.value ? fmtRange(range) : periodName(period);
-  const periodOptions = period === CUSTOM_PERIOD.value ? [...PERIODS, CUSTOM_PERIOD] : PERIODS;
+  const periodOptions =
+    period === CUSTOM_PERIOD.value
+      ? [...PERIODS, CUSTOM_PERIOD]
+      : period === OVERALL_PERIOD.value
+        ? [...PERIODS, OVERALL_PERIOD]
+        : PERIODS;
   // Numbers from the previous filter stay on screen, dimmed, until the new ones land.
   const refreshing = partnerOverview.loading && data ? "opacity-60" : "";
 
@@ -927,6 +938,12 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
             {/* The other tabs have their own filters and don't read this window. */}
             {(tab === TABS[0] || tab === "Analytics") && (
               <>
+                <OverallButton
+                  active={period === OVERALL_PERIOD.value}
+                  onClick={() => applyPeriod(OVERALL_PERIOD.value)}
+                  color={BRAND}
+                  look="rounded-lg border-gray-200 bg-white px-2.5 py-2 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
+                />
                 <DateRangeButton from={range.from} to={range.to} onApply={applyCustom} color={BRAND} toastId="partner-v2-range" className="relative [&>button]:py-2" />
                 <HeaderSelect label="Period" value={period} onChange={applyPeriod} options={periodOptions} className="flex [&_select]:py-0.5" />
               </>

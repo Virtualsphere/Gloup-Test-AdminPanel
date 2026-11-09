@@ -38,6 +38,7 @@ import { fetchDeepUserInsightsV2, fetchFarTravellingUsersV2 } from "../../redux/
 import { downloadCsv, rupees } from "../../utils/format";
 import { downloadXlsx } from "../../utils/excelExport";
 import { GOOGLE_MAPS_LOADER, HAS_MAPS_KEY } from "../../utils/googleMaps";
+import { OVERALL, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas, { Unscaled } from "../v2/ScaledCanvas";
 import { useCanvasScale } from "../v2/canvasScaleContext";
@@ -59,6 +60,7 @@ import {
   Segmented as BaseSegmented,
   Select as BaseSelect,
 } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
 
 // ---------------------------------------------------------------------------
 // The approved "Deep User Insights" mockup, on a fixed DESIGN_WIDTH canvas
@@ -525,6 +527,7 @@ const PageHeader = ({ title, subtitle, updated, range, period, setPeriod, onCust
             </span>
           </span>
         )}
+        <OverallButton active={period === OVERALL} onClick={() => setPeriod(OVERALL)} color={INDIGO} className="hidden lg:flex" />
         <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="deep-insights-range" className="relative hidden lg:block" />
         <HeaderSelect
           label="Period"
@@ -533,6 +536,7 @@ const PageHeader = ({ title, subtitle, updated, range, period, setPeriod, onCust
           options={[
             ...PERIODS.map((p) => ({ value: p.key, label: p.label })),
             ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []),
+            ...(period === OVERALL ? [OVERALL_OPTION] : []),
           ]}
           className="hidden lg:flex"
         />
@@ -567,6 +571,7 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
 
   const range = useMemo(() => {
     if (period === "custom" && custom) return custom;
+    if (period === OVERALL) return overallRange();
     const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[0]).range();
     return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
   }, [period, custom]);

@@ -45,7 +45,9 @@ import {
 } from "../../redux/slices/bookingSlice";
 import { fetchServiceCategories } from "../../redux/slices/partnersSlice";
 import { DatePicker, DateRangePicker } from "../common/DatePicker";
+import OverallButton from "../common/OverallButton";
 import SelectMenu from "../common/Select";
+import { isOverallRange, overallRange } from "../../utils/overall";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Bookings by Order Date" mockup, on a fixed
@@ -1091,6 +1093,17 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
               setFilter("toDate", v);
               if (v < fromDate) setField("fromDate", v);
             }}
+          />
+
+          <OverallButton
+            active={isOverallRange(fromDate, toDate)}
+            onClick={() => {
+              const { from, to } = overallRange();
+              setFilter("fromDate", from);
+              setField("toDate", to);
+            }}
+            color={BRAND}
+            look={`rounded-xl border-[#E6E8F0] bg-white px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50 ${T.base}`}
           />
 
           <div className="relative shrink-0">

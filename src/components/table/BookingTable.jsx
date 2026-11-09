@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import Select from "react-select";
 import { DatePicker } from "../common/DatePicker";
+import OverallButton from "../common/OverallButton";
+import { isOverallRange } from "../../utils/overall";
 
 const statusOptions = [
     { value: "", label: "All Bookings" },
@@ -30,7 +32,7 @@ const STATUS_COLOR = {
     refunded: "bg-purple-600",
 };
 
-const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStatus, search, setSearch, fromDate, toDate, setFromDate, setToDate, paymentStatus, setPaymentStatus }) => {
+const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStatus, search, setSearch, fromDate, toDate, setFromDate, setToDate, onOverall, paymentStatus, setPaymentStatus }) => {
 
     const navigate = useNavigate();
 
@@ -203,6 +205,14 @@ const BookingsTable = ({ data = [], page, limit, total, setPage, status, setStat
                         className="flex w-full items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left focus:outline-none"
                     />
                 </div>
+
+                {onOverall && (
+                    <OverallButton
+                        active={isOverallRange(fromDate, toDate)}
+                        onClick={onOverall}
+                        look="rounded-md border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                    />
+                )}
             </div>
 
             {/* Table */}

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
 import BookingTable from "../table/BookingTable";
 import { getbDetailByOrderDate } from "../../redux/slices/bookingSlice";
+import { overallRange } from "../../utils/overall";
 
 const getTodayDateString = () => new Date().toISOString().split("T")[0];
 
@@ -36,6 +37,18 @@ const BookingsByOrderDate = ({ title }) => {
 
   const setFromDate = (value) => updateParam("fromDate", value);
   const setToDate = (value) => updateParam("toDate", value);
+  // Both dates and page 1 in one update: setSearchParams calls made in a row
+  // each start from the same URL, so the last one would undo the others.
+  const applyOverall = () => {
+    const { from, to } = overallRange();
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("fromDate", from);
+      next.set("toDate", to);
+      next.delete("page");
+      return next;
+    });
+  };
   const setStatus = (value) => updateParam("status", value);
   const setSearch = (value) => updateParam("search", value);
   const setPage = (value) => updateParam("page", value === 1 ? "" : String(value));
@@ -117,6 +130,7 @@ const BookingsByOrderDate = ({ title }) => {
             toDate={toDate}
             setFromDate={setFromDate}
             setToDate={setToDate}
+            onOverall={applyOverall}
             paymentStatus={paymentStatus}
             setPaymentStatus={setPaymentStatus}
           />

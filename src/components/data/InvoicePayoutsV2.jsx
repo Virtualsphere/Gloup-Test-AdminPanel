@@ -44,7 +44,9 @@ import ScaledCanvas from "../v2/ScaledCanvas";
 import { CARD, WRAP } from "../v2/tokens";
 import { Card, Chip as BaseChip, HeaderBell, SalonLogo as BaseSalonLogo } from "../v2/ui";
 import { DateRangePicker } from "../common/DatePicker";
+import OverallButton from "../common/OverallButton";
 import SelectMenu from "../common/Select";
+import { isOverallRange, overallRange } from "../../utils/overall";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Invoices & Payouts" mockup, on a fixed
@@ -635,6 +637,14 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
     setDraft((prev) => ({ ...prev, payoutType: key }));
     setPage(1);
   };
+  // Overall applies at once, dates only - other draft edits still wait for Apply.
+  const applyOverall = () => {
+    const dates = overallRange(today);
+    setDraft((prev) => ({ ...prev, ...dates }));
+    setFilters((prev) => ({ ...prev, ...dates }));
+    setPage(1);
+  };
+  const overallOn = isOverallRange(draft.from, draft.to, today) && isOverallRange(filters.from, filters.to, today);
 
   // ---- data ---------------------------------------------------------------
 
@@ -919,15 +929,23 @@ const InvoicePayoutsV2 = ({ title = "Invoices & Payouts" }) => {
         <div className={`flex items-end gap-4 px-4 py-3 wrapped:flex-wrap ${CARD}`}>
           <div className="w-[300px] shrink-0">
             <FieldLabel>Date Range (visit days)</FieldLabel>
-            <DateRangePicker
-              from={draft.from}
-              to={draft.to}
-              max={today}
-              onChange={(from, to) => setDraft((prev) => ({ ...prev, from, to }))}
-              toastId="invoices-v2-filter"
-              ariaLabel="Date range (visit days)"
-              className={`flex w-full items-center gap-1.5 rounded-lg border border-[#E6E8F0] bg-white px-2 py-1.5 text-left text-slate-700 focus:outline-none ${T.xs}`}
-            />
+            <div className="flex items-stretch gap-2">
+              <DateRangePicker
+                from={draft.from}
+                to={draft.to}
+                max={today}
+                onChange={(from, to) => setDraft((prev) => ({ ...prev, from, to }))}
+                toastId="invoices-v2-filter"
+                ariaLabel="Date range (visit days)"
+                className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[#E6E8F0] bg-white px-2 py-1.5 text-left text-slate-700 focus:outline-none ${T.xs}`}
+              />
+              <OverallButton
+                active={overallOn}
+                onClick={applyOverall}
+                color={BRAND}
+                look={`rounded-lg border-[#E6E8F0] bg-white px-2.5 font-semibold text-slate-600 hover:bg-slate-50 ${T.xs}`}
+              />
+            </div>
           </div>
 
           <label className="w-[300px] shrink-0">
