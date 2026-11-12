@@ -948,7 +948,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
                               <button
                                 type="button"
                                 role="menuitem"
-                                onClick={() => navigate(`/partnerdetails/${row.store_id}`)}
+                                onClick={() => navigate(`/partner-details-v2/${row.store_id}`)}
                                 className="px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
                               >
                                 Open partner profile

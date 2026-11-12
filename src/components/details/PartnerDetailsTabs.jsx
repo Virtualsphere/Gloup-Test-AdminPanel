@@ -769,7 +769,7 @@ const MonthlyBookings = ({ storeId }) => {
                 </Td>
                 <Td right className="font-semibold text-slate-900">{money(row.amount)}</Td>
                 <Td right>
-                  <button type="button" onClick={() => navigate(`/bookings/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
+                  <button type="button" onClick={() => navigate(`/booking-details-v2/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
                     View
                   </button>
                 </Td>
@@ -834,7 +834,7 @@ export const BookingsTab = ({ storeId, recent, loading }) => {
                         <Tag tone={tone}>{label}</Tag>
                       </Td>
                       <Td right>
-                        <button type="button" onClick={() => navigate(`/bookings/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
+                        <button type="button" onClick={() => navigate(`/booking-details-v2/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
                           View
                         </button>
                       </Td>
@@ -1417,7 +1417,7 @@ export const ReviewsTab = ({ storeId }) => {
               onChange={filter(setStatus)}
               options={[{ value: "all", label: "All status" }, ...Object.keys(REVIEW_STATUS_TONES).map((s) => ({ value: s, label: s }))]}
             />
-            <LinkButton onClick={() => navigate("/review")}>Moderate in Reviews</LinkButton>
+            <LinkButton onClick={() => navigate("/reviews-ratings-v2")}>Moderate in Reviews</LinkButton>
           </span>
         }
       />
@@ -1650,7 +1650,7 @@ export const SubscriptionsTab = ({ storeId, subscription, loading }) => {
         <CardHeader
           title="Subscription"
           subtitle="A flat monthly fee (+18% GST), recovered from the salon's invoice payouts"
-          right={<LinkButton onClick={() => navigate("/partner-subscriptions")}>Manage in Partner Subscriptions</LinkButton>}
+          right={<LinkButton onClick={() => navigate("/partner-subscriptions-v2")}>Manage in Partner Subscriptions</LinkButton>}
         />
         {loading && !subscription && history.loading ? (
           <EmptyNote>Loading…</EmptyNote>

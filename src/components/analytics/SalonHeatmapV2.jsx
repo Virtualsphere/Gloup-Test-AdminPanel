@@ -493,7 +493,7 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
 
       <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`@container flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - KPI tiles */}
-        <div className={`grid ${KPI_COLS} ${GAP}`}>
+        <div data-testid="heatmap-kpis" className={`grid ${KPI_COLS} ${GAP}`}>
           {kpis.map(({ icon, tint, ...kpi }) => (
             <KpiTile key={kpi.label} {...kpi} icon={icon} iconTint={tint} />
           ))}
@@ -502,7 +502,7 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
         {/* Row 2 - Map / top performing areas */}
         <Card className="overflow-hidden">
           <div className={`grid ${MAP_COLS}`}>
-            <div className="relative min-h-[790px] overflow-hidden">
+            <div data-testid="heatmap-map" className="relative min-h-[790px] overflow-hidden">
               {HAS_MAPS_KEY ? (
                 <LiveHeatMap metric={metric} areas={mappable} />
               ) : (
@@ -511,7 +511,7 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
               <MapMetricSelect value={metric} onChange={setMetric} />
             </div>
 
-            <div className="flex min-w-0 flex-col border-l border-[#E6E8F0] px-6 pb-6 pt-7">
+            <div data-testid="heatmap-ranking" className="flex min-w-0 flex-col border-l border-[#E6E8F0] px-6 pb-6 pt-7">
               <div className="flex items-center justify-between gap-3">
                 <h2 className={`truncate font-bold tracking-tight text-slate-900 ${T.title}`}>Top Performing Areas</h2>
                 <BaseSelect value={metric} onChange={setMetric} options={RANK_METRIC_OPTIONS} size={T.tiny} className="w-[118px] [&_select]:py-1.5" />

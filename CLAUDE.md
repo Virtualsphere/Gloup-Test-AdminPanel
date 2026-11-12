@@ -15,7 +15,15 @@ npm run preview   # serve the built dist/
 npm run lint      # eslint .
 ```
 
-There is **no test framework configured** — no test runner, no test files, no `npm test`. Don't look for one; verification is `npm run lint` + `npm run build`, or driving the app in the browser.
+### End-to-end tests (Playwright)
+
+```bash
+npm run test:e2e          # run all tests headless (starts the dev server itself, or reuses one on :5173)
+npm run test:e2e:ui       # Playwright UI mode
+npm run test:e2e:report   # open the last HTML report
+```
+
+Config is [playwright.config.js](playwright.config.js); tests live in `tests/` as `*.spec.js`. Only the `chromium` project is configured. Tests are written one at a time as the user asks for them — **don't add test cases on your own**. There are no unit tests and CI does not run the e2e suite; other verification is `npm run lint` + `npm run build`. After a fresh clone, run `npx playwright install chromium` once to download the browser.
 
 `npm run lint` currently reports ~159 warnings and **0 errors**. That is the expected baseline: `eslint.config.js` deliberately downgrades legacy style debt (`no-unused-vars`, `no-undef`, `react-hooks/exhaustive-deps`) to warnings so CI passes. Only introduce zero new *errors*; don't try to clear the warning backlog wholesale.
 

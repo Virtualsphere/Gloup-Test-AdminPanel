@@ -969,20 +969,23 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                 */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-7 ${WRAP[7]} ${GAP}`}>
+        {/* Wrapped, the seven stay on one row instead of 4 + 3 (which left
+            each tile half empty): the icon moves above the text, so a tile
+            is only as wide as its numbers. */}
+        <div className={`grid grid-cols-7 ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             <div
               key={kpi.label}
-              className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#E3E7EF] bg-white p-3.5"
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#E3E7EF] bg-white p-3.5 wrapped:flex-col wrapped:items-start wrapped:gap-2 wrapped:p-3"
             >
               <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl wrapped:h-8 wrapped:w-8 wrapped:rounded-lg"
                 style={{ background: kpi.tint }}
               >
-                <Icon size={20} style={{ color: kpi.color }} />
+                <Icon size={20} className="wrapped:size-4" style={{ color: kpi.color }} />
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 wrapped:w-full">
                 <p className={`truncate text-slate-500 ${T.base}`}>{kpi.label}</p>
                 <p
                   className={`mt-0.5 whitespace-nowrap font-extrabold tracking-tight text-slate-900 ${T.kpi}`}
