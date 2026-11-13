@@ -44,6 +44,7 @@ import {
   fetchUserSegmentsV2,
 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
+import { OVERALL, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, toSpark, WRAP } from "../v2/tokens";
@@ -63,6 +64,7 @@ import {
   Segmented as BaseSegmented,
   Select as BaseSelect,
 } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
 
 // ---------------------------------------------------------------------------
 // The approved "User Analytics 360°" mockup, on a fixed DESIGN_WIDTH canvas
@@ -280,13 +282,14 @@ const PageHeader = ({ title, range, period, setPeriod, onCustom, platform, setPl
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton active={period === OVERALL} onClick={() => setPeriod(OVERALL)} color={INDIGO} className="hidden lg:flex" />
         <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="ua360-range" maxDays={92} className="relative hidden lg:block" />
         <HeaderSelect
           icon={CalendarDays}
           label="Period"
           value={period}
           onChange={setPeriod}
-          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : [])]}
+          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []), ...(period === OVERALL ? [OVERALL_OPTION] : [])]}
           className="hidden lg:flex"
         />
         <HeaderSelect icon={MonitorSmartphone} label="Platform" value={platform} onChange={setPlatform} options={PLATFORMS} className="hidden xl:flex" />
@@ -318,6 +321,7 @@ const UserAnalytics360V2 = ({ title = "User Analytics 360°" }) => {
 
   const range = useMemo(() => {
     if (period === "custom" && custom) return custom;
+    if (period === OVERALL) return overallRange();
     const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[0]).range();
     return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
   }, [period, custom]);
@@ -396,9 +400,14 @@ const UserAnalytics360V2 = ({ title = "User Analytics 360°" }) => {
   const prevStickiness = isNum(pm.dau) && pm.mau ? (pm.dau / pm.mau) * 100 : null;
 
   // ---- 1. Funnel --------------------------------------------------------------
+  // Not a strict funnel: Logins / Salon Views / Checkout count every active
+  // user, not just the period's sign-ups, so later steps can outnumber the
+  // first. % stays relative to the first step (as on User Analytics Overview);
+  // bar lengths (`fill`, 0-1) are relative to the largest step.
   const funnelRaw = (ov?.funnel || []).filter((s) => isNum(s.users));
   const funnelTop = funnelRaw[0]?.users || 0;
-  const funnel = funnelRaw.map((s, i) => ({ ...s, pct: share(s.users, funnelTop), width: funnelTop ? Math.max(18, (s.users / funnelTop) * 100) : 18, color: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }));
+  const funnelMax = Math.max(0, ...funnelRaw.map((s) => s.users));
+  const funnel = funnelRaw.map((s, i) => ({ ...s, pct: share(s.users, funnelTop), fill: funnelMax ? s.users / funnelMax : 0, color: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }));
   const overall = funnel.length > 1 ? funnel[funnel.length - 1].pct : null;
   const drops = funnel.slice(1).map((s, i) => ({ from: funnel[i].label, to: s.label, rate: funnel[i].users ? ((funnel[i].users - s.users) / funnel[i].users) * 100 : null }));
   const biggestDrop = [...drops].filter((d) => isNum(d.rate)).sort((a, b) => b.rate - a.rate)[0];
@@ -605,21 +614,23 @@ const UserAnalytics360V2 = ({ title = "User Analytics 360°" }) => {
             <CardHeader title={<Title index={1}>User Journey Funnel</Title>} subtitle="Unique users per step in the period" />
             {funnel.length ? (
               <div className="mt-3 flex flex-1 gap-4">
-                <ul className="flex min-w-0 flex-1 flex-col justify-between gap-1.5">
-                  {funnel.map((row) => {
-                    const inside = row.width > 55;
-                    return (
-                      <li key={row.key} className="relative h-[26px]">
-                        <span className={`absolute left-0 top-0 flex h-full items-center rounded-md px-2.5 font-semibold text-white ${T.xs}`} style={{ width: `${row.width}%`, background: row.color }}>
-                          <span className="truncate leading-tight">{row.label}</span>
-                        </span>
-                        <span className={`absolute top-1/2 -translate-y-1/2 whitespace-nowrap font-semibold ${T.xs} ${inside ? "text-white" : "text-slate-800"}`} style={{ left: inside ? `${row.width * 0.62}%` : `${row.width + 3}%` }}>
-                          {num(row.users)}
-                        </span>
-                        <span className={`absolute right-0 top-1/2 -translate-y-1/2 pr-2 ${T.xs} ${row.width > 90 ? "font-semibold text-white" : "pr-0 text-slate-600"}`}>{fmtPct(row.pct)}</span>
-                      </li>
-                    );
-                  })}
+                {/* Each bar is a label block (as wide as the longest label, so
+                    every bar starts level and no label is cut) plus a tail whose
+                    length is the step's share of the largest step; the count
+                    follows the bar and the % sits in its own column. */}
+                <ul className={`grid min-w-0 flex-1 grid-cols-[max-content_minmax(0,1fr)_auto] content-between items-center gap-y-1.5 leading-tight ${T.xs}`}>
+                  {funnel.map((row) => (
+                    <li key={row.key} className="contents">
+                      <span className="flex h-[26px] items-center whitespace-nowrap rounded-l-md pl-2.5 pr-1 font-semibold text-white" style={{ background: row.color }}>
+                        {row.label}
+                      </span>
+                      <span className="flex h-[26px] min-w-0 items-center">
+                        <span className="h-full shrink-0 rounded-r-md" style={{ width: `calc(8px + (100% - 52px) * ${row.fill})`, background: row.color }} />
+                        <span className="ml-2 whitespace-nowrap font-semibold text-slate-800">{num(row.users)}</span>
+                      </span>
+                      <span className="whitespace-nowrap pl-3 text-right text-slate-600">{fmtPct(row.pct)}</span>
+                    </li>
+                  ))}
                 </ul>
 
                 <div className="flex w-[148px] shrink-0 flex-col">

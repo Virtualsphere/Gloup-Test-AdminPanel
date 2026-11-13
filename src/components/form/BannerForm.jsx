@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { X, Save, UploadCloud } from "lucide-react";
 import { getImageUrl } from "../../utils/image";
+import SelectMenu from "../common/Select";
 
 const BannerForm = ({
   onSubmit,
@@ -157,7 +158,7 @@ const onFormSubmit = async (data) => {
           <label className="text-sm text-gray-600 mb-1 block">
             App Type
           </label>
-          <select
+          <SelectMenu
             {...register("appType", { required: "Required" })}
             className={`w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black ${
               errors.appType ? "border-red-500" : "border-gray-200"
@@ -167,7 +168,7 @@ const onFormSubmit = async (data) => {
             <option value="partner">Partner</option>
             <option value="user">User</option>
             <option value="web">Website</option>
-          </select>
+          </SelectMenu>
         </div>
 
         {/* TYPE */}
@@ -178,7 +179,7 @@ const onFormSubmit = async (data) => {
             <label className="text-sm text-gray-600 mb-1 block">
               Type
             </label>
-            <select
+            <SelectMenu
               {...register("type", { required: "Required" })}
               className={`w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black ${
                 errors.type ? "border-red-500" : "border-gray-200"
@@ -190,7 +191,7 @@ const onFormSubmit = async (data) => {
               {watch("appType") === "web" && (
                 <option value="sub2">Section Two</option>
               )}
-            </select>
+            </SelectMenu>
           </div>
         )}
 
@@ -199,7 +200,7 @@ const onFormSubmit = async (data) => {
           <label className="text-sm text-gray-600 mb-1 block">
             Subscription Type
           </label>
-          <select
+          <SelectMenu
             {...register("issub", { required: "Required" })}
             className="w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black border-gray-200"
           >
@@ -208,7 +209,7 @@ const onFormSubmit = async (data) => {
               <option value="true">Subscription</option>
             )}
             <option value="false">Normal</option>
-          </select>
+          </SelectMenu>
         </div>
 
         {/* PARTNER */}
@@ -217,7 +218,7 @@ const onFormSubmit = async (data) => {
             <label className="text-sm text-gray-600 mb-1 block">
               Partner
             </label>
-            <select
+            <SelectMenu
               {...register("id")}
               className="w-full px-4 py-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-black border-gray-200"
             >
@@ -227,7 +228,7 @@ const onFormSubmit = async (data) => {
                   {p.label}
                 </option>
               ))}
-            </select>
+            </SelectMenu>
           </div>
         )}
 

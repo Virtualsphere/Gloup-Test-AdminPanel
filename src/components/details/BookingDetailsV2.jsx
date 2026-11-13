@@ -755,7 +755,7 @@ const BookingDetailsV2 = () => {
                   {salonId && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/partnerdetails/${salonId}`)}
+                      onClick={() => navigate(`/partner-details-v2/${salonId}`)}
                       title="Open the salon"
                       aria-label="Open the salon"
                       className="shrink-0 text-slate-400 hover:text-slate-700"

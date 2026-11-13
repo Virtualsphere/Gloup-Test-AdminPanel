@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { fetchGrowthDashboardV2, fetchGrowthListV2, sendBulkUserPushV2 } from "../../redux/slices/analyticsSlice";
 import { downloadXlsx } from "../../utils/excelExport";
+import { OVERALL, OVERALL_FROM, OVERALL_LABEL, OVERALL_OPTION } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
@@ -47,6 +48,8 @@ import {
   Meter,
   PushDialog,
 } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // The approved "Dashboard - Real-time intelligence to grow GloUp" mockup (a
@@ -163,6 +166,8 @@ const periodRange = (key, date) => {
       return [d.clone().startOf("isoWeek"), d.clone()];
     case "last_90":
       return [d.clone().subtract(89, "days"), d.clone()];
+    case OVERALL:
+      return [moment(OVERALL_FROM), d.clone()];
     default:
       return [d.clone().startOf("month"), d.clone()];
   }
@@ -326,14 +331,21 @@ const PageHeader = ({ title, date, setDate, dateOptions, period, setPeriod, refr
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
         <HeaderSelect icon={CalendarDays} label="Date" value={date} onChange={setDate} options={dateOptions} className="hidden lg:flex" />
-        <HeaderSelect label="Period" value={period} onChange={setPeriod} options={PERIODS} className="hidden xl:flex" />
+        <OverallButton active={period === OVERALL} onClick={() => setPeriod(OVERALL)} color={BRAND} className="hidden xl:flex" />
+        <HeaderSelect
+          label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={period === OVERALL ? [...PERIODS, OVERALL_OPTION] : PERIODS}
+          className="hidden xl:flex"
+        />
 
         <span className="hidden items-center gap-2 xl:flex">
           <span className={`h-2 w-2 shrink-0 rounded-full ${refresh !== "0" ? "bg-emerald-500" : "bg-slate-300"}`} />
           <span className="leading-tight">
             <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-700">Auto refresh</span>
             <span className="relative block">
-              <select
+              <SelectMenu
                 value={refresh}
                 onChange={(e) => setRefresh(e.target.value)}
                 aria-label="Auto refresh interval"
@@ -344,7 +356,7 @@ const PageHeader = ({ title, date, setDate, dateOptions, period, setPeriod, refr
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </SelectMenu>
               <ChevronDown size={10} className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400" />
             </span>
           </span>
@@ -412,7 +424,7 @@ const GrowthDashboardV2 = ({ title = "Dashboard" }) => {
   const k = data?.kpis || {};
   const shown = (v, fmt = fmtInt) => (loading ? "…" : fmt(v));
   const dayLabel = date === today ? "Today" : moment(date).format("D MMM");
-  const periodLabel = PERIODS.find((p) => p.value === period)?.label;
+  const periodLabel = period === OVERALL ? OVERALL_LABEL : PERIODS.find((p) => p.value === period)?.label;
   const monthLabel = period === "this_month" ? moment(date).format("MMM") : periodLabel;
 
   const fetchList = useCallback(

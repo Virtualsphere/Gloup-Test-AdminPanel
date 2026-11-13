@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
-import DatePicker from "react-datepicker";
 import { format, startOfDay, isBefore } from "date-fns";
 import { toast, Toaster } from "react-hot-toast";
 import { CalendarOff, Trash2 } from "lucide-react";
@@ -13,7 +12,8 @@ import {
   removeWeeklyHoliday,
   clearHolidays,
 } from "../../redux/slices/holidaySlice";
-import "react-datepicker/dist/react-datepicker.css";
+import { DatePicker } from "../common/DatePicker";
+import { parseYmd } from "../../utils/dateValue";
 
 export const WEEKDAY_LABELS = [
   { value: 0, label: "Sun", full: "Sunday" },
@@ -265,11 +265,11 @@ const PartnerHolidaysPanel = ({
               Date
             </label>
             <DatePicker
-              selected={holidayDate}
-              onChange={(d) => d && setHolidayDate(d)}
-              dateFormat="yyyy-MM-dd"
-              calendarClassName="custom-datepicker"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formatYmd(holidayDate)}
+              onChange={(v) => v && setHolidayDate(parseYmd(v))}
+              displayFormat="yyyy-MM-dd"
+              ariaLabel="Holiday date"
+              className="flex w-full items-center gap-2 px-3 py-2 border border-gray-300 rounded-md bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div className="flex gap-2">

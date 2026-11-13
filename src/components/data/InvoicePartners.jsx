@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, Phone, Mail, ChevronRight } from "lucide-react";
 import { fetchInvoicePartners } from "../../redux/slices/invoiceSlice";
+import { DatePicker } from "../common/DatePicker";
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -72,11 +73,10 @@ const InvoicePartners = ({ title }) => {
       <div className="flex flex-wrap items-end gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="w-full sm:w-48">
           <label className="block text-xs text-gray-500 mb-1">Date</label>
-          <input
-            type="date"
+          <DatePicker
             value={selectedDate}
-            onChange={(e) => updateParam("date", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            onChange={(v) => updateParam("date", v)}
+            ariaLabel="Date"
           />
         </div>
 

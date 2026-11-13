@@ -1,8 +1,8 @@
 import { useForm, Controller } from "react-hook-form";
 import { Save, X } from "lucide-react";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
+import { DatePicker } from "../common/DatePicker";
+import SelectMenu from "../common/Select";
 const CouponForm = ({
   onSubmit,
   onCancel,
@@ -120,7 +120,7 @@ const CouponForm = ({
               <label className="text-sm font-medium text-gray-700 mb-1">
                 Discount Type
               </label>
-              <select
+              <SelectMenu
                 {...register("discount_type", { required: "Discount Type is required" })}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   errors.discount_type
@@ -131,7 +131,7 @@ const CouponForm = ({
                 <option value="">Select Discount Type</option>
                 <option value="flat">Flat</option>
                 <option value="percentage">Percentage</option>
-              </select>
+              </SelectMenu>
               {errors.discount_type && (
                 <p className="text-sm text-red-500 mt-1">
                   {errors.discount_type.message}
@@ -173,23 +173,17 @@ const CouponForm = ({
           rules={{ required: "Start date is required" }}
           render={({ field }) => (
             <DatePicker
-              selected={field.value ? new Date(field.value) : null}
-              onChange={(date) => {
-                field.onChange(date ? format(date, "yyyy-MM-dd") : null);
-              }}
-              // onChange={(date) => {
-              //   field.onChange(date?.toISOString().split("T")[0]); // sets "YYYY-MM-DD"
-              // }}
-              placeholderText="Pick start date"
-              dateFormat="dd, MMMM, yyyy"
-              minDate={new Date()} 
-              
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+              value={field.value || ""}
+              onChange={(v) => field.onChange(v || null)}
+              placeholder="Pick start date"
+              displayFormat="dd, MMMM, yyyy"
+              min={format(new Date(), "yyyy-MM-dd")}
+              ariaLabel="Start date"
+              className={`flex w-full items-center gap-2 px-3 py-2 border rounded-md bg-white text-left focus:outline-none focus:ring-2 ${
                 errors.start_date
                   ? "border-red-500 focus:ring-red-500"
                   : "border-gray-300 focus:ring-blue-500"
               }`}
-              calendarClassName="custom-datepicker"
             />
           )}
         />
@@ -223,26 +217,20 @@ const CouponForm = ({
             }}
             render={({ field }) => (
               <DatePicker
-                selected={field.value ? new Date(field.value) : null}
-                onChange={(date) => {
-                field.onChange(date ? format(date, "yyyy-MM-dd") : null);
-              }}
-                // onChange={(date) =>
-                //   field.onChange(date?.toISOString().split("T")[0])
-                // }
-                placeholderText="Pick end date"
-                dateFormat="dd, MMMM, yyyy"
-                minDate={
-                  watch("start_date")
-                    ? new Date(new Date(watch("start_date")).getTime() + 86400000)
-                    : new Date()
-                }
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                  errors.end_date
-                    ? "border-red-500 focus:ring-red-500"
-                    : "border-gray-300 focus:ring-blue-500"
-                }`}
-                calendarClassName="custom-datepicker"
+                value={field.value || ""}
+                onChange={(v) => field.onChange(v || null)}
+                placeholder="Pick end date"
+                displayFormat="dd, MMMM, yyyy"
+                min={format(
+                  watch("start_date") ? addDays(new Date(watch("start_date")), 1) : new Date(),
+                  "yyyy-MM-dd"
+                )}
+                ariaLabel="End date"
+                className={`flex w-full items-center gap-2 px-3 py-2 border rounded-md bg-white text-left focus:outline-none focus:ring-2 ${
+                errors.end_date
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-gray-300 focus:ring-blue-500"
+              }`}
               />
             )}
           />

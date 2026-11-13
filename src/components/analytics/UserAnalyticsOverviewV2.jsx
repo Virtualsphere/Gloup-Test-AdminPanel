@@ -28,6 +28,7 @@ import {
 import { fetchUserAnalyticsOverviewV2, fetchUserRetentionV2, fetchUserSegmentsV2 } from "../../redux/slices/analyticsSlice";
 import { getUsersSummaryV2 } from "../../redux/slices/allUsersSlice";
 import { downloadCsv } from "../../utils/format";
+import { OVERALL, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP, WRAP_FLOW, WRAP_WIDE } from "../v2/tokens";
@@ -45,6 +46,7 @@ import {
   RampLegend,
   Select as BaseSelect,
 } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
 
 // ---------------------------------------------------------------------------
 // The approved "User Analytics" mockup (the overview; a separate page from the
@@ -351,6 +353,7 @@ const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, 
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton active={period === OVERALL} onClick={() => setPeriod(OVERALL)} color={VIOLET} className="hidden lg:flex" />
         <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={VIOLET} toastId="uao-range" className="relative hidden lg:block" />
         <HeaderSelect
           label="Period"
@@ -359,6 +362,7 @@ const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, 
           options={[
             ...PERIODS.map((p) => ({ value: p.key, label: p.label })),
             ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []),
+            ...(period === OVERALL ? [OVERALL_OPTION] : []),
           ]}
           className="hidden lg:flex"
         />
@@ -387,6 +391,7 @@ const UserAnalyticsOverviewV2 = ({ title = "User Analytics" }) => {
 
   const range = useMemo(() => {
     if (period === "custom" && custom) return custom;
+    if (period === OVERALL) return overallRange();
     const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[0]).range();
     return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
   }, [period, custom]);

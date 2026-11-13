@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { Save, X, ImagePlus, Trash2 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { LOYALTY_TIERS } from "../../utils/loyalty";
+import SelectMenu from "../common/Select";
 
 const parseLoyaltyDefault = (raw) => {
   if (!raw) return [];
@@ -172,7 +173,7 @@ const NotificationForm = ({
         <label className="text-sm font-medium text-gray-700 mb-1">
           Notification Type
         </label>
-        <select
+        <SelectMenu
           {...register("notification_type", {
             required: "Notification Type is required",
           })}
@@ -185,7 +186,7 @@ const NotificationForm = ({
           <option value="">Select Notification Type</option>
           <option value="general">General</option>
           <option value="subscription">Subscription</option>
-        </select>
+        </SelectMenu>
         {errors.notification_type && (
           <p className="text-sm text-red-500 mt-1">
             {errors.notification_type.message}
@@ -198,7 +199,7 @@ const NotificationForm = ({
           <label className="text-sm font-medium text-gray-700 mb-1">
             Partner
           </label>
-          <select
+          <SelectMenu
             {...register("store_id", { required: "Partner is required" })}
             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
               errors.store_id
@@ -212,7 +213,7 @@ const NotificationForm = ({
                 {partner.label}
               </option>
             ))}
-          </select>
+          </SelectMenu>
           {errors.store_id && (
             <p className="mt-1 text-sm text-red-500">
               {errors.store_id.message}
@@ -223,7 +224,7 @@ const NotificationForm = ({
 
       <div className="flex flex-col">
         <label className="text-sm font-medium text-gray-700 mb-1">Sent To</label>
-        <select
+        <SelectMenu
           {...register("sent_to", { required: "Sent To is required" })}
           disabled={loyaltySelected.length > 0}
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
@@ -238,7 +239,7 @@ const NotificationForm = ({
               {option.label}
             </option>
           ))}
-        </select>
+        </SelectMenu>
         {loyaltySelected.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">
             Loyalty filter targets customers only (Sent To = User).

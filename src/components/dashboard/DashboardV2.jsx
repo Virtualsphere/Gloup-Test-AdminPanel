@@ -38,10 +38,14 @@ import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
 import { HeaderBell, HeaderSelect } from "../v2/ui";
+import { DateRangePicker } from "../common/DatePicker";
+import OverallButton from "../common/OverallButton";
+import { OVERALL, OVERALL_FROM, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import {
   getDashboardV2Alerts,
   getDashboardV2Metrics,
 } from "../../redux/slices/dashboardSlice";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved executive dashboard mockup, on a
@@ -166,10 +170,12 @@ const resolvePeriod = (period, today, custom) => {
   const thisMonth = monthKeyOf(t);
   const year = t.getFullYear();
 
-  if (period === CUSTOM_PERIOD && custom) {
-    const len = daysBetween(custom.from, custom.to);
+  // Overall (OVERALL_FROM to today) compares like a custom range.
+  if ((period === CUSTOM_PERIOD && custom) || period === OVERALL) {
+    const { from: start, to: end } = period === OVERALL ? overallRange(today) : custom;
+    const len = daysBetween(start, end);
     const ranges = [0, 1, 2].map((i) => {
-      const from = addDays(custom.from, -len * i);
+      const from = addDays(start, -len * i);
       const to = addDays(from, len - 1);
       return { from, to, label: `${fmtDay(from)} – ${fmtDay(to)}` };
     });
@@ -327,7 +333,7 @@ const ViewLink = ({ children, onClick }) => (
 
 const Select = ({ value, onChange, options, compact = false }) => (
   <div className="relative shrink-0">
-    <select
+    <SelectMenu
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={`appearance-none rounded-xl border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none ${compact ? `py-1.5 pl-2.5 pr-6 ${T.base}` : `py-2 pl-3 pr-7 ${T.md}`
@@ -336,7 +342,7 @@ const Select = ({ value, onChange, options, compact = false }) => (
       {options.map((o) => (
         <option key={o}>{o}</option>
       ))}
-    </select>
+    </SelectMenu>
     <ChevronDown
       size={compact ? 11 : 13}
       className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -494,65 +500,11 @@ const lowerBetterStatus = (pct) => {
   return { status: "STABLE", logic: `Within ±${LOWER_BETTER_BAND}%` };
 };
 
-// Popover under the date pill for picking any from/to range. Absolutely
-// positioned inside the canvas (not fixed), so the scaling doesn't trap it.
-const DateRangePicker = ({ initial, today, onApply, onClose }) => {
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
-  const error = !from || !to
-    ? "Pick both dates"
-    : from > to
-      ? "Start date must be before end date"
-      : to > today
-        ? "End date can't be in the future"
-        : null;
-
-  return (
-    <div className="absolute right-0 top-full z-20 mt-2 w-[280px] rounded-2xl border border-[#E3E7EF] bg-white p-4 shadow-lg">
-      <p className={`mb-3 font-bold text-slate-900 ${T.md}`}>Custom date range</p>
-      {[
-        ["From", from, setFrom],
-        ["To", to, setTo],
-      ].map(([label, value, set]) => (
-        <label key={label} className={`mb-2 flex items-center justify-between gap-3 text-slate-600 ${T.base}`}>
-          {label}
-          <input
-            type="date"
-            value={value}
-            max={today}
-            onChange={(e) => set(e.target.value)}
-            className={`rounded-lg border border-slate-200 px-2 py-1.5 text-slate-800 focus:outline-none ${T.base}`}
-          />
-        </label>
-      ))}
-      <p className={`min-h-[16px] text-rose-500 ${T.sm}`}>{error}</p>
-      <div className="mt-2 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className={`rounded-lg px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-100 ${T.base}`}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={!!error}
-          onClick={() => onApply({ from, to })}
-          className={`rounded-lg px-3 py-1.5 font-semibold text-white disabled:opacity-40 ${T.base}`}
-          style={{ background: BRAND }}
-        >
-          Apply
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const HOW_IT_WORKS = [
   {
     title: "Filters",
     items: [
-      "The period dropdown (or a custom range from the date pill) drives the KPI tiles, the scorecard, the comparison tables and the monthly charts. Every change is compared with the equal period just before it: whole months for This / Last Month, the previous week, the previous 90 days, the previous year, or the same number of days before a custom range.",
+      `The period dropdown (or a custom range from the date pill, or Overall: ${fmtDay(OVERALL_FROM)} ${OVERALL_FROM.slice(0, 4)} to today) drives the KPI tiles, the scorecard, the comparison tables and the monthly charts. Every change is compared with the equal period just before it: whole months for This / Last Month, the previous week, the previous 90 days, the previous year, or the same number of days before a custom range or Overall.`,
       "The Bookings & Revenue and Acquisition cards have their own filter. \"Last 6 Months\" is compared with the 6 months before it.",
       "The growth, partner, subscription and cancellation charts show the 3 calendar months ending with the selected period.",
     ],
@@ -656,7 +608,6 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const [bookingsWindow, setBookingsWindow] = useState("This Month");
   const [acquisitionWindow, setAcquisitionWindow] = useState("This Month");
   const [customRange, setCustomRange] = useState(null);
-  const [showRangePicker, setShowRangePicker] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState([]);
@@ -684,7 +635,6 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
   const applyCustomRange = (range) => {
     setCustomRange(range);
     setPeriod(CUSTOM_PERIOD);
-    setShowRangePicker(false);
   };
   const closeHowItWorks = useCallback(() => setShowHowItWorks(false), []);
 
@@ -929,32 +879,41 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
+          <OverallButton
+            active={period === OVERALL}
+            onClick={() => selectPeriod(OVERALL)}
+            color={BRAND}
+            className="hidden md:flex"
+          />
+
           <div className="relative hidden md:block">
-            <button
-              type="button"
-              onClick={() => setShowRangePicker((open) => !open)}
+            <DateRangePicker
+              from={curRange.from}
+              to={curRange.to}
+              max={today}
+              onChange={(from, to) => applyCustomRange({ from, to })}
+              align="right"
+              ariaLabel="Custom date range"
               className={`flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white py-1.5 pl-2.5 pr-2 text-[12px] font-medium text-slate-700 hover:border-slate-300 ${
                 period === CUSTOM_PERIOD ? "border-[#5B21F0]" : "border-gray-200"
               }`}
             >
               {rangeLabel}
               <CalendarDays size={14} className="shrink-0 text-slate-500" />
-            </button>
-            {showRangePicker && (
-              <DateRangePicker
-                initial={curRange}
-                today={today}
-                onApply={applyCustomRange}
-                onClose={() => setShowRangePicker(false)}
-              />
-            )}
+            </DateRangePicker>
           </div>
 
           <HeaderSelect
             label="Period"
             value={period}
             onChange={selectPeriod}
-            options={period === CUSTOM_PERIOD ? [...PERIODS, CUSTOM_PERIOD] : PERIODS}
+            options={
+              period === CUSTOM_PERIOD
+                ? [...PERIODS, CUSTOM_PERIOD]
+                : period === OVERALL
+                  ? [...PERIODS, OVERALL_OPTION]
+                  : PERIODS
+            }
           />
 
           <span className="hidden items-center gap-2 xl:flex">
@@ -964,7 +923,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
             <span className="leading-tight">
               <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-700">Auto refresh</span>
               <span className="relative block">
-                <select
+                <SelectMenu
                   value={refreshInterval}
                   onChange={(e) => setRefreshInterval(e.target.value)}
                   aria-label="Auto refresh interval"
@@ -973,7 +932,7 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
                   {Object.keys(REFRESH_MS).map((o) => (
                     <option key={o}>{o}</option>
                   ))}
-                </select>
+                </SelectMenu>
                 <ChevronDown
                   size={10}
                   className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"
@@ -1010,20 +969,23 @@ const DashboardV2 = ({ title = "Dashboard" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                 */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-7 ${WRAP[7]} ${GAP}`}>
+        {/* Wrapped, the seven stay on one row instead of 4 + 3 (which left
+            each tile half empty): the icon moves above the text, so a tile
+            is only as wide as its numbers. */}
+        <div className={`grid grid-cols-7 ${GAP}`}>
           {kpis.map(({ icon: Icon, ...kpi }) => (
             <div
               key={kpi.label}
-              className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#E3E7EF] bg-white p-3.5"
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#E3E7EF] bg-white p-3.5 wrapped:flex-col wrapped:items-start wrapped:gap-2 wrapped:p-3"
             >
               <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl wrapped:h-8 wrapped:w-8 wrapped:rounded-lg"
                 style={{ background: kpi.tint }}
               >
-                <Icon size={20} style={{ color: kpi.color }} />
+                <Icon size={20} className="wrapped:size-4" style={{ color: kpi.color }} />
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 wrapped:w-full">
                 <p className={`truncate text-slate-500 ${T.base}`}>{kpi.label}</p>
                 <p
                   className={`mt-0.5 whitespace-nowrap font-extrabold tracking-tight text-slate-900 ${T.kpi}`}

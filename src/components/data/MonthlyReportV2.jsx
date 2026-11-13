@@ -42,6 +42,7 @@ import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CARD, initials, WRAP } from "../v2/tokens";
 import { Card, Chip as BaseChip, HeaderBell } from "../v2/ui";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Monthly Report" mockup, on a fixed
@@ -564,7 +565,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
           <label className="w-[170px] shrink-0">
             <FieldLabel>Month</FieldLabel>
             <span className="relative block">
-              <select
+              <SelectMenu
                 value={month}
                 onChange={(e) => onFilter(setMonth)(e.target.value)}
                 className={`w-full appearance-none rounded-xl border border-[#E6E8F0] bg-white py-2 pl-3 pr-8 font-medium text-slate-700 focus:outline-none ${T.sm}`}
@@ -574,7 +575,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </SelectMenu>
               <CalendarDays size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             </span>
           </label>
@@ -650,7 +651,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
               {filtersOpen && (
                 <div className="absolute right-0 top-11 z-30 w-[240px] rounded-xl border border-[#E6E8F0] bg-white p-3 shadow-lg">
                   <FieldLabel>City</FieldLabel>
-                  <select
+                  <SelectMenu
                     value={city}
                     onChange={(e) => onFilter(setCity)(e.target.value)}
                     className={`w-full rounded-lg border border-[#E6E8F0] bg-white px-2 py-1.5 text-slate-700 focus:outline-none ${T.sm}`}
@@ -661,7 +662,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
                         {name}
                       </option>
                     ))}
-                  </select>
+                  </SelectMenu>
                   {city && (
                     <button type="button" onClick={() => onFilter(setCity)("")} className={`mt-2 font-semibold text-violet-600 ${T.xxs}`}>
                       Clear filter
@@ -673,7 +674,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
 
             <div className="relative flex w-[300px] shrink-0 items-center rounded-xl border border-[#E6E8F0] bg-white pl-3.5 pr-8">
               <span className={`shrink-0 whitespace-nowrap text-slate-400 ${T.base}`}>Sort by</span>
-              <select
+              <SelectMenu
                 value={sort}
                 onChange={(e) => onFilter(setSort)(e.target.value)}
                 className={`min-w-0 flex-1 appearance-none truncate bg-transparent py-2 pl-1.5 font-semibold text-slate-700 focus:outline-none ${T.base}`}
@@ -683,7 +684,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </SelectMenu>
               <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
 
@@ -947,7 +948,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
                               <button
                                 type="button"
                                 role="menuitem"
-                                onClick={() => navigate(`/partnerdetails/${row.store_id}`)}
+                                onClick={() => navigate(`/partner-details-v2/${row.store_id}`)}
                                 className="px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
                               >
                                 Open partner profile
@@ -1011,7 +1012,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
           <div className="flex items-center gap-2">
             <span className={`whitespace-nowrap text-slate-500 ${T.sm}`}>Rows per page</span>
             <div className="relative">
-              <select
+              <SelectMenu
                 value={rowsPerPage}
                 onChange={(e) => onFilter(setRowsPerPage)(e.target.value)}
                 className={`appearance-none rounded-lg border border-[#E6E8F0] bg-white py-1.5 pl-3 pr-7 font-medium text-slate-700 focus:outline-none ${T.sm}`}
@@ -1019,7 +1020,7 @@ const MonthlyReportV2 = ({ title = "Monthly Report" }) => {
                 {ROWS_PER_PAGE.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
-              </select>
+              </SelectMenu>
               <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
           </div>

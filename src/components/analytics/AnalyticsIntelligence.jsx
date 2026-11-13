@@ -26,6 +26,7 @@ import {
   MessageCircle,
   Rocket,
 } from "lucide-react";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // Static demo data (UI-only for now — will be wired up to the backend later)
@@ -243,7 +244,7 @@ const AnalyticsIntelligence = () => {
           </span>
 
           <div className="relative">
-            <select
+            <SelectMenu
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
               className="appearance-none text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg pl-3 pr-7 py-2 focus:outline-none"
@@ -252,7 +253,7 @@ const AnalyticsIntelligence = () => {
               <option>Last Week</option>
               <option>This Month</option>
               <option>Last Month</option>
-            </select>
+            </SelectMenu>
             <ChevronDown size={12} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           </div>
 
@@ -424,7 +425,7 @@ const AnalyticsIntelligence = () => {
             ))}
           </div>
           <div className="mt-auto pt-3 border-t border-gray-100 flex items-center gap-2">
-            <select
+            <SelectMenu
               value={messageType}
               onChange={(e) => setMessageType(e.target.value)}
               className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-2 focus:outline-none"
@@ -432,7 +433,7 @@ const AnalyticsIntelligence = () => {
               <option>WhatsApp</option>
               <option>SMS</option>
               <option>Email</option>
-            </select>
+            </SelectMenu>
             <span className="text-[11px] text-gray-400 whitespace-nowrap">1,932 users</span>
           </div>
           <button

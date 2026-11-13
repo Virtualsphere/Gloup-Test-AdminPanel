@@ -55,6 +55,7 @@ import {
 } from "../../redux/slices/reviewSlice";
 import { downloadCsv, toDate } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
+import { OVERALL, OVERALL_LABEL, overallDays } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark, WRAP } from "../v2/tokens";
@@ -68,6 +69,8 @@ import {
   Select as BaseSelect,
   Sparkline as BaseSparkline,
 } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Reviews & Ratings" mockup, on a fixed
@@ -416,9 +419,10 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
       </h1>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton active={range === OVERALL} onClick={() => setRange(OVERALL)} color={ROSE} className="hidden xl:flex" />
         <span className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 xl:flex">
           <CalendarDays size={14} className="shrink-0 text-slate-500" />
-          <select
+          <SelectMenu
             value={range}
             onChange={(e) => setRange(e.target.value)}
             className="cursor-pointer appearance-none bg-transparent pr-1 text-[12px] font-medium text-slate-600 focus:outline-none"
@@ -428,7 +432,8 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
                 {option.label}
               </option>
             ))}
-          </select>
+            {range === OVERALL && <option value={OVERALL}>{OVERALL_LABEL}</option>}
+          </SelectMenu>
           <ArrowRightLeft size={13} className="ml-1 shrink-0 text-slate-500" />
         </span>
 
@@ -712,7 +717,9 @@ const ReviewsRatingsV2 = ({ title = "Reviews & Ratings" }) => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const rangeDays = HEADER_RANGES.find((r) => r.value === headerRange)?.days ?? null;
+  // Overall is sized in days too, so it ends today and starts on OVERALL_FROM.
+  const rangeDays =
+    headerRange === OVERALL ? overallDays() : HEADER_RANGES.find((r) => r.value === headerRange)?.days ?? null;
 
   // ---- data ---------------------------------------------------------------
 

@@ -344,10 +344,11 @@ const BarTooltip = ({ active, payload, label, unit = "bookings" }) => {
   );
 };
 
-export const AnalyticsTab = ({ data, loading, periodLabel, periodSelect }) => {
-  const k = data?.kpis || {};
-  const pk = data?.previous_kpis || {};
-  const trend = (data?.trend || []).map((d) => ({ ...d, label: moment(d.day).format("D MMM") }));
+// `comparison` and `daily` are the two cards with their own date dropdown, each
+// { data, loading, k, pk, label, select }. The other cards read the page's window.
+export const AnalyticsTab = ({ data, loading, periodLabel, comparison, daily }) => {
+  const { k, pk } = comparison;
+  const trend = (daily.data?.trend || []).map((d) => ({ ...d, label: moment(d.day).format("D MMM") }));
   const split = data?.revenue_split || [];
   const splitMax = Math.max(0, ...split.map((s) => Number(s.gmv) || 0));
   const peak = data?.peak;
@@ -361,15 +362,15 @@ export const AnalyticsTab = ({ data, loading, periodLabel, periodSelect }) => {
     <div className={`flex flex-col ${GAP}`}>
       <div className={`grid grid-cols-[1.45fr_1fr] ${GAP}`}>
         <Card className={PAD}>
-          <CardHeader title="Period Comparison" subtitle={`${periodLabel} against the equal period before it`} right={periodSelect} />
-          {loading && !data ? (
+          <CardHeader title="Period Comparison" subtitle={`${comparison.label} against the equal period before it`} right={comparison.select} />
+          {comparison.loading ? (
             <EmptyNote>Loading…</EmptyNote>
           ) : (
             <table className="mt-3 w-full table-fixed border-collapse text-left">
               <thead>
                 <tr className="border-b border-slate-100">
                   <Th className="w-[34%]">Metric</Th>
-                  <Th right>{periodLabel}</Th>
+                  <Th right>{comparison.label}</Th>
                   <Th right>Previous period</Th>
                   <Th right>Change</Th>
                 </tr>
@@ -398,7 +399,7 @@ export const AnalyticsTab = ({ data, loading, periodLabel, periodSelect }) => {
         </Card>
 
         <Card className={PAD}>
-          <CardHeader title="Revenue by Category" subtitle={`GMV per service category, ${periodLabel.toLowerCase()}`} />
+          <CardHeader title="Revenue by Category" subtitle={`GMV per service category · ${periodLabel}`} />
           {split.length ? (
             <ul className="mt-4 flex flex-col gap-3.5">
               {split.map((s) => (
@@ -422,7 +423,7 @@ export const AnalyticsTab = ({ data, loading, periodLabel, periodSelect }) => {
       </div>
 
       <Card className={PAD}>
-        <CardHeader title="Daily Bookings" subtitle={periodLabel} right={periodSelect} />
+        <CardHeader title="Daily Bookings" subtitle={daily.label} right={daily.select} />
         {trend.some((d) => d.bookings) ? (
           <div className="mt-3 h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -436,7 +437,7 @@ export const AnalyticsTab = ({ data, loading, periodLabel, periodSelect }) => {
             </ResponsiveContainer>
           </div>
         ) : (
-          <EmptyNote>{loading ? "Loading…" : `No bookings in ${periodLabel.toLowerCase()}`}</EmptyNote>
+          <EmptyNote>{daily.loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
         )}
       </Card>
 
@@ -768,7 +769,7 @@ const MonthlyBookings = ({ storeId }) => {
                 </Td>
                 <Td right className="font-semibold text-slate-900">{money(row.amount)}</Td>
                 <Td right>
-                  <button type="button" onClick={() => navigate(`/bookings/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
+                  <button type="button" onClick={() => navigate(`/booking-details-v2/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
                     View
                   </button>
                 </Td>
@@ -833,7 +834,7 @@ export const BookingsTab = ({ storeId, recent, loading }) => {
                         <Tag tone={tone}>{label}</Tag>
                       </Td>
                       <Td right>
-                        <button type="button" onClick={() => navigate(`/bookings/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
+                        <button type="button" onClick={() => navigate(`/booking-details-v2/${row.id}`)} className={`font-semibold text-blue-600 hover:underline ${T.xs}`}>
                           View
                         </button>
                       </Td>
@@ -1416,7 +1417,7 @@ export const ReviewsTab = ({ storeId }) => {
               onChange={filter(setStatus)}
               options={[{ value: "all", label: "All status" }, ...Object.keys(REVIEW_STATUS_TONES).map((s) => ({ value: s, label: s }))]}
             />
-            <LinkButton onClick={() => navigate("/review")}>Moderate in Reviews</LinkButton>
+            <LinkButton onClick={() => navigate("/reviews-ratings-v2")}>Moderate in Reviews</LinkButton>
           </span>
         }
       />
@@ -1649,7 +1650,7 @@ export const SubscriptionsTab = ({ storeId, subscription, loading }) => {
         <CardHeader
           title="Subscription"
           subtitle="A flat monthly fee (+18% GST), recovered from the salon's invoice payouts"
-          right={<LinkButton onClick={() => navigate("/partner-subscriptions")}>Manage in Partner Subscriptions</LinkButton>}
+          right={<LinkButton onClick={() => navigate("/partner-subscriptions-v2")}>Manage in Partner Subscriptions</LinkButton>}
         />
         {loading && !subscription && history.loading ? (
           <EmptyNote>Loading…</EmptyNote>

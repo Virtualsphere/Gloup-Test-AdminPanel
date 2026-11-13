@@ -34,8 +34,9 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { fetchPartnerOverviewV2, fetchPartnerPickerV2, sendPartnerNotificationV2 } from "../../redux/slices/analyticsSlice";
+import { fetchPartnerCardOverviewV2, fetchPartnerOverviewV2, fetchPartnerPickerV2, sendPartnerNotificationV2 } from "../../redux/slices/analyticsSlice";
 import { deletePartner, getAllPartnersList, getPartnerDetail, updatePartnerStatus } from "../../redux/slices/partnersSlice";
+import { exportReviewsV2 } from "../../redux/slices/reviewSlice";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import { EditPartnerModal, savePartnerEdit } from "./PartnerDetails";
 import {
@@ -52,6 +53,8 @@ import {
 import { useListUiState } from "../../hooks/useListUiState";
 import { downloadCsv, pick } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
+import { OVERALL, OVERALL_FROM, OVERALL_LABEL } from "../../utils/overall";
+import OverallButton from "../common/OverallButton";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CARD, initials, toSpark, WRAP } from "../v2/tokens";
@@ -59,9 +62,11 @@ import {
   Card,
   CardHeader as BaseCardHeader,
   Chip,
+  DateRangeButton,
   Delta,
   Donut as BaseDonut,
   HeaderSearch,
+  HeaderSelect,
   HeatGrid as BaseHeatGrid,
   KpiTile as BaseKpiTile,
   RampLegend,
@@ -90,6 +95,14 @@ import {
 // Bookings / Reviews / Invoices / Monthly Report / Subscriptions pages. Edit
 // Salon and Delete Partner (More Actions) are the classic page's, saving
 // through its savePartnerEdit().
+//
+// Date filters: the range + period control beside the page actions drives the
+// Overview and Analytics tabs. A card with its own dropdown follows it until that
+// dropdown is changed, then reads its own getPartnerOverviewV2 call (not stored
+// in the slice) and only that card changes; changing the page filter puts every
+// card back on it. The API returns ratings all-time and bookings / activity as
+// "latest" lists, so those three cards filter in the browser: ratings from
+// getReviewsListV2's dated rows, the other two from the latest rows it returned.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -128,14 +141,20 @@ const DASH = "–";
 
 const TABS = ["Overview", "Analytics", "Bookings", "Services", "Offers", "Performance", "Reviews", "Payouts", "Subscriptions", "Activity Log"];
 const PERIODS = [
+  { value: "last_7", label: "Last 7 Days", range: () => [moment().subtract(6, "days"), moment()] },
+  { value: "last_30", label: "Last 30 Days", range: () => [moment().subtract(29, "days"), moment()] },
+  { value: "last_90", label: "Last 90 Days", range: () => [moment().subtract(89, "days"), moment()] },
   { value: "this_month", label: "This Month", range: () => [moment().startOf("month"), moment()] },
   {
     value: "last_month",
     label: "Last Month",
     range: () => [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")],
   },
-  { value: "last_90", label: "Last 90 Days", range: () => [moment().subtract(89, "days"), moment()] },
 ];
+const DEFAULT_PERIOD = "last_30";
+const CUSTOM_PERIOD = { value: "custom", label: "Custom" };
+// Set by the Overall button; like Custom, the dropdowns list it only while applied.
+const OVERALL_PERIOD = { value: OVERALL, label: OVERALL_LABEL, range: () => [moment(OVERALL_FROM), moment()] };
 const SPLIT_COLORS = [INDIGO, BLUE, GREEN, ORANGE, "#B8BFCE"];
 const PEAK_RAMP = ["#EEF0FD", "#C7CCFA", "#8F95F2", "#5B5FE6", "#4338CA"];
 const TYPE_LABEL = { men: "Men's Salon", women: "Women's Salon", unisex: "Unisex Salon", unknown: "Salon" };
@@ -168,6 +187,36 @@ const fmtPct = (v) => (isNum(v) ? `${Number(v).toFixed(1)}%` : DASH);
 const fmtDate = (d) => (d ? moment(d).format("MMM D, YYYY") : DASH);
 const fmtTime = (t) => (t ? moment(t, "HH:mm").format("h:mm A") : "");
 const change = (cur, prev) => (isNum(cur) && isNum(prev) && prev ? ((cur - prev) / prev) * 100 : null);
+const findPeriod = (value) =>
+  PERIODS.find((p) => p.value === value) || (value === OVERALL_PERIOD.value ? OVERALL_PERIOD : PERIODS[1]);
+const periodRange = (value) => {
+  const [from, to] = findPeriod(value).range();
+  return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
+};
+const periodName = (value) => findPeriod(value).label;
+const fmtRange = ({ from, to }) => {
+  const a = moment(from);
+  const b = moment(to);
+  return `${a.format(a.year() === b.year() ? "D MMM" : "D MMM YYYY")} – ${b.format("D MMM YYYY")}`;
+};
+const inRange = (date, { from, to }) => {
+  if (!date) return false;
+  const day = moment(date).format("YYYY-MM-DD");
+  return day >= from && day <= to;
+};
+// The Ratings & Reviews card's numbers for the reviews inside the page's window.
+const summarizeRatings = (rows) => {
+  const stars = rows.map((r) => Math.round(Number(r.rating) || 0));
+  const total = stars.length;
+  return {
+    total,
+    average: total ? Number((stars.reduce((sum, n) => sum + n, 0) / total).toFixed(1)) : 0,
+    bars: [5, 4, 3, 2, 1].map((n) => {
+      const count = stars.filter((s) => s === n).length;
+      return { stars: n, count, share: total ? (count / total) * 100 : 0 };
+    }),
+  };
+};
 const tenure = (since) => {
   if (!since) return "";
   const months = moment().diff(moment(since), "months");
@@ -182,7 +231,7 @@ const tenure = (since) => {
 
 const CardHeader = (props) => <BaseCardHeader titleSize={T.title} subtitleSize={T.tiny} {...props} />;
 
-const Select = ({ size = T.tiny, ...props }) => <BaseSelect size={size} className="w-[104px] [&_select]:py-1" {...props} />;
+const Select = ({ size = T.tiny, ...props }) => <BaseSelect size={size} className="w-[112px] [&_select]:py-1" {...props} />;
 
 const KpiTile = (props) => <BaseKpiTile sizes={{ label: T.tiny, value: T.kpi, delta: T.xs, caption: T.tiny }} iconClass="h-[46px] w-[46px] rounded-full" iconSize={22} className="px-4 py-4" {...props} />;
 
@@ -542,6 +591,39 @@ const PageHeader = ({ onPick }) => (
   </PageHeaderPortal>
 );
 
+// The cards whose own dropdown has moved them off the page's filter: card key ->
+// period, and each period's payload. A failed load puts the card back on the page.
+const useCardPeriods = (storeId) => {
+  const dispatch = useDispatch();
+  const [periods, setPeriods] = useState({});
+  const [results, setResults] = useState({});
+  const requested = useRef(new Set());
+
+  useEffect(() => {
+    if (!storeId) return;
+    new Set(Object.values(periods)).forEach((period) => {
+      const key = `${storeId}|${period}`;
+      if (requested.current.has(key)) return;
+      requested.current.add(key);
+      dispatch(fetchPartnerCardOverviewV2({ store_id: storeId, ...periodRange(period) }))
+        .unwrap()
+        .then((payload) => setResults((prev) => ({ ...prev, [key]: payload })))
+        .catch((message) => {
+          requested.current.delete(key);
+          toast.error(message || "Failed to load this card", { id: "partner-v2-card" });
+          setPeriods((prev) => Object.fromEntries(Object.entries(prev).filter(([, value]) => value !== period)));
+        });
+    });
+  }, [dispatch, storeId, periods]);
+
+  const reset = () => {
+    setPeriods({});
+    setResults({});
+    requested.current.clear();
+  };
+  return { periods, setPeriods, results, reset };
+};
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -553,7 +635,10 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const storeId = Number(id) || null;
   const { partnerOverview } = useSelector((state) => state.analytics);
   const [tab, setTab] = useState(TABS[0]);
-  const [period, setPeriod] = useState(PERIODS[0].value);
+  const [period, setPeriod] = useState(DEFAULT_PERIOD);
+  const [custom, setCustom] = useState(null); // { from, to } while period is "custom"
+  const cards = useCardPeriods(storeId);
+  const [reviews, setReviews] = useState({ rows: null, failed: false });
   const [messageOpen, setMessageOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
@@ -561,27 +646,55 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const range = useMemo(() => {
-    const [from, to] = (PERIODS.find((p) => p.value === period) || PERIODS[0]).range();
-    return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
-  }, [period]);
+  const range = useMemo(() => (period === CUSTOM_PERIOD.value && custom ? custom : periodRange(period)), [period, custom]);
 
+  // Aborting on the next filter stops a slower, older response landing last and
+  // showing the wrong window's numbers under the new filter.
   const load = () => {
-    if (!storeId) return;
-    dispatch(fetchPartnerOverviewV2({ store_id: storeId, from: range.from, to: range.to }))
-      .unwrap()
-      .catch((message) => toast.error(message || "Failed to load partner", { id: "partner-v2" }));
+    if (!storeId) return undefined;
+    const request = dispatch(fetchPartnerOverviewV2({ store_id: storeId, from: range.from, to: range.to }));
+    request.unwrap().catch((message) => {
+      if (message?.name !== "AbortError") toast.error(message || "Failed to load partner", { id: "partner-v2" });
+    });
+    return () => request.abort();
   };
   useEffect(load, [dispatch, storeId, range.from, range.to]);
+
+  useEffect(() => {
+    if (!storeId) return undefined;
+    let alive = true;
+    setReviews({ rows: null, failed: false });
+    dispatch(exportReviewsV2({ store_id: storeId, sort: "newest" }))
+      .unwrap()
+      .then((rows) => alive && setReviews({ rows, failed: false }))
+      .catch(() => alive && setReviews({ rows: [], failed: true }));
+    return () => {
+      alive = false;
+    };
+  }, [dispatch, storeId]);
+
+  // The page filter applies to every card, so it clears their own choices.
+  const applyPeriod = (value) => {
+    setPeriod(value);
+    cards.reset();
+  };
+  const applyCustom = (from, to) => {
+    setCustom({ from, to });
+    applyPeriod(CUSTOM_PERIOD.value);
+  };
 
   const pick = (sid) => navigate(`/partner-details-v2/${sid}`);
   const breadcrumb = (
     <nav aria-label="Breadcrumb" className={`flex items-center gap-2 text-slate-600 ${T.xs}`}>
       <House size={14} className="text-slate-400" />
       <ChevronRight size={12} className="text-slate-300" />
-      <button type="button" onClick={() => navigate("/partner")} className="hover:text-slate-900 hover:underline">
-        Partners
-      </button>
+      {storeId ? (
+        <button type="button" onClick={() => navigate("/partner-details-v2")} className="hover:text-slate-900 hover:underline">
+          Partners
+        </button>
+      ) : (
+        <span>Partners</span>
+      )}
       <ChevronRight size={12} className="text-slate-300" />
       <span className="font-medium text-slate-800">{title}</span>
     </nav>
@@ -607,7 +720,38 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const k = data?.kpis || {};
   const pk = data?.previous_kpis || {};
   const shown = (v, fmt = num) => (loading ? "…" : fmt(v));
-  const periodLabel = (PERIODS.find((x) => x.value === period) || PERIODS[0]).label;
+  const periodLabel = period === CUSTOM_PERIOD.value ? fmtRange(range) : periodName(period);
+  const periodOptions =
+    period === CUSTOM_PERIOD.value
+      ? [...PERIODS, CUSTOM_PERIOD]
+      : period === OVERALL_PERIOD.value
+        ? [...PERIODS, OVERALL_PERIOD]
+        : PERIODS;
+  // Numbers from the previous filter stay on screen, dimmed, until the new ones land.
+  const refreshing = partnerOverview.loading && data ? "opacity-60" : "";
+
+  // What one card reads: the page's window, or its own once its dropdown differs.
+  // Picking the page's period again puts the card back on the page.
+  const cardView = (key) => {
+    const own = cards.periods[key];
+    const select = (
+      <Select
+        value={own || period}
+        options={periodOptions}
+        onChange={(value) =>
+          cards.setPeriods((prev) => {
+            const next = { ...prev };
+            if (value === period) delete next[key];
+            else next[key] = value;
+            return next;
+          })
+        }
+      />
+    );
+    if (!own) return { data, loading, k, pk, label: periodLabel, select };
+    const payload = cards.results[`${storeId}|${own}`] || null;
+    return { data: payload, loading: !payload, k: payload?.kpis || {}, pk: payload?.previous_kpis || {}, label: periodName(own), select };
+  };
   const classic = () => navigate(`/partnerdetails/${storeId}`);
   const active = p?.status === "active";
 
@@ -663,7 +807,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
       await dispatch(deletePartner(storeId)).unwrap();
       setDeleteOpen(false);
       toast.success(`${p?.name || "Partner"} deleted`, { id: "partner-v2-delete" });
-      navigate("/partner");
+      navigate("/partner-details-v2");
     } catch (message) {
       setDeleteOpen(false);
       toast.error(typeof message === "string" ? message : "Failed to delete partner.", { id: "partner-v2-delete" });
@@ -726,8 +870,15 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
     },
   ];
 
-  const trend = data?.trend || [];
-  const trendSpark = toSpark(trend.map((d) => d.bookings));
+  const trendCard = cardView("trend");
+  const revenueCard = cardView("revenue");
+  const servicesCard = cardView("services");
+  const bookedForCard = cardView("bookedFor");
+  const retentionCard = cardView("retention");
+
+  const trend = trendCard.data?.trend || [];
+  const revenueTrend = revenueCard.data?.trend || [];
+  const trendSpark = toSpark(revenueTrend.map((d) => d.bookings));
   const periodStats = data
     ? [
         { label: "Today", value: data.periods.today },
@@ -736,9 +887,9 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
         { label: "Last Month", value: data.periods.last_month },
       ]
     : [];
-  const split = (data?.revenue_split || []).map((s, i) => ({ name: s.name, value: s.gmv, share: s.share, color: SPLIT_COLORS[i] }));
-  const topServices = data?.top_services || [];
-  const bookedFor = data?.booked_for || { self: 0, guest: 0 };
+  const split = (revenueCard.data?.revenue_split || []).map((s, i) => ({ name: s.name, value: s.gmv, share: s.share, color: SPLIT_COLORS[i] }));
+  const topServices = servicesCard.data?.top_services || [];
+  const bookedFor = bookedForCard.data?.booked_for || { self: 0, guest: 0 };
   const bookedTotal = bookedFor.self + bookedFor.guest;
   const forRows = [
     { name: "For themselves", count: bookedFor.self, color: INDIGO },
@@ -748,14 +899,17 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const peakMax = peak ? Math.max(0, ...peak.values.flat()) : 0;
   const peakValues = peak ? peak.values.map((row) => row.map((v) => (peakMax ? v / peakMax : 0))) : [];
   const hourLabels = peak ? peak.hours.map((h, i) => (i % 3 === 0 ? moment({ hour: h % 24 }).format("h A") : "")) : [];
-  const retention = data?.retention || { customers: 0, returning: 0, new: 0 };
+  const retention = retentionCard.data?.retention || { customers: 0, returning: 0, new: 0 };
   const retentionRows = [
     { name: "Returning Customers", count: retention.returning, color: INDIGO },
     { name: "New Customers", count: retention.new, color: "#C9CEDB" },
   ];
-  const ratings = data?.ratings;
-  const recent = data?.recent_bookings || [];
-  const activity = data?.activity || [];
+  const allTimeRatings = data?.ratings; // the profile chip
+  const ratings = summarizeRatings((reviews.rows || []).filter((r) => inRange(r.created_at, range)));
+  const recent = data?.recent_bookings || []; // the Bookings tab shows them all
+  const recentInRange = recent.filter((row) => inRange(row.day, range));
+  const activity = data?.activity || []; // the Activity Log tab shows it all
+  const activityInRange = activity.filter((item) => inRange(item.at, range));
 
   const quickActions = [
     { icon: MessageSquare, label: "Send Message", color: BRAND, onClick: () => setMessageOpen(true) },
@@ -777,10 +931,23 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
 
       <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Breadcrumb + actions */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 wrapped:flex-wrap">
           {breadcrumb}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 wrapped:flex-wrap">
+            {/* The other tabs have their own filters and don't read this window. */}
+            {(tab === TABS[0] || tab === "Analytics") && (
+              <>
+                <OverallButton
+                  active={period === OVERALL_PERIOD.value}
+                  onClick={() => applyPeriod(OVERALL_PERIOD.value)}
+                  color={BRAND}
+                  look="rounded-lg border-gray-200 bg-white px-2.5 py-2 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
+                />
+                <DateRangeButton from={range.from} to={range.to} onApply={applyCustom} color={BRAND} toastId="partner-v2-range" className="relative [&>button]:py-2" />
+                <HeaderSelect label="Period" value={period} onChange={applyPeriod} options={periodOptions} className="flex [&_select]:py-0.5" />
+              </>
+            )}
             <ActionButton icon={Mail} className="text-white" style={{ background: BRAND }} onClick={() => setMessageOpen(true)} disabled={!p}>
               Send Message
             </ActionButton>
@@ -873,7 +1040,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                     {[
                       { icon: Scissors, text: TYPE_LABEL[p?.type] || "Salon" },
                       { icon: CalendarDays, text: p?.partner_since ? `Since ${moment(p.partner_since).format("MMM YYYY")}` : DASH },
-                      { icon: Star, text: ratings?.average ? `${ratings.average} (${num(ratings.total)} Reviews)` : "No reviews", amber: true },
+                      { icon: Star, text: allTimeRatings?.average ? `${allTimeRatings.average} (${num(allTimeRatings.total)} Reviews)` : "No reviews", amber: true },
                       { text: `ID: ${storeId}` },
                     ].map(({ icon: Icon, text, amber }) => (
                       <li key={text} className="flex items-center gap-1.5 rounded-md border border-[#E6E8F0] bg-[#F8F9FC] px-2.5 py-1">
@@ -934,12 +1101,9 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
             {tab !== TABS[0] ? (
               <>
                 {tab === "Analytics" && (
-                  <AnalyticsTab
-                    data={data}
-                    loading={loading}
-                    periodLabel={periodLabel}
-                    periodSelect={<Select value={period} onChange={setPeriod} options={PERIODS} />}
-                  />
+                  <div className={`transition-opacity ${refreshing}`}>
+                    <AnalyticsTab data={data} loading={loading} periodLabel={periodLabel} comparison={cardView("analyticsComparison")} daily={cardView("analyticsDaily")} />
+                  </div>
                 )}
                 {tab === "Bookings" && <BookingsTab storeId={storeId} recent={recent} loading={loading} />}
                 {tab === "Services" && <ServicesTab storeId={storeId} />}
@@ -953,16 +1117,16 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
             ) : (
               <>
                 {/* KPI tiles */}
-                <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
+                <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP} transition-opacity ${refreshing}`}>
                   {kpis.map(({ icon, color, tint, ...kpi }) => (
                     <KpiTile key={kpi.label} {...kpi} icon={icon} iconColor={color} iconTint={tint} />
                   ))}
                 </div>
 
                 {/* Row 2 - Trend / revenue / top services */}
-                <div className={`grid ${ROW2_COLS} ${GAP}`}>
+                <div className={`grid ${ROW2_COLS} ${GAP} transition-opacity ${refreshing}`}>
                   <Card className={PAD}>
-                    <CardHeader title="Bookings Trend" right={<Select value={period} onChange={setPeriod} options={PERIODS} />} />
+                    <CardHeader title="Bookings Trend" right={trendCard.select} />
                     {trend.some((d) => d.bookings) ? (
                       <div className="mt-2 min-h-[150px] flex-1">
                         <ResponsiveContainer width="100%" height="100%">
@@ -982,7 +1146,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                         </ResponsiveContainer>
                       </div>
                     ) : (
-                      <EmptyNote>{loading ? "Loading…" : `No bookings in ${periodLabel.toLowerCase()}`}</EmptyNote>
+                      <EmptyNote>{trendCard.loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
                     )}
 
                     <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-100 pt-3">
@@ -1000,15 +1164,15 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                   </Card>
 
                   <Card className={PAD}>
-                    <CardHeader title="Revenue Overview" right={<Select value={period} onChange={setPeriod} options={PERIODS} />} />
+                    <CardHeader title="Revenue Overview" right={revenueCard.select} />
                     <div className="mt-3 flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <p className={`text-slate-500 ${T.tiny}`}>Total Revenue (GMV)</p>
-                        <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.stat}`}>{shown(k.gmv, rupee)}</p>
+                        <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.stat}`}>{revenueCard.loading ? "…" : rupee(revenueCard.k.gmv)}</p>
                         <p className={`mt-0.5 ${T.tiny}`}>
-                          <VsPrevious cur={k.gmv} prev={pk.gmv} />
+                          {!revenueCard.loading && <VsPrevious cur={revenueCard.k.gmv} prev={revenueCard.pk.gmv} />}
                         </p>
-                        {trend.length > 1 && (
+                        {revenueTrend.length > 1 && (
                           <div className="mt-2 w-[140px]">
                             <Sparkline id="pd-revenue-spark" data={trendSpark} color={GREEN} height={28} fillOpacity={0} domain={["dataMin", "dataMax"]} />
                           </div>
@@ -1033,15 +1197,15 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
 
                     <div className="mt-auto grid grid-cols-3 gap-3 border-t border-slate-100 pt-3">
                       {[
-                        { label: "Average Order Value", value: rupee(k.aov), cur: k.aov, prev: pk.aov },
-                        { label: "Highest Booking", value: rupee(data?.highest_booking?.gmv), note: data?.highest_booking ? fmtDate(data.highest_booking.day) : "" },
-                        { label: "Total Services Sold", value: num(k.services_sold), cur: k.services_sold, prev: pk.services_sold },
+                        { label: "Average Order Value", value: rupee(revenueCard.k.aov), cur: revenueCard.k.aov, prev: revenueCard.pk.aov },
+                        { label: "Highest Booking", value: rupee(revenueCard.data?.highest_booking?.gmv), note: revenueCard.data?.highest_booking ? fmtDate(revenueCard.data.highest_booking.day) : "" },
+                        { label: "Total Services Sold", value: num(revenueCard.k.services_sold), cur: revenueCard.k.services_sold, prev: revenueCard.pk.services_sold },
                       ].map((stat) => {
                         const d = change(stat.cur, stat.prev);
                         return (
                           <div key={stat.label} className="min-w-0">
                             <p className={`truncate text-slate-500 ${T.tiny}`}>{stat.label}</p>
-                            <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.sm}`}>{loading ? "…" : stat.value}</p>
+                            <p className={`mt-1 font-extrabold tracking-tight text-slate-900 ${T.sm}`}>{revenueCard.loading ? "…" : stat.value}</p>
                             {isNum(d) && <Delta value={`${Math.abs(d).toFixed(1)}%`} up={d >= 0} size={T.tiny} iconSize={11} />}
                             {stat.note && <p className={`text-slate-500 ${T.tiny}`}>{stat.note}</p>}
                           </div>
@@ -1055,7 +1219,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                       title="Top Services"
                       right={
                         <span className="flex items-center gap-3">
-                          <Select value={period} onChange={setPeriod} options={PERIODS} />
+                          {servicesCard.select}
                           <ViewAll pill onClick={() => setTab("Services")} />
                         </span>
                       }
@@ -1082,22 +1246,22 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                             ))}
                             <tr className="h-[34px] border-t border-slate-100" title="All services, not only the top five">
                               <td className={`font-bold text-slate-900 ${T.xs}`}>Total</td>
-                              <td className={`text-right font-bold text-slate-900 ${T.xs}`}>{num(k.services_sold)}</td>
-                              <td className={`text-right font-bold text-slate-900 ${T.xs}`}>{num(k.gmv)}</td>
+                              <td className={`text-right font-bold text-slate-900 ${T.xs}`}>{num(servicesCard.k.services_sold)}</td>
+                              <td className={`text-right font-bold text-slate-900 ${T.xs}`}>{num(servicesCard.k.gmv)}</td>
                             </tr>
                           </tbody>
                         </table>
                       </div>
                     ) : (
-                      <EmptyNote>{loading ? "Loading…" : "No services booked in this period"}</EmptyNote>
+                      <EmptyNote>{servicesCard.loading ? "Loading…" : "No services booked in this period"}</EmptyNote>
                     )}
                   </Card>
                 </div>
 
                 {/* Row 3 - Booked for / peak hours / retention / ratings */}
-                <div className={`grid ${ROW3_COLS} ${GAP}`}>
+                <div className={`grid ${ROW3_COLS} ${GAP} transition-opacity ${refreshing}`}>
                   <Card className={PAD}>
-                    <CardHeader title="Booked For" subtitle="Booking source isn't recorded yet" right={<Select value={period} onChange={setPeriod} options={PERIODS} />} />
+                    <CardHeader title="Booked For" subtitle="Booking source isn't recorded yet" right={bookedForCard.select} />
                     {bookedTotal ? (
                       <div className="flex flex-1 items-center gap-3 pt-2">
                         <Donut data={forRows.map((s) => ({ name: s.name, value: s.count, color: s.color }))} center={num(bookedTotal)} caption="Total" />
@@ -1114,7 +1278,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                         </ul>
                       </div>
                     ) : (
-                      <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
+                      <EmptyNote>{bookedForCard.loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
                     )}
                   </Card>
 
@@ -1148,7 +1312,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                   </Card>
 
                   <Card className={PAD}>
-                    <CardHeader title="Customer Retention" subtitle="Returning = booked this salon before the period" right={<Select value={period} onChange={setPeriod} options={PERIODS} />} />
+                    <CardHeader title="Customer Retention" subtitle="Returning = booked this salon before the period" right={retentionCard.select} />
                     {retention.customers ? (
                       <div className="flex flex-1 items-center gap-4 pt-2">
                         <Donut data={retentionRows.map((r) => ({ name: r.name, value: r.count, color: r.color }))} inner="62%" center={`${Math.round((retention.returning / retention.customers) * 100)}%`} caption="Returning" />
@@ -1165,13 +1329,13 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                         </ul>
                       </div>
                     ) : (
-                      <EmptyNote>{loading ? "Loading…" : "No customers in this period"}</EmptyNote>
+                      <EmptyNote>{retentionCard.loading ? "Loading…" : "No customers in this period"}</EmptyNote>
                     )}
                   </Card>
 
                   <Card className={PAD}>
                     <CardHeader title="Ratings & Reviews" right={<ViewAll onClick={() => setTab("Reviews")} />} />
-                    {ratings?.total ? (
+                    {ratings.total ? (
                       <div className="flex flex-1 items-center gap-6 pt-2">
                         <div className="flex shrink-0 flex-col items-center">
                           <p className="text-[30px] font-extrabold leading-none tracking-tight text-slate-900">{ratings.average}</p>
@@ -1199,18 +1363,18 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                         </ul>
                       </div>
                     ) : (
-                      <EmptyNote>{loading ? "Loading…" : "No reviews yet (all time)"}</EmptyNote>
+                      <EmptyNote>{!reviews.rows ? "Loading…" : reviews.failed ? "Couldn't load the reviews" : "No reviews in this period"}</EmptyNote>
                     )}
                   </Card>
                 </div>
 
                 {/* Row 4 - Recent bookings / activity / quick actions */}
-                <div className={`grid ${ROW4_COLS} ${GAP}`}>
+                <div className={`grid ${ROW4_COLS} ${GAP} transition-opacity ${refreshing}`}>
                   <Card className={PAD}>
-                    <CardHeader title="Recent Bookings" subtitle="Latest paid bookings, any status" right={<ViewAll pill onClick={() => setTab("Bookings")} />} />
-                    {recent.length ? (
+                    <CardHeader title="Recent Bookings" subtitle="Latest paid bookings in this period, any status" right={<ViewAll pill onClick={() => setTab("Bookings")} />} />
+                    {recentInRange.length ? (
                       <ul className="mt-2 flex flex-1 flex-col justify-around">
-                        {recent.slice(0, 4).map((row, i) => {
+                        {recentInRange.slice(0, 4).map((row, i) => {
                           const [bg, fg] = AVATAR_TONES[i % AVATAR_TONES.length];
                           const [label, tone] = STATUS_CHIP[row.status] || STATUS_CHIP.not_completed;
                           return (
@@ -1240,7 +1404,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                         })}
                       </ul>
                     ) : (
-                      <EmptyNote>{loading ? "Loading…" : "No bookings yet"}</EmptyNote>
+                      <EmptyNote>{loading ? "Loading…" : recent.length ? "None of the latest bookings fall in this period" : "No bookings yet"}</EmptyNote>
                     )}
                   </Card>
 
@@ -1253,9 +1417,9 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                       }
                       right={<ViewAll pill onClick={() => setTab("Activity Log")} />}
                     />
-                    {activity.length ? (
+                    {activityInRange.length ? (
                       <ul className="mt-2 flex flex-1 flex-col justify-around gap-2">
-                        {activity.slice(0, 4).map((item, i) => {
+                        {activityInRange.slice(0, 4).map((item, i) => {
                           const meta = ACTIVITY[item.kind] || ACTIVITY.payout;
                           const Icon = meta.icon;
                           return (
@@ -1276,7 +1440,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
                         })}
                       </ul>
                     ) : (
-                      <EmptyNote>{loading ? "Loading…" : "No recorded activity"}</EmptyNote>
+                      <EmptyNote>{loading ? "Loading…" : activity.length ? "None of the latest activity falls in this period" : "No recorded activity"}</EmptyNote>
                     )}
                   </Card>
 

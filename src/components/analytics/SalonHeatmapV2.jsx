@@ -23,12 +23,14 @@ import {
 import { fetchSalonHeatmapV2 } from "../../redux/slices/analyticsSlice";
 import { downloadXlsx } from "../../utils/excelExport";
 import { rupees } from "../../utils/format";
-import { GOOGLE_MAPS_LOADER } from "../../utils/googleMaps";
+import { GOOGLE_MAPS_LOADER, HAS_MAPS_KEY } from "../../utils/googleMaps";
+import { OVERALL, OVERALL_OPTION, overallRange } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas, { Unscaled } from "../v2/ScaledCanvas";
-import { WRAP } from "../v2/tokens";
 import { useCanvasScale } from "../v2/canvasScaleContext";
 import { Card, DateRangeButton, Delta, HeaderSelect, KpiTile as BaseKpiTile, ListDialog, Select as BaseSelect } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // The approved "Salon Analytics - Heatmap" mockup, on a fixed DESIGN_WIDTH
@@ -55,8 +57,19 @@ const MIN_WIDTH = 1000;
 const GREEN = "#22C55E";
 const INDIGO = "#4F46E5";
 
-// Map | ranking panel, as measured from the mockup.
-const MAP_COLS = `grid-cols-[961fr_331fr] ${WRAP[2]}`;
+// Map | ranking panel, as measured from the mockup. They stay side by side in
+// the wrapped layout too: stacked, the ranking rows stretch to the full canvas
+// width (name at one edge, growth at the other) below a 790px map.
+// 360px keeps the panel's title and metric select on one line.
+const MAP_COLS = "grid-cols-[minmax(0,961fr)_minmax(360px,331fr)]";
+
+// The five KPI tiles stay on one row while the canvas (an @container) leaves
+// each tile room for its value and caption, and split 3 + 2 below that, the
+// same as WRAP[5]. Container queries rather than `wrapped:` because the
+// wrapped canvas spans 1000px to just under the design width, and 5 across
+// still fits across most of that range.
+const KPI_COLS =
+  "grid-cols-5 @max-[1199px]:grid-cols-6 @max-[1199px]:[&>*]:col-span-2 @max-[1199px]:[&>:nth-child(n+4)]:col-span-3";
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1292px of content, so measured sizes carry over at ~1.18x.
@@ -342,20 +355,27 @@ const LiveHeatMap = ({ metric, areas }) => {
 // ---------------------------------------------------------------------------
 
 const KpiTile = (props) => (
-  <BaseKpiTile sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.sm }} iconClass="h-[52px] w-[52px] rounded-xl shadow-md shadow-black/10" iconSize={24} iconColor="#fff" className="px-5 py-5" {...props} />
+  <BaseKpiTile
+    sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.sm }}
+    iconClass="h-[52px] w-[52px] rounded-xl shadow-md shadow-black/10 wrapped:h-11 wrapped:w-11"
+    iconSize={24}
+    iconColor="#fff"
+    className="px-5 py-5 wrapped:px-4"
+    {...props}
+  />
 );
 
 // The "Booking Heatmap" switch floating over the map's top-left corner.
 const MapMetricSelect = ({ value, onChange }) => (
   <span className="absolute left-4 top-4 flex items-center gap-2 rounded-xl bg-white py-2.5 pl-3 pr-9 shadow-md ring-1 ring-black/5">
     <ChartColumn size={16} className="shrink-0 text-slate-500" />
-    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Heat map metric" className={`cursor-pointer appearance-none bg-transparent font-semibold text-slate-800 focus:outline-none ${T.sm}`}>
+    <SelectMenu value={value} onChange={(e) => onChange(e.target.value)} aria-label="Heat map metric" className={`cursor-pointer appearance-none bg-transparent font-semibold text-slate-800 focus:outline-none ${T.sm}`}>
       {MAP_METRIC_OPTIONS.map((option) => (
         <option key={option.value} value={option.value}>
           {option.label}
         </option>
       ))}
-    </select>
+    </SelectMenu>
     <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
   </span>
 );
@@ -370,12 +390,13 @@ const PageHeader = ({ title, range, period, setPeriod, onCustom, city, setCity, 
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton active={period === OVERALL} onClick={() => setPeriod(OVERALL)} color={INDIGO} className="hidden lg:flex" />
         <DateRangeButton from={range.from} to={range.to} onApply={onCustom} color={INDIGO} toastId="heatmap-range" className="relative hidden lg:block" />
         <HeaderSelect
           label="Period"
           value={period}
           onChange={setPeriod}
-          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : [])]}
+          options={[...PERIODS.map((p) => ({ value: p.key, label: p.label })), ...(period === "custom" ? [{ value: "custom", label: "Custom" }] : []), ...(period === OVERALL ? [OVERALL_OPTION] : [])]}
           className="hidden lg:flex"
         />
         <HeaderSelect icon={MapPin} label="City" value={city} onChange={setCity} options={cityOptions} className="hidden xl:flex" />
@@ -401,11 +422,11 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
   const [metric, setMetric] = useState("bookings");
   const [showAll, setShowAll] = useState(false);
   const [loadedAt, setLoadedAt] = useState(null);
-  const hasKey = Boolean(GOOGLE_MAPS_LOADER.googleMapsApiKey);
   const { value, format, unit, note } = METRICS[metric];
 
   const range = useMemo(() => {
     if (period === "custom" && custom) return custom;
+    if (period === OVERALL) return overallRange();
     const [from, to] = (PERIODS.find((p) => p.key === period) || PERIODS[1]).range();
     return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
   }, [period, custom]);
@@ -442,7 +463,7 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
     {
       label: "Active Salons",
       value: shown(k.active_salons, num),
-      caption: k.new_salons ? <Delta value={`${num(k.new_salons)} new salon${k.new_salons === 1 ? "" : "s"}`} up size={T.sm} /> : <span className="text-slate-400">No new salons in period</span>,
+      caption: k.new_salons ? <Delta value={`${num(k.new_salons)} new salon${k.new_salons === 1 ? "" : "s"}`} up size={T.sm} /> : <span className="text-slate-400">No new salons</span>,
       icon: Store,
       tint: badge("#8AD95F", "#4FBE4A"),
     },
@@ -470,9 +491,9 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
         onRefresh={load}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`@container flex flex-col pb-4 leading-snug ${GAP}`}>
         {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-5 ${WRAP[5]} ${GAP}`}>
+        <div data-testid="heatmap-kpis" className={`grid ${KPI_COLS} ${GAP}`}>
           {kpis.map(({ icon, tint, ...kpi }) => (
             <KpiTile key={kpi.label} {...kpi} icon={icon} iconTint={tint} />
           ))}
@@ -481,16 +502,16 @@ const SalonHeatmapV2 = ({ title = "Salon Analytics - Heatmap" }) => {
         {/* Row 2 - Map / top performing areas */}
         <Card className="overflow-hidden">
           <div className={`grid ${MAP_COLS}`}>
-            <div className="relative min-h-[790px] overflow-hidden">
-              {hasKey ? (
+            <div data-testid="heatmap-map" className="relative min-h-[790px] overflow-hidden">
+              {HAS_MAPS_KEY ? (
                 <LiveHeatMap metric={metric} areas={mappable} />
               ) : (
-                <MapUnavailable>No Google Maps key is configured (VITE_GOOGLE_MAPS_KEY). The area ranking is on the right.</MapUnavailable>
+                <MapUnavailable>No valid Google Maps key is configured (VITE_GOOGLE_MAPS_KEY). The area ranking is on the right.</MapUnavailable>
               )}
               <MapMetricSelect value={metric} onChange={setMetric} />
             </div>
 
-            <div className="flex min-w-0 flex-col border-l border-[#E6E8F0] px-6 pb-6 pt-7">
+            <div data-testid="heatmap-ranking" className="flex min-w-0 flex-col border-l border-[#E6E8F0] px-6 pb-6 pt-7">
               <div className="flex items-center justify-between gap-3">
                 <h2 className={`truncate font-bold tracking-tight text-slate-900 ${T.title}`}>Top Performing Areas</h2>
                 <BaseSelect value={metric} onChange={setMetric} options={RANK_METRIC_OPTIONS} size={T.tiny} className="w-[118px] [&_select]:py-1.5" />

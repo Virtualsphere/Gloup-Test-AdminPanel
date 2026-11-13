@@ -54,6 +54,7 @@ import {
 import { getDashboardV2Metrics } from "../../redux/slices/dashboardSlice";
 import { downloadCsv } from "../../utils/format";
 import { getImageUrl } from "../../utils/image";
+import { OVERALL, OVERALL_LABEL, overallDays } from "../../utils/overall";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS as AXIS, CHART_TOOLTIP as TOOLTIP, WRAP } from "../v2/tokens";
@@ -66,6 +67,8 @@ import {
   SectionTitle as BaseSectionTitle,
   Select as BaseSelect,
 } from "../v2/ui";
+import OverallButton from "../common/OverallButton";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Partner Subscriptions" mockup, on a fixed
@@ -373,9 +376,10 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <OverallButton active={range === OVERALL} onClick={() => setRange(OVERALL)} color={BRAND} className="hidden xl:flex" />
         <span className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 xl:flex">
           <CalendarDays size={14} className="shrink-0 text-slate-400" />
-          <select
+          <SelectMenu
             value={range}
             onChange={(e) => setRange(e.target.value)}
             className="cursor-pointer appearance-none bg-transparent pr-1 text-[12px] font-medium text-slate-600 focus:outline-none"
@@ -385,7 +389,8 @@ const PageHeader = ({ title, range, setRange, search, setSearch }) => (
                 {option.label}
               </option>
             ))}
-          </select>
+            {range === OVERALL && <option value={OVERALL}>{OVERALL_LABEL}</option>}
+          </SelectMenu>
           <ChevronDown size={13} className="shrink-0 text-slate-400" />
         </span>
 
@@ -492,7 +497,7 @@ const PlanDialog = ({ mode, row, candidates, defaultLimit, busy, onSubmit, onClo
       {!row && (
         <label className="mb-3 block text-sm font-semibold text-slate-700">
           Partner
-          <select
+          <SelectMenu
             value={storeId}
             onChange={(e) => setStoreId(e.target.value)}
             className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-violet-200"
@@ -503,7 +508,7 @@ const PlanDialog = ({ mode, row, candidates, defaultLimit, busy, onSubmit, onClo
                 {c.partner_name} · {c.total_booking_count} bookings
               </option>
             ))}
-          </select>
+          </SelectMenu>
           {candidates.length === 0 && (
             <span className="mt-1 block text-xs font-normal text-slate-400">
               No partner currently needs a subscription.
@@ -754,7 +759,11 @@ const PartnerSubscriptionsV2 = ({ title = "Partner Subscriptions" }) => {
   const [exporting, setExporting] = useState(false);
 
   const today = istToday();
-  const ranges = useMemo(() => buildRanges(Number(headerRange)), [headerRange]);
+  // Overall is sized in days too, so it ends today (IST) and starts on OVERALL_FROM.
+  const ranges = useMemo(
+    () => buildRanges(headerRange === OVERALL ? overallDays(istToday()) : Number(headerRange)),
+    [headerRange]
+  );
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
   // Any filter change sends the table back to page 1.

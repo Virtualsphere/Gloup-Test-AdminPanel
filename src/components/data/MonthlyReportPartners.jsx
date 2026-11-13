@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { FileText, Phone, Mail, ChevronRight } from "lucide-react";
 import { fetchMonthlyInvoicePartners } from "../../redux/slices/monthlyInvoiceSlice";
+import { MonthPicker } from "../common/DatePicker";
 
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -46,11 +47,11 @@ const MonthlyReportPartners = ({ title }) => {
         <div className="flex items-center gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Month</label>
-            <input
-              type="month"
+            <MonthPicker
               value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md"
+              onChange={setMonth}
+              align="right"
+              className="flex w-44 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4461F2]/40"
             />
           </div>
 

@@ -9,6 +9,7 @@ import UseBookingSSE from "./components/data/UseBookingSSE";
 import Dashboard from "./components/dashboard/DashboardPage";
 
 import Auth from "./components/auth/AuthPages";
+import ResetPassword from "./components/auth/ResetPassword";
 import AppRoutes from "./routes/AppRoutes";
 import { PageHeaderSlotProvider } from "./components/layout/PageHeaderSlot";
 
@@ -60,20 +61,25 @@ useEffect(() => {
 
   const isAuth = !!localStorage.getItem("token");
 
+  const isLoginPage = location.pathname === "/auth";
+  // Open even with a token saved, so an emailed link works in any browser.
+  const isResetPage = location.pathname === "/reset-password";
+
   // ✅ Auth protection
-  if (!isAuth && location.pathname !== "/auth") {
+  if (!isAuth && !isLoginPage && !isResetPage) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (isAuth && location.pathname === "/auth") {
+  if (isAuth && isLoginPage) {
     return <Navigate to="/" replace />;
   }
 
-  // ✅ Auth page (no layout)
-  if (location.pathname === "/auth") {
+  // ✅ Auth pages (no layout)
+  if (isLoginPage || isResetPage) {
     return (
       <Routes>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     );
   }

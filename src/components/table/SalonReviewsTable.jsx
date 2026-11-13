@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, Star, ChevronDown } from "lucide-react";
+import SelectMenu from "../common/Select";
 
 const SALON_REVIEW_SEARCH_FIELDS = [
   "review_id",
@@ -141,7 +142,7 @@ const SalonReviewsTable = ({ reviews = [], summaries = [] }) => {
           />
         </div>
 
-        <select
+        <SelectMenu
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white"
@@ -149,9 +150,9 @@ const SalonReviewsTable = ({ reviews = [], summaries = [] }) => {
           <option value="all">All statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
-        </select>
+        </SelectMenu>
 
-        <select
+        <SelectMenu
           value={storeFilter}
           onChange={(e) => setStoreFilter(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white min-w-[180px]"
@@ -162,7 +163,7 @@ const SalonReviewsTable = ({ reviews = [], summaries = [] }) => {
               {summary.store_name}
             </option>
           ))}
-        </select>
+        </SelectMenu>
       </div>
 
       <div className="overflow-x-auto">

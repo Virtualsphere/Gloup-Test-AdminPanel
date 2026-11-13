@@ -1,8 +1,7 @@
 import { useForm, Controller } from "react-hook-form";
 import { Save, X } from "lucide-react";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
+import SelectMenu from "../common/Select";
 const SubscriptionForm = ({
   onSubmit,
   onCancel,
@@ -45,7 +44,7 @@ const SubscriptionForm = ({
               <label className="text-sm font-medium text-gray-700 mb-1">
                 Type
               </label>
-              <select
+              <SelectMenu
                 {...register("type", { required: "Type is required" })}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   errors.type
@@ -58,7 +57,7 @@ const SubscriptionForm = ({
                 <option value="range">Range</option>
                 <option value="banner">Banner</option>
                 <option value="notification">Notification</option>
-              </select>
+              </SelectMenu>
               {errors.type && (
                 <p className="text-sm text-red-500 mt-1">
                   {errors.type.message}

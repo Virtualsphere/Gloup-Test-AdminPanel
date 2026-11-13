@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
@@ -44,6 +44,10 @@ import {
   updateBookingStatus,
 } from "../../redux/slices/bookingSlice";
 import { fetchServiceCategories } from "../../redux/slices/partnersSlice";
+import { DatePicker, DateRangePicker } from "../common/DatePicker";
+import OverallButton from "../common/OverallButton";
+import SelectMenu from "../common/Select";
+import { isOverallRange, overallRange } from "../../utils/overall";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Bookings by Order Date" mockup, on a fixed
@@ -441,14 +445,15 @@ const ConfirmDialog = ({ confirming, busy, reference, onReference, onCancel, onC
   );
 };
 
-const DateInput = ({ value, onChange, inputRef, label }) => (
-  <input
-    ref={inputRef}
-    type="date"
+// Each of the from / to pickers shows the whole range on its calendar.
+const DateInput = ({ value, onChange, label, range }) => (
+  <DatePicker
     value={value}
-    aria-label={label}
-    onChange={(e) => e.target.value && onChange(e.target.value)}
-    className={`w-[128px] shrink-0 rounded-xl border border-[#E6E8F0] bg-white px-2.5 py-1.5 text-slate-700 focus:outline-none ${T.base}`}
+    onChange={(v) => v && onChange(v)}
+    highlight={range}
+    ariaLabel={label}
+    icon="right"
+    className={`flex w-[146px] shrink-0 items-center gap-2 rounded-xl border border-[#E6E8F0] bg-white px-2.5 py-1.5 text-left text-slate-700 hover:border-slate-300 focus:outline-none ${T.base}`}
   />
 );
 
@@ -511,7 +516,7 @@ const DonutCard = ({ title, total, slices }) => (
 );
 
 // Title, breadcrumb and header affordances live in the app bar, not the canvas.
-const PageHeader = ({ title, rangeLabel, onRangeClick, search, setSearch }) => (
+const PageHeader = ({ title, rangeLabel, fromDate, toDate, onRangeChange, search, setSearch }) => (
   <PageHeaderPortal>
     <div className="flex min-w-0 flex-1 items-center gap-4 pl-1 pr-4">
       <div className="min-w-0">
@@ -530,15 +535,18 @@ const PageHeader = ({ title, rangeLabel, onRangeClick, search, setSearch }) => (
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        <button
-          type="button"
-          onClick={onRangeClick}
+        <DateRangePicker
+          from={fromDate}
+          to={toDate}
+          onChange={onRangeChange}
+          align="right"
+          ariaLabel="Order date range"
           className="hidden items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-600 xl:flex"
         >
           <CalendarDays size={14} className="shrink-0 text-slate-400" />
           {rangeLabel}
           <ChevronDown size={13} className="shrink-0 text-slate-400" />
-        </button>
+        </DateRangePicker>
 
         <HeaderSearch
           value={search}
@@ -572,7 +580,6 @@ const pageNumbers = (page, totalPages) => {
 const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const fromInputRef = useRef(null);
 
   const defaults = useMemo(defaultUi, []);
   const [ui, setField] = useListUiState(UI_KEY, defaults);
@@ -929,13 +936,6 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
     { label: "Cancelled", value: today && !today.failed ? fmtInt(today.cancelled) : DASH, icon: XCircle, color: RED },
   ];
 
-  const openFromPicker = () => {
-    try {
-      fromInputRef.current?.showPicker();
-    } catch {
-      fromInputRef.current?.focus();
-    }
-  };
 
   // Status and a non-default payment filter both live under More Filters.
   const moreFilterCount = (status ? 1 : 0) + (payment !== PAID_ONLY ? 1 : 0);
@@ -948,7 +948,12 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
       <PageHeader
         title={title}
         rangeLabel={`${fmtYmdLong(fromDate)} - ${fmtYmdLong(toDate)}`}
-        onRangeClick={openFromPicker}
+        fromDate={fromDate}
+        toDate={toDate}
+        onRangeChange={(from, to) => {
+          setFilter("fromDate", from);
+          setField("toDate", to);
+        }}
         search={search}
         setSearch={(v) => setFilter("search", v)}
       />
@@ -1048,7 +1053,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
 
           {/* Booking type = service category of any service in the booking. */}
           <div className="relative shrink-0">
-            <select
+            <SelectMenu
               value={bookingType}
               onChange={(e) => setFilter("bookingType", e.target.value)}
               className={`w-[150px] appearance-none rounded-xl border bg-white py-1.5 pl-3 pr-7 font-medium text-slate-700 focus:outline-none ${T.base} ${
@@ -1061,7 +1066,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
                   {category.name}
                 </option>
               ))}
-            </select>
+            </SelectMenu>
             <ChevronDown
               size={13}
               className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
@@ -1069,8 +1074,8 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
           </div>
 
           <DateInput
-            inputRef={fromInputRef}
             label="From date"
+            range={[fromDate, toDate]}
             value={fromDate}
             onChange={(v) => {
               setFilter("fromDate", v);
@@ -1082,11 +1087,23 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
 
           <DateInput
             label="To date"
+            range={[fromDate, toDate]}
             value={toDate}
             onChange={(v) => {
               setFilter("toDate", v);
               if (v < fromDate) setField("fromDate", v);
             }}
+          />
+
+          <OverallButton
+            active={isOverallRange(fromDate, toDate)}
+            onClick={() => {
+              const { from, to } = overallRange();
+              setFilter("fromDate", from);
+              setField("toDate", to);
+            }}
+            color={BRAND}
+            look={`rounded-xl border-[#E6E8F0] bg-white px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50 ${T.base}`}
           />
 
           <div className="relative shrink-0">
@@ -1114,7 +1131,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
               <div className="absolute right-0 top-full z-20 mt-2 w-[200px] rounded-xl border border-[#E6E8F0] bg-white p-3 shadow-lg">
                 <label className={`block font-semibold text-slate-600 ${T.sm}`}>
                   Status
-                  <select
+                  <SelectMenu
                     value={status}
                     onChange={(e) => {
                       setFilter("status", e.target.value);
@@ -1128,12 +1145,12 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
                         {meta.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectMenu>
                 </label>
 
                 <label className={`mt-2.5 block font-semibold text-slate-600 ${T.sm}`}>
                   Payment
-                  <select
+                  <SelectMenu
                     value={payment}
                     onChange={(e) => {
                       setFilter("payment", e.target.value);
@@ -1146,7 +1163,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectMenu>
                 </label>
               </div>
             )}
@@ -1414,7 +1431,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
                   Rows per page
                 </span>
                 <div className="relative">
-                  <select
+                  <SelectMenu
                     value={rowsPerPage}
                     onChange={(e) => setFilter("rowsPerPage", e.target.value)}
                     className={`appearance-none rounded-lg border border-[#E6E8F0] bg-white py-1 pl-2 pr-6 font-medium text-slate-700 focus:outline-none ${T.sm}`}
@@ -1422,7 +1439,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
                     {ROWS_PER_PAGE.map((option) => (
                       <option key={option}>{option}</option>
                     ))}
-                  </select>
+                  </SelectMenu>
                   <ChevronDown
                     size={11}
                     className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400"

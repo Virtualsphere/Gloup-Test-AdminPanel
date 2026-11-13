@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { getStoreServices } from "../../redux/slices/partnersSlice";
 import { Clock, Tag, Scissors, Sparkles, Heart, Search, Filter, CheckCircle, XCircle } from "lucide-react"
 import { useParams } from 'react-router-dom';
+import SelectMenu from "../common/Select";
 
 
 const StoreServices = ({ title }) => {
@@ -121,7 +122,7 @@ const StoreServices = ({ title }) => {
                     {/* Status Filter */}
                     <div className="flex items-center gap-2">
                       <Filter className="text-gray-400 w-5 h-5" />
-                      <select
+                      <SelectMenu
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -129,7 +130,7 @@ const StoreServices = ({ title }) => {
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
-                      </select>
+                      </SelectMenu>
                     </div>
                   </div>
                 </div>

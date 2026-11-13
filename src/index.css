@@ -45,32 +45,6 @@ body {
 }
 
 
-/* Add to your global CSS file */
-.custom-datepicker .react-datepicker__day--selected {
-  background-color: #000000 !important;
-  color: white !important;
-}
-
-.custom-datepicker .react-datepicker__day--selected:hover {
-  background-color: #000000 !important;
-  color: white !important;
-}
-
-.custom-datepicker .react-datepicker__day:hover {
-  background-color: #000000 !important;
-  color: white !important;
-}
-
-.custom-datepicker .react-datepicker__day--keyboard-selected {
-  background-color: #000000 !important;
-  color: white !important;
-}
-
-.custom-datepicker .react-datepicker__day--in-range {
-  background-color: #000000 !important;
-  color: white !important;
-}
-
 /* ===== CUSTOM SCROLLBAR ===== */
 
 .custom-scroll::-webkit-scrollbar {

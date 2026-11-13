@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { fetchUserAnalyticsOverviewV2, fetchUserRetentionV2 } from "../../redux/slices/analyticsSlice";
 import { downloadCsv } from "../../utils/format";
+import { OVERALL, OVERALL_OPTION, overallRange } from "../../utils/overall";
+import OverallButton from "../common/OverallButton";
 import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CHART_AXIS, CHART_TOOLTIP as TOOLTIP, toSpark as spark, WRAP } from "../v2/tokens";
@@ -302,12 +304,18 @@ const PageHeader = ({ title, subtitle, updated, filters, onExport }) => (
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {updated && <LiveStamp updated={updated} className="hidden 2xl:flex" />}
+        <OverallButton
+          active={filters.period === OVERALL}
+          onClick={() => filters.setPeriod(OVERALL)}
+          color={VIOLET}
+          className="hidden lg:flex"
+        />
         <HeaderSelect
           icon={CalendarDays}
           label="Date range"
           value={filters.period}
           onChange={filters.setPeriod}
-          options={PERIODS}
+          options={filters.period === OVERALL ? [...PERIODS, OVERALL_OPTION] : PERIODS}
           className="hidden lg:flex"
         />
         <HeaderSelect
@@ -348,6 +356,7 @@ const UserAnalyticsV2 = ({ title = "User Analytics Dashboard" }) => {
   const [updated, setUpdated] = useState(null);
 
   const range = useMemo(() => {
+    if (period === OVERALL) return overallRange();
     const [from, to] = (PERIODS.find((p) => p.value === period) || PERIODS[0]).range();
     return { from: from.format("YYYY-MM-DD"), to: to.format("YYYY-MM-DD") };
   }, [period]);

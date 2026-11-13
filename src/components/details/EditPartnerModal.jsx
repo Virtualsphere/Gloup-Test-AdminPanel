@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { XCircle, Upload, Trash2, AlertCircle } from "lucide-react";
 import MapPicker from "../../components/MapPicker";
+import SelectMenu from "../common/Select";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
@@ -242,7 +243,7 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
         </div>
 
         {/* Status */}
-        <select
+        <SelectMenu
           className="input"
           value={form.status}
           onChange={(e) => handleChange("status", e.target.value)}
@@ -252,7 +253,7 @@ const EditPartnerModal = ({ isOpen, onClose, partnerData, onSave }) => {
               {s.label}
             </option>
           ))}
-        </select>
+        </SelectMenu>
 
         {/* Map */}
         <MapPicker

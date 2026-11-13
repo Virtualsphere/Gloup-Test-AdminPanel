@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { createService, fetchServiceCategories } from "../../redux/slices/partnersSlice";
 import toast from "react-hot-toast";
+import SelectMenu from "../common/Select";
 
 const CreateServiceModal = ({ setShowModal, storeId }) => {
 
@@ -139,7 +140,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
                 Category
               </label>
 
-              <select
+              <SelectMenu
                 value={serviceCategory}
                 onChange={(e) => setServiceCategory(e.target.value)}
                 className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
@@ -152,7 +153,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
                     {cat.name}
                   </option>
                 ))}
-              </select>
+              </SelectMenu>
             </div>
 
             {/* Priority */}
@@ -161,7 +162,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
                 Priority
               </label>
 
-              <select
+              <SelectMenu
                 value={priority}
                 onChange={(e) => setPriority(Number(e.target.value))}
                 className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
@@ -173,7 +174,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
                 <option value={4}>4</option>
                 <option value={5}>5</option>
                 <option value={6}>6</option>
-              </select>
+              </SelectMenu>
             </div>
           </div>
 
@@ -292,7 +293,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
             <label className="text-sm font-medium text-gray-600">
               Service For
             </label>
-            <select
+            <SelectMenu
               value={serviceFor}
               onChange={(e) => setServiceFor(e.target.value)}
               className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
@@ -300,7 +301,7 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
               <option value="male">Male</option>
               <option value="female">Female</option>
               <option value="unisex">Unisex</option>
-            </select>
+            </SelectMenu>
           </div>
 
           {/* Status */}
@@ -308,14 +309,14 @@ const CreateServiceModal = ({ setShowModal, storeId }) => {
             <label className="text-sm font-medium text-gray-600">
               Status
             </label>
-            <select
+            <SelectMenu
               value={serviceStatus}
               onChange={(e) => setServiceStatus(e.target.value)}
               className="w-full border border-gray-300 focus:border-black focus:ring-1 focus:ring-black px-4 py-2.5 rounded-lg transition"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-            </select>
+            </SelectMenu>
           </div>
 
           {/* Submit */}

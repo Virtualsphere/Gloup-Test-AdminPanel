@@ -41,6 +41,7 @@ import CustomerSegments from "./CustomerSegments";
 import RepeatBookingsChart from "./RepeatBookingsChart";
 import SparklineStatCard from "./SparklineStatCard";
 import { useNavigate } from "react-router-dom";
+import { DatePicker } from "../common/DatePicker";
 
 
 const COLORS = [
@@ -449,11 +450,12 @@ const DashboardDetail = ({ data }) => {
           </div>
           {editingCutoff ? (
             <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
-              <input
-                type="date"
+              <DatePicker
                 value={cutoffInput}
-                onChange={(e) => setCutoffInput(e.target.value)}
-                className="text-xs text-gray-700 border-none focus:outline-none"
+                onChange={setCutoffInput}
+                align="right"
+                ariaLabel="Cutoff date"
+                className="flex items-center gap-1.5 text-xs text-gray-700 border-none focus:outline-none"
               />
               <button
                 type="button"

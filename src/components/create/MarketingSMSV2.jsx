@@ -38,6 +38,9 @@ import { PageHeaderPortal } from "../layout/PageHeaderSlot";
 import ScaledCanvas from "../v2/ScaledCanvas";
 import { CARD, WRAP } from "../v2/tokens";
 import { Card, HeaderBell, SectionTitle as BaseSectionTitle } from "../v2/ui";
+import { DatePicker } from "../common/DatePicker";
+import { toYmd } from "../../utils/dateValue";
+import SelectMenu from "../common/Select";
 
 // ---------------------------------------------------------------------------
 // 1:1 reproduction of the approved "Send Marketing SMS" mockup, on a fixed
@@ -593,7 +596,7 @@ const MarketingSMSV2 = ({ title = "Send Marketing SMS" }) => {
                   )}
                 </span>
                 <span className="relative flex h-9 w-[118px] items-center rounded-lg border border-[#E6E8F0]">
-                  <select
+                  <SelectMenu
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     className={`h-full w-full cursor-pointer appearance-none bg-transparent pl-3 pr-7 text-slate-700 focus:outline-none ${T.xxs}`}
@@ -604,7 +607,7 @@ const MarketingSMSV2 = ({ title = "Send Marketing SMS" }) => {
                         {c.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectMenu>
                   <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-slate-500" />
                 </span>
               </div>
@@ -736,11 +739,14 @@ const MarketingSMSV2 = ({ title = "Send Marketing SMS" }) => {
                   <CalendarDays size={15} className="text-slate-500" />
                 </button>
                 {scheduleMode === "later" && (
-                  <input
-                    type="datetime-local"
+                  <DatePicker
+                    withTime
                     value={scheduleAt}
-                    onChange={(e) => setScheduleAt(e.target.value)}
-                    className={`h-9 rounded-lg border border-[#E6E8F0] px-2 text-slate-700 focus:border-[#5B4BF5] focus:outline-none ${T.xxs}`}
+                    onChange={setScheduleAt}
+                    min={toYmd(new Date())}
+                    placeholder="Pick date & time"
+                    ariaLabel="Schedule date and time"
+                    className={`flex h-9 items-center gap-1.5 rounded-lg border border-[#E6E8F0] bg-white px-2 text-left text-slate-700 focus:border-[#5B4BF5] focus:outline-none ${T.xxs}`}
                   />
                 )}
 
