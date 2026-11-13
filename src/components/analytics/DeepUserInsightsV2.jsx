@@ -76,6 +76,10 @@ import OverallButton from "../common/OverallButton";
 // from, or - until bookings carry a location - where the booked salons are.
 // The map renders inside <Unscaled> so dragging and zooming track the cursor
 // despite the canvas scaling, and shares GOOGLE_MAPS_LOADER with MapPicker.
+//
+// Wrapped layout: the six KPI tiles stay on one row (icon stacked above the
+// text) down to a 1040px canvas, the heat map gets a full-width row of its own
+// (420px tall), and Key Insights takes the full width.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -364,12 +368,18 @@ const Select = ({ size = T.tiny, ...props }) => <BaseSelect size={size} classNam
 
 const Segmented = (props) => <BaseSegmented size={T.tiny} {...props} />;
 
+// Once wrapped, the six tiles stay on one row while the canvas (an @container)
+// is at least 1040px wide: the icon moves above the text (smaller) so each
+// narrow tile is filled instead of half empty. Narrower than that the labels
+// would truncate, so the row falls back to 3 + 3 with the icon beside the text.
+const KPI_ROW_COLS = "grid-cols-6 wrapped:grid-cols-3 wrapped:@min-[1040px]:grid-cols-6";
 const KpiTile = (props) => (
   <BaseKpiTile
     sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.tiny }}
-    iconClass="h-14 w-14 rounded-full"
+    iconClass="h-14 w-14 rounded-full wrapped:@min-[1040px]:h-10 wrapped:@min-[1040px]:w-10 wrapped:@min-[1040px]:[&>svg]:h-5 wrapped:@min-[1040px]:[&>svg]:w-5"
     iconSize={26}
-    className="px-4 py-5"
+    bodyClass="wrapped:@min-[1040px]:flex-col wrapped:@min-[1040px]:items-stretch wrapped:@min-[1040px]:gap-2.5"
+    className="px-4 py-5 wrapped:@min-[1040px]:py-4"
     {...props}
   />
 );
@@ -400,7 +410,7 @@ const EmptyNote = ({ children, className = "" }) => (
   </div>
 );
 
-const HeatMapCard = ({ heatmap, loading }) => {
+const HeatMapCard = ({ heatmap, loading, className = "" }) => {
   const [view, setView] = useState("map");
   const hasKey = HAS_MAPS_KEY;
   const spots = heatmap?.cells || [];
@@ -408,7 +418,7 @@ const HeatMapCard = ({ heatmap, loading }) => {
   const bySalon = heatmap?.basis === "salon";
 
   return (
-    <Card>
+    <Card className={className}>
       <div className="px-4 pt-4">
         <CardHeader
           title={
@@ -437,7 +447,7 @@ const HeatMapCard = ({ heatmap, loading }) => {
       {/* The map area bleeds to the card edges. List View is laid over the map
           rather than replacing it, so toggling doesn't create a new map (each
           one is a billable load). */}
-      <div className="relative mt-3 min-h-[250px] flex-1 overflow-hidden rounded-b-2xl">
+      <div className="relative mt-3 min-h-[250px] flex-1 overflow-hidden rounded-b-2xl wrapped:min-h-[420px]">
         {hasKey ? (
           <LiveHeatMap spots={spots} />
         ) : (
@@ -786,21 +796,22 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
         onExport={exportReport}
       />
 
-      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${WRAP_FLOW} ${GAP}`}>
+      <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`@container flex flex-col pb-4 leading-snug ${WRAP_FLOW} ${GAP}`}>
         {/* ---------------------------------------------------------------- */}
         {/* Row 1 - KPI tiles                                                */}
         {/* ---------------------------------------------------------------- */}
-        <div className={`grid grid-cols-6 ${WRAP[6]} ${WRAP_WIDE} ${GAP}`}>
+        <div data-kpis className={`grid ${KPI_ROW_COLS} ${WRAP_WIDE} ${GAP}`}>
           {kpis.map(({ icon, color, tint, filled, ...tile }) => (
             <KpiTile key={tile.label} {...tile} icon={icon} iconColor={color} iconTint={tint} iconFill={filled} />
           ))}
         </div>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Row 2 - Heat map / distance / travel time                        */}
+        {/* Row 2 - Heat map / distance / travel time. Once wrapped, the map */}
+        {/* gets a full-width row; Distance and Travel Time pair up below.   */}
         {/* ---------------------------------------------------------------- */}
         <div className={`grid ${ROW2_COLS} ${GAP}`}>
-          <HeatMapCard heatmap={data?.heatmap} loading={loading} />
+          <HeatMapCard heatmap={data?.heatmap} loading={loading} className={WRAP_WIDE} />
 
           <Card className="p-4">
             <CardHeader
@@ -846,7 +857,7 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
             />
 
             {travelTotal ? (
-              <ul className="mt-4 flex flex-col gap-[14px]">
+              <ul className="mt-4 flex flex-col gap-[14px] wrapped:mb-4">
                 {travelRows.map((row) => {
                   const pct = pctOf(row.value, travelTotal);
                   return (
@@ -1163,9 +1174,9 @@ const DeepUserInsightsV2 = ({ title = "Deep User Insights" }) => {
         {/* ---------------------------------------------------------------- */}
         {/* Row 5 - Key insights                                             */}
         {/* ---------------------------------------------------------------- */}
-        <Card className="px-4 pb-4 pt-3.5">
+        <Card className={`px-4 pb-4 pt-3.5 ${WRAP_WIDE}`}>
           <CardHeader title="Key Insights & Recommendations" />
-          <div className={`mt-2.5 grid grid-cols-4 ${WRAP[4]} ${GAP}`}>
+          <div className={`mt-2.5 grid grid-cols-4 ${GAP}`}>
             {insights.map((item) => (
               <InsightTile key={item.title} icon={item.icon} color={item.color} tint={item.tint} title={item.title} titleSize={T.sm} textSize={T.xs}>
                 {item.text}

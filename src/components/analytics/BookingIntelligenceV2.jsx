@@ -137,13 +137,19 @@ const CardHeader = (props) => <BaseCardHeader titleSize={T.title} subtitleSize={
 
 const Select = ({ size = T.micro, ...props }) => <BaseSelect size={size} className="w-[104px] [&_select]:py-1" {...props} />;
 
+// The five tiles stay in one row once wrapped, so each is narrower: a smaller
+// badge and padding. A tile too narrow for badge + text side by side (1366px
+// with the sidebar open) puts the badge above the text, and a value that
+// still can't fit its delta pushes the delta onto the next line.
 const KpiTile = (props) => (
   <BaseKpiTile
     sizes={{ label: T.base, value: T.kpi, delta: T.sm, caption: T.sm }}
-    iconClass="h-[58px] w-[58px] rounded-xl"
+    iconClass="h-[58px] w-[58px] rounded-xl wrapped:h-[44px] wrapped:w-[44px] wrapped:[&>svg]:size-[22px]"
     iconSize={26}
     iconColor="#fff"
-    className="px-5 py-5"
+    className="@container px-5 py-5 wrapped:px-4"
+    bodyClass="wrapped:gap-2.5 @max-[200px]:flex-col @max-[200px]:items-start"
+    rowClass="flex-wrap gap-y-0"
     {...props}
   />
 );
@@ -422,8 +428,8 @@ const BookingIntelligenceV2 = ({ title = "Booking Intelligence" }) => {
       />
 
       <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
-        {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-5 ${WRAP[5]} ${GAP}`}>
+        {/* Row 1 - KPI tiles, one row of five at every width */}
+        <div className={`grid grid-cols-5 ${GAP}`}>
           {kpis.map(({ icon, tint, ...tile }) => (
             <KpiTile key={tile.label} {...tile} icon={icon} iconTint={tint} />
           ))}
