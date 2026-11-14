@@ -372,7 +372,7 @@ const PageHeader = ({ title, date, setDate, dateOptions, period, setPeriod, refr
 // Page
 // ---------------------------------------------------------------------------
 
-const GrowthDashboardV2 = ({ title = "Dashboard" }) => {
+const GrowthDashboardV2 = ({ title = "User Dashboard & User Behavior" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { growth } = useSelector((state) => state.analytics);
@@ -790,7 +790,7 @@ const GrowthDashboardV2 = ({ title = "Dashboard" }) => {
             </table>
             {!levels.length && <EmptyNote>{loading ? "Loading…" : DASH}</EmptyNote>}
 
-            <ViewLink onClick={() => navigate("/user-analytics-v2")}>View Cohort Analysis</ViewLink>
+            <ViewLink onClick={() => navigate("/user-analytics-360-v2")}>View Cohort Analysis</ViewLink>
           </Card>
 
           <Card className={PAD}>
@@ -919,7 +919,7 @@ const GrowthDashboardV2 = ({ title = "Dashboard" }) => {
               </div>
             </div>
 
-            <ViewLink onClick={() => navigate("/user-analytics-v2")}>View Full Funnel</ViewLink>
+            <ViewLink onClick={() => navigate("/user-analytics-360-v2")}>View Full Funnel</ViewLink>
           </Card>
 
           <Card className={PAD}>

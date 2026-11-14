@@ -77,7 +77,13 @@ const RED = "#EF4444";
 const BLUE = "#3B82F6";
 
 // Measured card widths from the mockup, used directly as grid fr units.
-const ROW_COLS = `grid-cols-[460fr_392fr_450fr] ${WRAP[3]}`;
+const COLS = "grid-cols-[460fr_392fr_450fr]";
+const ROW_COLS = `${COLS} ${WRAP[3]}`;
+// Rows 2 and 3 share one grid of six cards, so once wrapped they pair up
+// (instead of 2 + 1 full width twice) and the category share sits beside the
+// price distribution: LATER moves the trend and add-ons cards after those two.
+const PAIR_COLS = `${COLS} wrapped:grid-cols-2`;
+const LATER = "wrapped:order-1";
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1327px of content, so measured sizes carry over at ~1.15x.
@@ -162,12 +168,18 @@ const change = (cur, prev, { points = false } = {}) => {
 const CardHeader = (props) => <BaseCardHeader titleSize={T.title} subtitleSize={T.micro} {...props} />;
 const Segmented = (props) => <BaseSegmented size={T.micro} {...props} />;
 
+// The six tiles stay in one row once wrapped, so each is narrower: a smaller
+// badge and padding. A tile too narrow for badge + text side by side (1366px
+// with the sidebar open) puts the badge above the text, and a value that
+// can't fit its delta pushes the delta onto the next line.
 const KpiTile = (props) => (
   <BaseKpiTile
     sizes={{ label: T.sm, value: T.kpi, delta: T.sm, caption: T.micro }}
-    iconClass="h-11 w-11 rounded-full"
+    iconClass="h-11 w-11 rounded-full wrapped:h-8 wrapped:w-8 wrapped:[&>svg]:size-4"
     iconSize={20}
-    className="px-4 py-4"
+    className="@container px-4 py-4 wrapped:px-3.5"
+    bodyClass="wrapped:gap-2 @max-[162px]:flex-col @max-[162px]:items-start"
+    rowClass="flex-wrap gap-y-0"
     {...props}
   />
 );
@@ -200,6 +212,11 @@ const ServiceGlyph = ({ name, color }) => {
 const COLS_LEFT = [22, 24, 12, 18, 24];
 const COLS_RIGHT = [37.7, 11.3, 17.8, 15.2, 18];
 
+// The table scrolls inside its card past this height: the header (~21px) plus
+// the 8 rows the API returns today (24px each), so 8 rows show no scrollbar.
+const SERVICES_MAX_H = "max-h-[220px]";
+const STICKY_TH = "sticky top-0 z-[1] bg-white";
+
 // Ranking table with the Men's / Women's / All toggle; two cards share it.
 const ServicesCard = ({ rows, segment, setSegment, cols, loading, coverage }) => {
   const max = Math.max(0, ...rows.filter((r) => r.key !== "others").map((r) => r.bookings));
@@ -211,47 +228,49 @@ const ServicesCard = ({ rows, segment, setSegment, cols, loading, coverage }) =>
         right={<Segmented value={segment} onChange={setSegment} options={SEGMENTS} />}
       />
       {rows.length ? (
-        <table className="mt-3 w-full table-fixed border-collapse text-left">
-          <colgroup>
-            {cols.map((width, i) => (
-              <col key={i} style={{ width: `${width}%` }} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr>
-              <th className={`pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Service</th>
-              <th />
-              <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Bookings</th>
-              <th className={`pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Share</th>
-              <th className={`pb-2 text-right font-medium text-slate-500 ${T.nano}`}>GMV (₹)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={row.key} className="h-[24px]">
-                <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
-                  <span className="flex min-w-0 items-center gap-2">
-                    <ServiceGlyph name={row.name} />
-                    <span className="truncate" title={row.name}>
-                      {row.name}
-                    </span>
-                  </span>
-                </td>
-                <td className="pr-3">
-                  <Meter
-                    pct={max ? (row.bookings / max) * 100 : 0}
-                    height={3}
-                    track="transparent"
-                    color={`rgba(91,63,240,${Math.max(0.45, 1 - i * 0.08).toFixed(2)})`}
-                  />
-                </td>
-                <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{num(row.bookings)}</td>
-                <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{fmtPct(row.share)}</td>
-                <td className={`whitespace-nowrap text-right text-slate-700 ${T.xs}`}>{num(Math.round(row.gmv))}</td>
+        <div className={`mt-3 overflow-y-auto ${SERVICES_MAX_H} [scrollbar-color:#CBD5E1_transparent] [scrollbar-width:thin]`}>
+          <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              {cols.map((width, i) => (
+                <col key={i} style={{ width: `${width}%` }} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr>
+                <th className={`${STICKY_TH} pb-2 pr-2 font-medium text-slate-500 ${T.nano}`}>Service</th>
+                <th className={STICKY_TH} />
+                <th className={`${STICKY_TH} pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Bookings</th>
+                <th className={`${STICKY_TH} pb-2 pr-2 text-right font-medium text-slate-500 ${T.nano}`}>Share</th>
+                <th className={`${STICKY_TH} pb-2 text-right font-medium text-slate-500 ${T.nano}`}>GMV (₹)</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={row.key} className="h-[24px]">
+                  <td className={`whitespace-nowrap pr-2 text-slate-800 ${T.xs}`}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <ServiceGlyph name={row.name} />
+                      <span className="truncate" title={row.name}>
+                        {row.name}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="pr-3">
+                    <Meter
+                      pct={max ? (row.bookings / max) * 100 : 0}
+                      height={3}
+                      track="transparent"
+                      color={`rgba(91,63,240,${Math.max(0.45, 1 - i * 0.08).toFixed(2)})`}
+                    />
+                  </td>
+                  <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{num(row.bookings)}</td>
+                  <td className={`whitespace-nowrap pr-2 text-right text-slate-700 ${T.xs}`}>{fmtPct(row.share)}</td>
+                  <td className={`whitespace-nowrap text-right text-slate-700 ${T.xs}`}>{num(Math.round(row.gmv))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
       )}
@@ -446,15 +465,16 @@ const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => 
       />
 
       <ScaledCanvas width={DESIGN_WIDTH} minWidth={MIN_WIDTH} className={`flex flex-col pb-4 leading-snug ${GAP}`}>
-        {/* Row 1 - KPI tiles */}
-        <div className={`grid grid-cols-6 ${WRAP[6]} ${GAP}`}>
+        {/* Row 1 - KPI tiles, one row of six at every width */}
+        <div className={`grid grid-cols-6 ${GAP}`}>
           {kpis.map(({ icon, color, tint, filled, ...tile }) => (
             <KpiTile key={tile.label} {...tile} icon={icon} iconColor={color} iconTint={tint} iconFill={filled} />
           ))}
         </div>
 
-        {/* Row 2 - Top services x2 / category share */}
-        <div className={`grid ${ROW_COLS} ${GAP}`}>
+        {/* Rows 2-3 - Top services x2 / category share, then trend / add-ons /
+            price distribution (one grid, see PAIR_COLS) */}
+        <div className={`grid ${PAIR_COLS} ${GAP}`}>
           <ServicesCard rows={services[leftSegment] || []} segment={leftSegment} setSegment={setLeftSegment} cols={COLS_LEFT} loading={loading} coverage={data?.gender_coverage} />
           <ServicesCard rows={services[rightSegment] || []} segment={rightSegment} setSegment={setRightSegment} cols={COLS_RIGHT} loading={loading} coverage={data?.gender_coverage} />
 
@@ -478,11 +498,8 @@ const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => 
               <EmptyNote>{loading ? "Loading…" : "No bookings in this period"}</EmptyNote>
             )}
           </Card>
-        </div>
 
-        {/* Row 3 - Trend / add-ons / price distribution */}
-        <div className={`grid ${ROW_COLS} ${GAP}`}>
-          <Card className="p-4">
+          <Card className={`p-4 ${LATER}`}>
             <CardHeader title="Service Trend Over Time" subtitle="Daily bookings of the three most booked services" />
             <div className="mt-3 flex items-center justify-center gap-7">
               {trendServices.map((s, i) => (
@@ -518,7 +535,7 @@ const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => 
             )}
           </Card>
 
-          <Card className="p-4">
+          <Card className={`p-4 ${LATER}`}>
             <CardHeader title="Service Add-on Performance" subtitle="Extra services in multi-service bookings" />
             {addons.length ? (
               <table className="mt-3 w-full table-auto border-collapse text-left">
@@ -641,7 +658,8 @@ const ServiceIntelligenceV2 = ({ title = "Service Intelligence Dashboard" }) => 
 
           <Card className="p-4">
             <CardHeader title="Services Insights" />
-            <div className={`mt-3 grid flex-1 grid-cols-2 ${GAP}`}>
+            {/* Full width once wrapped, so the four tiles go side by side. */}
+            <div className={`mt-3 grid flex-1 grid-cols-2 wrapped:grid-cols-4 ${GAP}`}>
               {insights.map((item) => (
                 <InsightTile
                   key={item.title}

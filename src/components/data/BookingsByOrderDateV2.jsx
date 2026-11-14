@@ -111,8 +111,14 @@ const PAID_ONLY = "paid";
 const PAYMENT_FILTERS = [
   { value: PAID_ONLY, label: "Paid" },
   { value: "unpaid", label: "Unpaid" },
+  { value: "refunded", label: "Refunded" },
   { value: "", label: "All payments" },
 ];
+// The "paid" filter excludes refunded bookings (status 'refunded' and
+// payment_status 'refunded'), so Status = Refunded under the default Paid
+// filter would always be empty - use the refunded payment filter instead.
+const tablePayment = (status, payment) =>
+  status === "refunded" && payment === PAID_ONLY ? "refunded" : payment;
 // Search hits the API, so wait for typing to pause.
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -633,7 +639,7 @@ const BookingsByOrderDateV2 = ({ title = "Bookings by Order Date" }) => {
       fromDate,
       toDate,
       status,
-      payment,
+      payment: tablePayment(status, payment),
       search: debouncedSearch.trim(),
       service_category_id: bookingType,
     }),

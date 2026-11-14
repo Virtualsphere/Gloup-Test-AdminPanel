@@ -724,8 +724,9 @@ const fetchWithFallback = async (img) => {
 
 // Validates the Edit Salon form and saves it (/editpartner). Alerts and returns
 // false on invalid input; throws if the save fails. Shared with the redesigned
-// Partner Details page (PartnerDetailsV2), so both save exactly the same way.
-export const savePartnerEdit = async (dispatch, id, updatedData) => {
+// Edit Salon page (EditSalonV2), so both save exactly the same way. `extra`
+// holds more fields to send as they are (arrays / objects as JSON, null as "").
+export const savePartnerEdit = async (dispatch, id, updatedData, extra = {}) => {
   // -----------------------------
   // 1️⃣ BASIC REQUIRED VALIDATION
   // -----------------------------
@@ -820,6 +821,13 @@ export const savePartnerEdit = async (dispatch, id, updatedData) => {
   formData.append("servicesProvidedFor", JSON.stringify(updatedData.servicesProvidedFor));
   formData.append("languages", JSON.stringify(updatedData.languages));
   formData.append("isPremium", updatedData.isPremium);
+
+  Object.entries(extra).forEach(([key, value]) => {
+    formData.append(
+      key,
+      value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value)
+    );
+  });
 
   // -----------------------------
   // LOGO HANDLING

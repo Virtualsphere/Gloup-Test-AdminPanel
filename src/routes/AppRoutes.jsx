@@ -51,7 +51,6 @@ const MarketingSMSV2 = lazy(() => import("../components/create/MarketingSMSV2"))
 const UsersV2 = lazy(() => import("../components/data/UsersV2"));
 const UserDetailsV2 = lazy(() => import("../components/details/UserDetailsV2"));
 const BookingDetailsV2 = lazy(() => import("../components/details/BookingDetailsV2"));
-const UserAnalyticsV2 = lazy(() => import("../components/analytics/UserAnalyticsV2"));
 const DeepUserInsightsV2 = lazy(() => import("../components/analytics/DeepUserInsightsV2"));
 const GrowthDashboardV2 = lazy(() => import("../components/dashboard/GrowthDashboardV2"));
 const ClickInteractionV2 = lazy(() => import("../components/analytics/ClickInteractionV2"));
@@ -62,6 +61,7 @@ const UserAnalytics360V2 = lazy(() => import("../components/analytics/UserAnalyt
 const SalonHeatmapV2 = lazy(() => import("../components/analytics/SalonHeatmapV2"));
 const BookingIntelligenceV2 = lazy(() => import("../components/analytics/BookingIntelligenceV2"));
 const PartnerDetailsV2 = lazy(() => import("../components/details/PartnerDetailsV2"));
+const EditSalonV2 = lazy(() => import("../components/details/EditSalonV2"));
 const SalonCategoryIntelligenceV2 = lazy(() => import("../components/analytics/SalonCategoryIntelligenceV2"));
 
 const AppRoutes = () => {
@@ -91,9 +91,10 @@ const AppRoutes = () => {
           <Route path="/user-details-v2" element={<UserDetailsV2 />} />
           <Route path="/user-details-v2/:id" element={<UserDetailsV2 />} />
           <Route path="/booking-details-v2/:id" element={<BookingDetailsV2 />} />
-          <Route path="/user-analytics-v2" element={<UserAnalyticsV2 title="User Analytics Dashboard" />} />
+          {/* Its cards moved to User Analytics 360°; old links land there. */}
+          <Route path="/user-analytics-v2" element={<Navigate to="/user-analytics-360-v2" replace />} />
           <Route path="/deep-user-insights-v2" element={<DeepUserInsightsV2 title="Deep User Insights" />} />
-          <Route path="/growth-dashboard-v2" element={<GrowthDashboardV2 title="Dashboard" />} />
+          <Route path="/growth-dashboard-v2" element={<GrowthDashboardV2 title="User Dashboard & User Behavior" />} />
           <Route path="/click-interaction-v2" element={<ClickInteractionV2 title="User Click & Interaction Analytics" />} />
           <Route path="/user-analytics-overview-v2" element={<UserAnalyticsOverviewV2 title="User Analytics" />} />
           <Route path="/service-intelligence-v2" element={<ServiceIntelligenceV2 title="Service Intelligence Dashboard" />} />
@@ -103,6 +104,7 @@ const AppRoutes = () => {
           <Route path="/booking-intelligence-v2" element={<BookingIntelligenceV2 title="Booking Intelligence" />} />
           <Route path="/partner-details-v2" element={<PartnerDetailsV2 title="Partner Details" />} />
           <Route path="/partner-details-v2/:id" element={<PartnerDetailsV2 title="Partner Details" />} />
+          <Route path="/partner-details-v2/:id/edit" element={<EditSalonV2 />} />
           <Route path="/salon-category-intelligence-v2" element={<SalonCategoryIntelligenceV2 title="Salon Category Intelligence" />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin title="Admin" />} />

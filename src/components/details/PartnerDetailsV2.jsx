@@ -35,10 +35,9 @@ import {
   X,
 } from "lucide-react";
 import { fetchPartnerCardOverviewV2, fetchPartnerOverviewV2, fetchPartnerPickerV2, sendPartnerNotificationV2 } from "../../redux/slices/analyticsSlice";
-import { deletePartner, getAllPartnersList, getPartnerDetail, updatePartnerStatus } from "../../redux/slices/partnersSlice";
+import { deletePartner, getAllPartnersList, updatePartnerStatus } from "../../redux/slices/partnersSlice";
 import { exportReviewsV2 } from "../../redux/slices/reviewSlice";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
-import { EditPartnerModal, savePartnerEdit } from "./PartnerDetails";
 import {
   ActivityTab,
   AnalyticsTab,
@@ -93,8 +92,8 @@ import {
 // tabs (PartnerDetailsTabs.jsx) carry the classic page's backend - services,
 // slots, holidays, stylists, payout logs - and the per-salon APIs of the
 // Bookings / Reviews / Invoices / Monthly Report / Subscriptions pages. Edit
-// Salon and Delete Partner (More Actions) are the classic page's, saving
-// through its savePartnerEdit().
+// Salon (More Actions) opens the Edit Salon V2 page (EditSalonV2.jsx,
+// /partner-details-v2/:id/edit); Delete Partner is the classic page's.
 //
 // Date filters: the range + period control beside the page actions drives the
 // Overview and Analytics tabs. A card with its own dropdown follows it until that
@@ -642,8 +641,6 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   const [messageOpen, setMessageOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
-  const [editData, setEditData] = useState(null); // classic /getallpartnerdetails payload
-  const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const range = useMemo(() => (period === CUSTOM_PERIOD.value && custom ? custom : periodRange(period)), [period, custom]);
@@ -780,27 +777,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
       setStatusBusy(false);
     }
   };
-  // Edit Salon / Delete Partner are the classic page's, on the same APIs.
-  const openEdit = async () => {
-    try {
-      setEditData(await dispatch(getPartnerDetail({ id: String(storeId) })).unwrap());
-    } catch (message) {
-      toast.error(typeof message === "string" ? message : "Failed to load the salon", { id: "partner-v2-edit" });
-    }
-  };
-  const saveEdit = async (updated) => {
-    try {
-      setSaving(true);
-      if (!(await savePartnerEdit(dispatch, String(storeId), updated))) return;
-      toast.success("Partner updated", { id: "partner-v2-edit" });
-      setEditData(null);
-      load();
-    } catch {
-      toast.error("Failed to save changes. Please try again.", { id: "partner-v2-edit" });
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Delete Partner is the classic page's, on the same API.
   const confirmDelete = async () => {
     try {
       // The thunk wraps the id itself ({ id }), as the Partners list calls it.
@@ -921,7 +898,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
   ];
   const moreActions = [
     ...quickActions.slice(2),
-    { icon: Pencil, label: "Edit Salon", color: "#475569", onClick: openEdit },
+    { icon: Pencil, label: "Edit Salon", color: "#475569", onClick: () => navigate(`/partner-details-v2/${storeId}/edit`) },
     { icon: Trash2, label: "Delete Partner", color: RED, onClick: () => setDeleteOpen(true), disabled: !p },
   ];
 
@@ -1475,10 +1452,7 @@ const PartnerDetailsV2 = ({ title = "Partner Details" }) => {
 
       {messageOpen && p && <MessageDialog salon={p.name} onClose={() => setMessageOpen(false)} onSend={sendMessage} />}
 
-      {/* The classic page's edit form and delete confirmation, outside the canvas. */}
-      {editData && (
-        <EditPartnerModal isOpen onClose={() => setEditData(null)} partnerData={editData} onSave={saveEdit} saving={saving} />
-      )}
+      {/* The classic page's delete confirmation, outside the canvas. */}
       <DeleteConfirmationModal
         isOpen={deleteOpen}
         onConfirm={confirmDelete}

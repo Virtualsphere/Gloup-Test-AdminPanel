@@ -72,7 +72,9 @@ import OverallButton from "../common/OverallButton";
 // px sizes in T read smaller on screen).
 //
 // A roll-up of the other analytics APIs (analyticsSlice): getUserAnalytics-
-// OverviewV2 (KPIs, funnel, activity heatmap, uninstalls), getUserRetentionV2
+// OverviewV2 (KPIs, funnel, activity heatmap, uninstalls, and cards 17-22:
+// activity / session trends, platforms, key metrics, top actions, drop-offs),
+// getUserRetentionV2
 // (cohorts at day 7 / 14 / 28 / 56), getUserSegmentsV2 (segments, booking
 // behaviour, LTV, acquisition, leave reasons), getClickInteractionV2 (screen
 // time, taps, top paths), getServiceIntelligenceV2 (most booked services /
@@ -81,6 +83,11 @@ import OverallButton from "../common/OverallButton";
 // sign-ups. Acquisition channels need the app's /v2/attribution call; until
 // then referral (used a code) vs organic is shown. Uninstall / checkout
 // reasons come from the reason prompts the app sends to /v2/feedback.
+//
+// Cards 17-22 were moved here from the old User Analytics Dashboard page
+// (/user-analytics-v2, which now redirects here). Its other cards (KPIs,
+// funnel, new vs returning, uninstall rate, both heatmaps, retention cohort,
+// insights) were already on this page, so they weren't copied a second time.
 // ---------------------------------------------------------------------------
 
 const DESIGN_WIDTH = 1520;
@@ -102,6 +109,10 @@ const ROW2_COLS = `grid-cols-[432fr_513fr_389fr] ${WRAP[3]}`;
 const ROW3_COLS = `grid-cols-[243fr_316fr_258fr_196fr_302fr] ${WRAP[5]}`;
 const ROW4_COLS = `grid-cols-[228fr_436fr_272fr_382fr] ${WRAP[4]}`;
 const ROW5_COLS = `grid-cols-[412fr_285fr_242fr_380fr] ${WRAP[4]}`;
+// Rows 6-7 hold the cards moved from the User Analytics Dashboard; the 360°
+// mockup doesn't draw them, so they split the row evenly.
+const ROW6_COLS = `grid-cols-3 ${WRAP[3]}`;
+const ROW7_COLS = `grid-cols-[316fr_343fr_376fr] ${WRAP[3]}`;
 
 // Type scale in design px on the 1520px canvas. The mockup is a 1536px
 // screenshot with ~1352px of content, so measured sizes carry over at ~1.12x.
@@ -166,6 +177,14 @@ const FEED_STYLE = {
   review: { icon: Star, color: "#D97706", tint: "#FEF3C7", title: "New review" },
 };
 const FEED_POLL_MS = 30000;
+const PLATFORM_SLICES = {
+  android: { name: "Android", color: GREEN },
+  ios: { name: "iOS", color: BLUE },
+  web: { name: "Web", color: AMBER },
+  app: { name: "App (platform not sent)", color: VIOLET },
+  unknown: { name: "Unknown", color: "#CBD5E1" },
+};
+const BAR_GRADIENT = "linear-gradient(90deg,#8B74F5,#5B3FF0)";
 
 const isNum = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
 const num = (v) => (isNum(v) ? Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 }) : DASH);
@@ -183,6 +202,17 @@ const ago = (at) => {
   return `${Math.floor(m / 1440)}d ago`;
 };
 const change = (cur, prev) => (isNum(cur) && isNum(prev) && prev ? ((cur - prev) / prev) * 100 : null);
+const thousands = (v) => (v >= 1000 ? `${Number((v / 1000).toFixed(1))}K` : `${v}`);
+
+// Key Metrics row change: relative %, or percentage points when the metric is
+// itself a rate; `inverse` when a fall is good news (uninstall rate).
+const metricChange = (cur, prev, { points = false, inverse = false } = {}) => {
+  if (!isNum(cur) || !isNum(prev)) return null;
+  const diff = points ? cur - prev : prev ? ((cur - prev) / prev) * 100 : null;
+  if (diff === null) return null;
+  const up = diff >= 0;
+  return { value: `${Math.abs(diff).toFixed(points ? 2 : 1)}${points ? " pts" : "%"}`, up, good: inverse ? !up : up };
+};
 
 // ---------------------------------------------------------------------------
 // Building blocks
@@ -236,6 +266,23 @@ const SegmentLegend = ({ data }) => (
       </li>
     ))}
   </ul>
+);
+
+// Line chart that fills the rest of its card (activity / session trends).
+const TrendChart = ({ data, lines, tickFormatter, formatter, allowDecimals = false }) => (
+  <div className="mt-1 min-h-[110px] flex-1">
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid stroke="#EEF1F6" vertical={false} />
+        <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ ...AXIS, fontSize: 8.5 }} dy={4} interval="preserveStartEnd" minTickGap={14} padding={{ left: 6, right: 6 }} />
+        <YAxis domain={[0, "auto"]} allowDecimals={allowDecimals} tickFormatter={tickFormatter} tickLine={false} axisLine={false} tick={{ ...AXIS, fontSize: 8.5 }} width={36} />
+        <Tooltip {...TOOLTIP} formatter={formatter} />
+        {lines.map((line) => (
+          <Line key={line.key} type="monotone" dataKey={line.key} name={line.name} stroke={line.color} strokeWidth={1.8} dot={data.length <= 31 ? { r: 2.4, fill: line.color, strokeWidth: 0 } : false} connectNulls={false} isAnimationActive={false} />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  </div>
 );
 
 // Small channel badge: a coloured disc with a glyph or letter.
@@ -522,6 +569,49 @@ const UserAnalytics360V2 = ({ title = "User Analytics 360°" }) => {
   })();
   const feed = liveFeed.data?.items || [];
 
+  // ---- 17-19. Activity trend / session duration / platforms ---------------------------
+  const trendSeries = series.map((r) => ({
+    ...r,
+    day: fmtDay(r.day),
+    minutes: isNum(r.avg_session_seconds) ? Number((r.avg_session_seconds / 60).toFixed(2)) : null,
+  }));
+  // Heartbeat-fed cards: what's missing, the partial window, or the comparison.
+  const trackedNote = !ov ? "" : !ov.activity_since ? "No app activity yet" : m.activity_partial ? activityNote : compare;
+  const platformRaw = (ov?.platforms || []).map((row) => ({ ...(PLATFORM_SLICES[row.key] || PLATFORM_SLICES.unknown), value: row.users }));
+  const platformTotal = platformRaw.reduce((t, s) => t + s.value, 0);
+  const platformRows = platformRaw.map((s) => ({ ...s, pct: share(s.value, platformTotal) }));
+
+  // ---- 20. Key metrics ----------------------------------------------------------------
+  const keyMetrics = [
+    { metric: "Sign-ups", key: "signups" },
+    { metric: "Logins", key: "logins" },
+    { metric: "Salon Views (users)", key: "salon_viewers" },
+    { metric: "Checkout Started", key: "checkout_users" },
+    { metric: "1st Bookings", key: "first_bookings" },
+    { metric: "1st Bookings Completed", key: "first_completed" },
+    { metric: "DAU (avg.)", key: "dau" },
+    { metric: "MAU", key: "mau" },
+    { metric: "Avg. Session Duration", key: "avg_session_seconds", format: secs },
+    { metric: "Uninstall Rate", key: "uninstall_rate", format: (v) => (isNum(v) ? `${Number(v).toFixed(2)}%` : DASH), points: true, inverse: true },
+  ].map((row) => {
+    const format = row.format || num;
+    return { ...row, thisPeriod: format(m[row.key]), lastPeriod: format(pm[row.key]), change: metricChange(m[row.key], pm[row.key], row) };
+  });
+  const exportKeyMetrics = () => {
+    if (!ov) return;
+    downloadCsv(
+      `user-analytics-key-metrics_${ov.from}_${ov.to}.csv`,
+      ["Metric", `This Period (${ov.from} to ${ov.to})`, `Last Period (${ov.previous.from} to ${ov.previous.to})`, "Change"],
+      keyMetrics.map((row) => [row.metric, row.thisPeriod, row.lastPeriod, row.change ? `${row.change.up ? "+" : "-"}${row.change.value}` : DASH])
+    );
+  };
+
+  // ---- 21 / 22. Top actions, drop-offs ------------------------------------------------
+  const topActions = ov?.top_actions || [];
+  const actionMax = Math.max(0, ...topActions.map((a) => (isNum(a.users) ? a.users : 0)));
+  const dropOffs = ov?.drop_offs || [];
+  const maxDropOff = Math.max(0, ...dropOffs.map((d) => (isNum(d.pct) ? d.pct : 0)));
+
   // ---- 16. Insights ---------------------------------------------------------------------
   const recommendations = [];
   if (attributed.length) {
@@ -547,6 +637,10 @@ const UserAnalytics360V2 = ({ title = "User Analytics 360°" }) => {
         ...channelRows.map((c) => ["Acquisition", c.name, c.users, fmtPct(share(c.users, channelTotal))]),
         ...(retention?.cohorts || []).map((c) => ["Retention", `${c.from} to ${c.to} (${c.users} users)`, c.retention.map((v, i) => `D${cohortCols[i]} ${fmtPct(v)}`).join(" · "), ""]),
         ...ltvRows.map((r) => ["LTV", r.label, r.avg_lifetime_spend, ""]),
+        ...platformRows.map((p) => ["Platform", p.name, p.value, fmtPct(p.pct)]),
+        ...keyMetrics.map((r) => ["Key Metrics", r.metric, r.thisPeriod, ""]),
+        ...topActions.map((a) => ["Top Actions", a.label, a.users, fmtPct(a.pct)]),
+        ...dropOffs.map((d) => ["Drop-off", `${d.label} (${d.note})`, isNum(d.of) ? `${d.dropped} of ${d.of}` : DASH, fmtPct(d.pct)]),
       ]
     );
   };
@@ -1190,6 +1284,146 @@ const UserAnalytics360V2 = ({ title = "User Analytics 360°" }) => {
               })}
               {!recommendations.length && <li className={`text-center text-slate-400 ${T.xs}`}>{loading ? "Loading…" : "Not enough data for insights yet."}</li>}
             </ul>
+          </Card>
+        </div>
+
+        {/* Row 6 - Activity trend / session duration / platforms */}
+        <div className={`grid ${ROW6_COLS} ${GAP}`}>
+          <Card className="p-4">
+            <CardHeader title={<Title index={17}>User Activity Trend</Title>} subtitle={trackedNote || undefined} />
+            <div className="mt-2 flex items-center gap-4">
+              <LegendDot line color={BRAND} label="DAU" size={T.nano} />
+              <LegendDot line color={GREEN} label="MAU (30 days)" size={T.nano} />
+            </div>
+            {ov?.activity_since ? (
+              <TrendChart
+                data={trendSeries}
+                tickFormatter={thousands}
+                formatter={(v) => num(v)}
+                lines={[
+                  { key: "dau", name: "DAU", color: BRAND },
+                  { key: "mau", name: "MAU", color: GREEN },
+                ]}
+              />
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : activityNote}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title={<Title index={18}>Average Session Duration</Title>} />
+            <p className="mt-2 flex items-baseline gap-2">
+              <span className="text-[18px] font-extrabold tracking-tight text-slate-900">{shown(m.avg_session_seconds, secs)}</span>
+              <span className={`truncate text-slate-400 ${T.nano}`}>{trackedNote}</span>
+            </p>
+            {ov?.activity_since ? (
+              <TrendChart data={trendSeries} allowDecimals tickFormatter={(v) => `${v}m`} formatter={(v) => `${v} min`} lines={[{ key: "minutes", name: "Avg. Session", color: BRAND }]} />
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : activityNote}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title={<Title index={19}>Users by Platform</Title>} subtitle="Active app users in the period" />
+            {platformTotal ? (
+              <div className="mt-2 flex flex-1 items-center gap-4">
+                <Donut data={platformRows} size={124} inner="64%" center={num(platformTotal)} caption="Active Users" />
+                <SegmentLegend data={platformRows} />
+              </div>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : ov?.activity_since ? "No app activity in this period" : activityNote}</EmptyNote>
+            )}
+          </Card>
+        </div>
+
+        {/* Row 7 - Key metrics / top actions / drop-offs */}
+        <div className={`grid ${ROW7_COLS} ${GAP}`}>
+          <Card className="p-4">
+            <CardHeader
+              title={<Title index={20}>Key Metrics Summary</Title>}
+              subtitle={compare ? `This period ${compare}` : undefined}
+              right={
+                <button
+                  type="button"
+                  onClick={exportKeyMetrics}
+                  disabled={!ov}
+                  aria-label="Download key metrics"
+                  title="Download key metrics (CSV)"
+                  className="grid h-6 w-6 place-items-center rounded-md border border-[#E6E8F0] text-slate-500 transition-colors hover:text-[#4F46E5] disabled:opacity-50"
+                >
+                  <Download size={12} />
+                </button>
+              }
+            />
+            <table className="mt-2.5 w-full table-auto border-collapse text-left">
+              <thead>
+                <tr>
+                  {["Metric", "This Period", "Last Period", "Change"].map((h, i) => (
+                    <th key={h} className={`pb-1.5 font-medium text-slate-500 ${T.nano} ${i ? "text-right" : ""}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {keyMetrics.map((row) => (
+                  <tr key={row.metric} className="h-[19px]">
+                    <td className={`whitespace-nowrap pr-2 text-slate-700 ${T.xs}`}>{row.metric}</td>
+                    <td className={`whitespace-nowrap pr-2 text-right font-semibold text-slate-800 ${T.xs}`}>{loading ? "…" : row.thisPeriod}</td>
+                    <td className={`whitespace-nowrap pr-2 text-right text-slate-500 ${T.xs}`}>{loading ? "…" : row.lastPeriod}</td>
+                    <td className={`text-right ${T.xs}`}>
+                      {row.change ? <Delta value={row.change.value} up={row.change.up} good={row.change.good} size={T.xs} iconSize={9} /> : <span className="text-slate-400">{DASH}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title={<Title index={21}>Top User Actions</Title>} right={<span className={`text-slate-500 ${T.nano}`}>Users (% of active)</span>} />
+            {topActions.length ? (
+              <ul className="mt-2.5 flex flex-1 flex-col justify-around gap-1.5">
+                {topActions.map((row, i) => (
+                  <li key={row.key} className={`flex items-center gap-2 ${T.xs}`}>
+                    <span className="w-4 shrink-0 text-slate-500">{i + 1}.</span>
+                    <span className="w-[112px] shrink-0 truncate text-slate-700" title={row.label}>
+                      {row.label}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <Meter pct={isNum(row.pct) ? row.pct : share(row.users, actionMax) || 0} height={4} track="transparent" color={BAR_GRADIENT} />
+                    </span>
+                    <span className="w-[92px] shrink-0 whitespace-nowrap text-right font-semibold text-slate-700">
+                      {num(row.users)}
+                      {isNum(row.pct) && <span className="font-normal text-slate-500"> ({fmtPct(row.pct)})</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No app actions in this period"}</EmptyNote>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title={<Title index={22}>User Drop-off Points</Title>} subtitle="Where users leave the booking flow" right={<span className={`text-slate-500 ${T.nano}`}>Drop-off rate</span>} />
+            {dropOffs.length ? (
+              <ul className="mt-2.5 flex flex-1 flex-col justify-around gap-1.5">
+                {dropOffs.map((row) => (
+                  <li key={row.key} className={`flex items-center gap-2.5 ${T.xs}`} title={isNum(row.of) ? `${num(row.dropped)} of ${num(row.of)}` : "Recorded once the update is live"}>
+                    <span className="w-[196px] shrink-0 truncate text-slate-700">
+                      {row.label} <span className="text-slate-500">({row.note})</span>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <Meter pct={isNum(row.pct) && maxDropOff ? (row.pct / maxDropOff) * 100 : 0} height={4} track="transparent" color={BAR_GRADIENT} />
+                    </span>
+                    <span className="w-[38px] shrink-0 text-right font-semibold text-slate-700">{fmtPct(row.pct)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyNote>{loading ? "Loading…" : "No booking-flow data in this period"}</EmptyNote>
+            )}
           </Card>
         </div>
       </ScaledCanvas>

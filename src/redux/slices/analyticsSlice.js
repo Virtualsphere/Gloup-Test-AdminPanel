@@ -35,7 +35,7 @@ export const fetchAnalyticsUninstalledV2 = createAsyncThunk(
   post("/admin/app/getAnalyticsUninstalledV2", "Failed to fetch uninstalled users")
 );
 
-// User Analytics V2. Overview also takes { city, platform }; retention takes
+// User Analytics Overview / 360°. Overview also takes { city, platform }; retention takes
 // { mode: "signup" | "first_booking", to, weeks }.
 export const fetchUserAnalyticsOverviewV2 = createAsyncThunk(
   "analytics/fetchUserOverviewV2",

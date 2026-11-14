@@ -165,7 +165,9 @@ export const Delta = ({ value, up, good = up, size = "text-[12px]", iconSize = 1
 // KPI card of the analytics pages: label, value + Delta and a comparison
 // caption, with an optional tinted icon badge on the left and an optional
 // sparkline underneath (or any `footer` node instead, e.g. a bar sparkline).
-// `sizes` = { label, value, delta, caption } classes.
+// `sizes` = { label, value, delta, caption } classes. `bodyClass` is added to
+// the icon + text row, e.g. to stack the icon above the text once wrapped;
+// `rowClass` to the value + Delta line, e.g. `flex-wrap` for narrow tiles.
 export const KpiTile = ({
   label,
   value,
@@ -185,10 +187,12 @@ export const KpiTile = ({
   sparkHeight = 40,
   footer,
   sizes,
+  bodyClass = "",
+  rowClass = "",
   className = "",
 }) => (
   <Card className={`p-4 ${className}`}>
-    <div className="flex min-w-0 items-center gap-3">
+    <div className={`flex min-w-0 items-center gap-3 ${bodyClass}`}>
       {Icon && (
         <span
           className={`grid shrink-0 place-items-center ${iconClass}`}
@@ -204,7 +208,7 @@ export const KpiTile = ({
 
       <div className="min-w-0 flex-1">
         <p className={`truncate font-medium text-slate-600 ${sizes.label}`}>{label}</p>
-        <div className="mt-0.5 flex min-w-0 items-baseline gap-2">
+        <div className={`mt-0.5 flex min-w-0 items-baseline gap-2 ${rowClass}`}>
           <span
             className={`whitespace-nowrap font-extrabold tracking-tight text-slate-900 ${sizes.value}`}
           >
